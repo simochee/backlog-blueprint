@@ -1,0 +1,98 @@
+# yaml-language-server: $schema=https://<host>/schema/0.1.0/project.json
+#
+# マニフェストの構造案。実装の前にこの形で合意を取るための叩き台。
+# 記述順がそのまま Backlog 上の表示順になる。
+
+key: PROJ_A
+name: プロジェクトA
+
+settings:
+  textFormattingRule: markdown
+  chartEnabled: true
+  useResolvedForChart: false
+  subtaskingEnabled: true
+  grandchildIssueEnabled: false
+  useWiki: true
+  useWikiTreeView: true
+  useFileSharing: true
+  useGit: true
+  useSubversion: false
+  useDevAttributes: true
+  projectLeaderCanEditProjectLeader: false
+
+# 初期状態の タスク/バグ/要望/その他 は、ここに書かれていなければ削除される。
+# 色は必ず引用符で囲む（引用符が無いと # 以降がコメント扱いになる）。
+issueTypes:
+  # 既定と同じ名前・色なら差分ゼロ = 0リクエスト
+  - name: タスク
+    color: "#7ea800"
+  - name: バグ
+    color: "#990000"
+    templateSummary: "【不具合】"
+    templateDescription: |
+      ## 再現手順
+      ## 期待する挙動
+      ## 実際の挙動
+  # oldname を書くと、既定の「その他」を削除して作り直すのではなく
+  # リネームで済ませる（2リクエスト → 1リクエスト）
+  - name: 調査
+    oldname: その他
+    color: "#2779ca"
+
+# 既定の4つ（未対応・処理中・処理済み・完了）は API で削除できないため、
+# ここに必ず書く。書かれていない場合は検証エラーで中断する（V-A6）。
+# 既定の4つに color は指定しない（変更できないため）。
+statuses:
+  - name: 未対応
+  - name: 処理中
+  - name: レビュー中
+    color: "#3b9dbd"
+  - name: 処理済み
+  - name: 完了
+
+categories:
+  - name: フロントエンド
+  - name: バックエンド
+  - name: インフラ
+
+milestones:
+  - name: v1.0.0
+    description: 初回リリース
+    startDate: 2026-10-01
+    releaseDueDate: 2026-12-31
+
+customFields:
+  - name: 影響範囲
+    type: singleList
+    required: true
+    applicableIssueTypes:
+      - バグ
+    items:
+      - 軽微
+      - 中
+      - 重大
+  - name: 見積工数
+    type: number
+    unit: 人日
+    min: 0
+
+# チームと個人は別キーにする。
+# teams は 1チーム = 1リクエストで済むため、人数が増えても適用時間が伸びない。
+# members には「どのチームにも属さない個人」だけを書く。
+# administrators に書いた人がまだ参加していなければ、自動で個人参加させる。
+access:
+  teams:
+    - 開発チーム
+    - QA
+  members:
+    - suzuki
+  administrators:
+    - yamada
+
+webhooks:
+  - name: Slack 通知
+    description: 課題の追加・更新を Slack に流す
+    hookUrl: ${SLACK_WEBHOOK_URL}
+    activityTypeIds:
+      - issueCreated
+      - issueUpdated
