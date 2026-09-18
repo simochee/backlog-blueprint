@@ -22,7 +22,7 @@
 | 項目 | 決定 | 理由 |
 | --- | --- | --- |
 | ファイル単位 | 1ファイル = 1プロジェクト | プロジェクト単位でレビュー・適用したい。ファイル名と対象が1対1で対応する |
-| バージョニング | `$schema` にバージョン入りの URL を書く | 詳細と選定理由は [manifest-versioning.md](../design/manifest-versioning.md) |
+| バージョニング | `$schema` にバージョン入りの URL を書く。実体は `https://simochee.github.io/backlog-blueprint/schema/<version>/project.json` | 詳細と選定理由は [manifest-versioning.md](../design/manifest-versioning.md) |
 | キー名 | Backlog API のフィールド名をそのまま使う（camelCase） | GitHub の設定 IaC が採る「API の命名をそのまま使う」原則に倣う。API リファレンスと Yaml とエラーメッセージが1対1で対応する |
 | 色の表記 | `"#ea2c00"` のように**必ず引用符で囲む** | `#` から始まる値は引用符が無いと YAML のコメントとして解釈される。先行事例で頻出する罠 |
 | 未知キー | **エラー**（strict parse） | 新しい Yaml を古い CLI に食わせたとき黙って無視されるのが最悪。タイプミスも同時に防げる |
@@ -45,7 +45,7 @@
 | `milestones` | マイルストーン（版） | Yaml に無いものは削除 |
 | `customFields` | カスタム属性 | Yaml に無いものは削除 |
 | `access` | `teams` / `members` / `administrators` の3キー（[詳細](#26-access-の仕様)） | Yaml に無いものは削除 |
-| `webhooks` | Webhook | Yaml に無いものは削除 |
+| `webhooks` | Webhook（[詳細](#27-webhooks-の仕様)） | Yaml に無いものは削除 |
 
 **すべてのリソースで「Yaml に書いていないものは削除」する。** 依頼者の選択による。
 宣言的であること（Yaml が現実の完全な写像であること）を優先し、
@@ -155,6 +155,35 @@ access:
 既定値（false）ではチーム経由の参加者も含まれるため、
 「Yaml の `members` に無いから削除」と判定するとチームの所属者を個人として削除しようとしてしまう。
 
+### 2.7 `webhooks` の仕様
+
+```yaml
+webhooks:
+  - name: Slack 通知
+    description: 課題の追加・更新を Slack に流す
+    hookUrl: ${SLACK_WEBHOOK_URL}
+    events:
+      - issueCreated      # 名前で書ける
+      - issueUpdated
+      - 50                # CLI が知らない新しいイベントは数値で書ける
+
+  - name: 監査ログ
+    hookUrl: ${AUDIT_URL}
+    events: all           # API の allEvent: true に対応する
+```
+
+| 決定 | 内容 | 理由 |
+| --- | --- | --- |
+| W-1 | `events` は**イベント名と数値 ID の両方**を受け付ける | 名前で読めることと、Backlog が新イベントを追加しても CLI を更新せず使えることを両立させる |
+| W-2 | `events: all` を API の `allEvent: true` に対応させる | 全イベント指定を明示的に書けるようにする |
+| W-3 | キー名を `activityTypeIds` ではなく `events` にする | 値が ID だけでなくなるため、`activityTypeIds` は実態と合わない。[G-3（API の命名をそのまま使う）](../design/syntax-reference-github.md#1-構造の取り方)から外れる唯一の箇所 |
+| W-4 | **未知の名前はエラー、未知の数値は警告** | 名前のタイプミスは確実に間違いなので止める。数値は前方互換のために通す |
+| W-5 | plan では数値に名前を添えて表示する | `events: 1 (Issue Created), 2 (Issue Updated)` |
+
+イベント名は [activityTypeId 一覧](../research/backlog-api-constraints.md#activitytypeid-の一覧)の
+英語名を camelCase にしたもの（`Issue Created` → `issueCreated`）。
+JSON Schema に名前の enum と各値の説明を持たせ、エディタ補完で意味が出るようにする。
+
 ## 3. 機能要件
 
 ### FR-1 マニフェストの読み込み
@@ -164,7 +193,7 @@ access:
 | FR-1.1 | Yaml をパースし、スキーマに従って型検証する |
 | FR-1.2 | 未知のキーが存在したらエラーにする |
 | FR-1.3 | `${NAME}` を環境変数から展開する。未定義ならエラー |
-| FR-1.4 | JSON Schema を成果物として配布し、エディタ補完が効くようにする |
+| FR-1.4 | JSON Schema を GitHub Pages に配布し、エディタ補完が効くようにする |
 
 ### FR-2 検証
 
@@ -218,7 +247,7 @@ FR-5.4 は「既存プロジェクトならプロジェクト管理者でよい�
 
 | ID | 要件 |
 | --- | --- |
-| FR-6.1 | `npx` で実行できる |
+| FR-6.1 | `npx @simochee/backlog-blueprint` で実行できる |
 | FR-6.2 | `plan` / `apply` のサブコマンドを持つ |
 | FR-6.3 | 終了コードで結果を区別する |
 
@@ -257,6 +286,7 @@ Yaml を GUI フォームから生成する機能、既存プロジェクトか�
 | NFR-6 | 検証・計画のロジックは CLI と Web UI で同一のコードを使う | 「CLI では通るが Web では落ちる」を構造的に作らない |
 | NFR-7 | **マニフェストを置いたリポジトリへの push 権限が、実質的にスペース管理者権限になる**ことを README で警告する | 実装では防げない。CI に置く API キーはスペース管理者のものなので、そのリポジトリに push できる人は任意のプロジェクト設定を書き換えられる。[先行事例](../design/syntax-reference-github.md#33-設定リポジトリへの-push-権限が管理者権限になる)でも同じ警告が出ている |
 | NFR-8 | リソース種別ごとに独立した reconciler（現状取得 → 差分算出 → 適用）として実装する | リソース追加が「ファイルを1つ足して適用順序に並べる」だけで済む。plan と apply が同じ `Action[]` を扱うので「plan に出ないのに apply で起きる」が構造的に消える |
+| NFR-9 | CLI / Web UI / JSON Schema のメッセージは**英語のみ**とする | OSS として公開する前提。Backlog 自体が多言語展開しており、利用者層を日本語圏に狭めない。i18n の仕組みは入れない |
 
 ## 5. 検証仕様
 
@@ -315,19 +345,24 @@ V-B8 を警告に留めるのは、待てば解消するため。中断する理
 
 ### 5.3 エラー出力の形
 
+メッセージは英語（NFR-9）。
+
 ```
-$ blueprint apply -f projects/PROJ_A.yaml
+$ npx @simochee/backlog-blueprint apply -f projects/PROJ_A.yaml
 
-検証エラーが 2 件あります。何も適用していません。
+2 validation errors. Nothing has been applied.
 
-ERROR [V-A6] statuses: 既定ステータスは削除できません
-  定義に含まれていない既定ステータス: 処理済み
-  → statuses に「処理済み」を追加してください
+ERROR [V-A6] statuses: default statuses cannot be deleted
+  missing default status: 処理済み
+  → add "処理済み" to statuses, or rename it with oldname
 
-ERROR [V-B3] key: このプロジェクトには既に課題が存在します
-  PROJ_A: 課題 43 件
-  → 課題が0件のプロジェクトのみ対象にできます
+ERROR [V-B3] key: project already has issues
+  PROJ_A: 43 issues
+  → only projects with zero issues can be targeted
 ```
+
+ステータス名や課題種別名など、**利用者が Backlog 上で付けた名前はそのまま表示する**。
+翻訳の対象はツールが発するメッセージだけ。
 
 ## 6. 適用順序
 
@@ -370,6 +405,32 @@ packages/
 Go CLI + TypeScript Web という案は、検証ロジックを2回実装することになり
 「CLI では通るが Web では落ちる」が構造的に発生しうるため採らない。
 
+`core/resources/` はリソース種別ごとに1ファイルとし、それぞれが
+「現状取得 → 差分算出 → 適用」を実装する（NFR-8）。
+
+### 7.1 配布
+
+| 対象 | 配布先 |
+| --- | --- |
+| CLI | npm `@simochee/backlog-blueprint`。実行ファイル名は `backlog-blueprint` |
+| Web UI | GitHub Pages `https://simochee.github.io/backlog-blueprint/` |
+| JSON Schema | GitHub Pages `https://simochee.github.io/backlog-blueprint/schema/<version>/project.json` |
+
+```
+https://simochee.github.io/backlog-blueprint/
+├── index.html                      Web UI
+└── schema/
+    ├── 0.1.0/project.json
+    └── 0.2.0/project.json          過去バージョンは消さない
+```
+
+`$schema` の URL に含まれるバージョンは npm パッケージの semver と一致させる
+（[バージョニング方針 D-2](../design/manifest-versioning.md#3-本プロジェクトの決定)）。
+
+**リリース時に npm publish と Pages デプロイを必ず同時に行う。**
+スキーマだけデプロイし忘れると、利用者のエディタで `$schema` が 404 になり
+補完が黙って効かなくなる。CI で同一ジョブにまとめ、片方だけ成功する状態を作らない。
+
 ## 8. 受け入れ基準
 
 | ID | シナリオ |
@@ -385,16 +446,18 @@ Go CLI + TypeScript Web という案は、検証ロジックを2回実装する�
 | AC-9 | `${SLACK_WEBHOOK_URL}` を含むマニフェストで、環境変数が未定義なら V-A4 のエラーになる |
 | AC-10 | plan / apply の出力とログのどこにも API キーが現れない |
 
-## 9. 未決事項
+## 9. 残る未検証事項
 
-| # | 論点 | 備考 |
+決定待ちの論点は解消済み。残るのは**実スペースで叩かないと分からない API の挙動**だけ。
+実装着手前に確認し、判明した内容をここと [API 制約](../research/backlog-api-constraints.md)に反映する。
+
+| # | 確認すること | 判明したら見直す箇所 |
 | --- | --- | --- |
-| 1 | npm パッケージ名、CLI コマンド名 | 本文では仮に `blueprint` と表記 |
-| 2 | JSON Schema の配布 URL とホスティング先 | Web UI と同じ静的ホストに置くのが自然 |
-| 3 | Web UI のホスティング先 | GitHub Pages / Cloudflare Pages など |
-| 4 | メッセージの言語（日本語のみ / i18n） | Backlog 自体が多言語なので将来 i18n の可能性 |
-| 5 | Webhook の通知対象イベントの指定方法 | 数値 ID をそのまま書かせるか、名前で書かせるか |
-| 6 | 既定ステータスのリネーム可否 | 判明次第、セクション6と V-A6 を見直す |
-| 7 | プロジェクト管理者の付与に個人参加が前提か | 前提なら A-3 の自動参加は必須。不要でも順序を変える必要はない |
-| 8 | 既定の課題種別4つの正確な色 | L-2（既定と一致させて0リクエスト）を雛形で実践するために必要 |
-| 9 | 削除除外（`exclude`）と継承（`_extends`）を将来入れるか | どちらも[先行事例](../design/syntax-reference-github.md#2-借りるべき仕組み)に前例がある。初期スコープ外 |
+| 1 | 既定ステータス（未対応 / 処理中 / 処理済み / 完了）をリネーム・色変更できるか | リネーム可なら V-A6 を「`oldname` で参照していれば可」に緩和し、適用フェーズ3を見直す |
+| 2 | プロジェクト管理者の付与に、対象が事前にプロジェクト参加者である必要があるか | 必要なら `access` の A-3（自動参加）が必須要件になる |
+| 3 | 既定の課題種別4つ（タスク / バグ / 要望 / その他）の正確な色 | 雛形で L-2（既定と一致させて0リクエスト）を実践するために要る |
+| 4 | CORS プリフライトの実挙動と、ブラウザから API キーを渡す方法 | 成立しなければ Web UI（FR-7）の前提が崩れる |
+| 5 | `roleType` の数値と役割の対応 | V-B2（スペース管理者判定）の実装に直結する |
+| 6 | カテゴリー・マイルストーンの表示順が何で決まるか | §2.4 の表を確定させる |
+
+1 と 4 は結論次第で仕様が変わる。**4 は Web UI の成立条件**なので最優先で確認する。

@@ -1,7 +1,8 @@
-# yaml-language-server: $schema=https://<host>/schema/0.1.0/project.json
+# yaml-language-server: $schema=https://simochee.github.io/backlog-blueprint/schema/0.1.0/project.json
 #
 # マニフェストの構造案。実装の前にこの形で合意を取るための叩き台。
-# 記述順がそのまま Backlog 上の表示順になる。
+# ここでの注釈は設計意図の説明なので日本語。実際に配布する雛形と
+# ツールのメッセージは英語（NFR-9）。
 
 key: PROJ_A
 name: プロジェクトA
@@ -89,10 +90,17 @@ access:
   administrators:
     - yamada
 
+# events はイベント名でも数値 ID でも書ける。
+# 名前は CLI が数値に解決する。CLI が知らない新しいイベントは数値で書く。
 webhooks:
   - name: Slack 通知
     description: 課題の追加・更新を Slack に流す
     hookUrl: ${SLACK_WEBHOOK_URL}
-    activityTypeIds:
+    events:
       - issueCreated
       - issueUpdated
+      - issueCommented
+
+  - name: 監査ログ
+    hookUrl: ${AUDIT_URL}
+    events: all

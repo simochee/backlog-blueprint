@@ -167,6 +167,49 @@ plan の段階で所要時間を見積もって提示し、apply 中は進捗を
 | プロジェクトへの個人追加 | 1人1リクエスト |
 | プロジェクト管理者の付与 | 1人1リクエスト |
 
+## Webhook
+
+| 項目 | 内容 |
+| --- | --- |
+| 追加 | `POST /projects/:key/webhooks`。Administrator / Project Administrator |
+| パラメータ | `name` `description` `hookUrl` `allEvent`(Boolean) `activityTypeIds[]`(Number 複数) |
+| `allEvent` | true にすると全イベントを通知する。個別指定が不要になる |
+
+### activityTypeId の一覧
+
+| ID | イベント | ID | イベント |
+| --- | --- | --- | --- |
+| 1 | Issue Created | 25 | Project Group Added |
+| 2 | Issue Updated | 26 | Project Group Deleted |
+| 3 | Issue Commented | 36 | Document Created |
+| 4 | Issue Deleted | 37 | Document Deleted |
+| 5 | Wiki Created | 38 | Document Title Updated |
+| 6 | Wiki Updated | 39 | Document Revision Updated |
+| 7 | Wiki Deleted | 40 | Document Commented |
+| 8 | File Added | 41 | Document Comment Updated |
+| 9 | File Updated | 42 | Document Comment Deleted |
+| 10 | File Deleted | 43 | Document Comment Reply Created |
+| 11 | SVN Committed | 44 | Document Comment Reply Updated |
+| 12 | Git Pushed | 45 | Document Comment Reply Deleted |
+| 13 | Git Repository Created | 46 | Document Attachment Added |
+| 14 | Issue Multi Updated | 48 | Document Multi Created |
+| 15 | Project User Added | 49 | Document Mentioned |
+| 16 | Project User Deleted | | |
+| 17 | Comment Notification Added | | |
+| 18 | Pull Request Added | | |
+| 19 | Pull Request Updated | | |
+| 20 | Comment Added on Pull Request | | |
+| 21 | Pull Request Deleted | | |
+| 22 | Milestone Created | | |
+| 23 | Milestone Updated | | |
+| 24 | Milestone Deleted | | |
+
+出典: [Get Recent Updates](https://developer.nulab.com/docs/backlog/api/2/get-recent-updates/)
+
+**27〜35 と 47 は欠番。** Document 関連が 36 番以降に後から追加されており、
+今後もイベントが増える。番号が連番でも網羅的でもないことが、
+マニフェストで名前も書けるようにする理由になっている。
+
 ## その他の関連 API
 
 | 用途 | エンドポイント |
