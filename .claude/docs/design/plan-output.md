@@ -12,26 +12,36 @@
 
 記号ベース（Terraform 風）を採る。
 
+以下は**本文書を通して使う例**。存在しない `PROJ_A` に対し、
+課題種別に タスク（既定のまま）/ バグ（テンプレート追加）/ 調査（`oldname: その他`）を、
+ステータスに既定4つ + レビュー中を、`access` に 開発チーム と suzuki を、
+Webhook に Slack 通知を宣言したマニフェストを適用する。
+
 ```
 Blueprint: PROJ_A (example.backlog.com)
 Project does not exist and will be created.
 
-  + project      PROJ_A "プロジェクトA"
-  = issueType    "タスク"
-  ~ issueType    "バグ"
+  + project        PROJ_A "プロジェクトA"
+  ↻ refresh        reading back default issue types and statuses
+  ~ issueType      "バグ"
       templateSummary: (none) -> "【不具合】"
-  + issueType    "調査"        rename of "その他"
-  - issueType    "要望"        issues move to "タスク"
-  + status       "レビュー中"   color "#3b9dbd"
-  ~ statusOrder  未対応, 処理中, レビュー中, 処理済み, 完了
-  + webhook      "Slack 通知"  hookUrl ***
+  ~ issueType      "調査"         renamed from "その他"
+  - issueType      "要望"         issues move to "タスク"
+  + status         "レビュー中"    color "#3b9dbd"
+  ~ statusOrder    未対応, 処理中, レビュー中, 処理済み, 完了
+  + projectTeam    "開発チーム"
+  + projectMember  "suzuki"
+  + webhook        "Slack 通知"   hookUrl ***
 
 Warnings:
-  ! [V-A15] categories: resulting order differs from manifest
+  ! [V-A16] access.members: "suzuki" already belongs to team "開発チーム"
 
-Plan: 4 to add, 2 to change, 1 to destroy, 9 unchanged.
-Write requests: 8 (estimated 8s)
+Plan: 5 to add, 3 to change, 1 to destroy, 5 unchanged.
+Write requests: 9 (estimated 9s)
 ```
+
+一致している5件（タスクと既定ステータス4つ）は既定では表示されない（§1.2）。
+`↻ refresh` は GET なので更新系の件数には入らない。
 
 | 記号 | `op` | 意味 |
 | --- | --- | --- |
@@ -41,6 +51,17 @@ Write requests: 8 (estimated 8s)
 | `=` | `noop` | 一致しているので何もしない |
 | `↻` | `refresh` | 作成直後の既定リソースを読み直す（GET のみ） |
 | `!` | — | 警告 |
+
+### PO-1: `oldname` によるリネームは `+` ではなく `~` で表す
+
+`oldname` の対象が存在すれば、`Action` は `create` ではなく `update` になる
+（[差分算出規則](core-reconciler.md#62-oldname-の解釈)）。
+利用者から見れば「新しい課題種別が増える」ので `+` と書きたくなるが、それは採らない。
+
+要件定義 L-6 の効果は「削除＋作成の2リクエストが更新1リクエストになる」ことにある。
+`+` と描くと、`-` が見当たらないのにリクエスト数が1しか増えない理由を説明できず、
+**`oldname` を書いた甲斐が plan の上で見えなくなる**。
+`~ ... renamed from "その他"` なら、1リクエストで済んでいることが読める。
 
 **採らなかった案。**
 
@@ -81,6 +102,7 @@ Write requests: 8 (estimated 8s)
 | to add / to change / to destroy | `create` / `update` + `reorder` / `delete` の件数 |
 | unchanged | `noop` の件数 |
 | Write requests | `writeRequest: true` の Action 数。`refresh` と `noop` は含まない |
+| 進捗の分母（apply） | **実行される Action 数**。`noop` を除き、`refresh` を含む。上の例では 10 |
 | estimated | Write requests × 1秒（X-1）。切り上げ。60 秒以上は `2m 30s` 形式 |
 
 **差分なし**（終了コード 0）の定義は「`writeRequest: true` の Action が 0 件」。
@@ -99,6 +121,9 @@ No changes. The project already matches the manifest.
 表示順を制御できないリソース（課題種別・カテゴリー・マイルストーン・カスタム属性）は、
 **適用後に実際どう並ぶか**を示す（要件定義 §2.4）。
 記述順と一致するなら黙り、ずれるときだけ警告（V-A15）と一緒に出す。
+
+以下は通し例とは**別のシナリオ**。既にカテゴリー「インフラ」がある課題0件のプロジェクトに、
+フロントエンド / バックエンド / インフラ の順で宣言した場合。
 
 ```
 Warnings:
@@ -124,18 +149,18 @@ Warnings:
   "project": { "key": "PROJ_A", "name": "プロジェクトA", "exists": false },
   "summary": {
     "hasChanges": true,
-    "create": 4, "update": 2, "delete": 1, "reorder": 1, "noop": 9,
-    "writeRequests": 8,
-    "estimatedSeconds": 8
+    "create": 5, "update": 2, "delete": 1, "reorder": 1, "noop": 5,
+    "writeRequests": 9,
+    "estimatedSeconds": 9
   },
   "diagnostics": [
     {
-      "id": "V-A15",
+      "id": "V-A16",
       "severity": "warning",
       "stage": "plan",
-      "path": "categories",
-      "message": "resulting order differs from manifest",
-      "hint": "New items are always appended after existing ones; there is no reorder API."
+      "path": "access/members/0",
+      "message": "\"suzuki\" already belongs to team \"開発チーム\"",
+      "hint": "Remove it from access.members to save one write request."
     }
   ],
   "actions": [
@@ -147,7 +172,7 @@ Warnings:
       "name": "調査",
       "writeRequest": true,
       "target": { "$ref": { "kind": "issueType", "name": "その他" } },
-      "notes": [{ "type": "rename", "from": "その他" }],
+      "notes": [{ "type": "renamed", "from": "その他" }],
       "changes": [
         { "field": "name",  "before": "その他",   "after": "調査" },
         { "field": "color", "before": "#2779ca", "after": "#2779ca" }
@@ -162,9 +187,9 @@ Warnings:
   "resultingOrder": {
     "issueTypes": ["タスク", "バグ", "調査"],
     "statuses": ["未対応", "処理中", "レビュー中", "処理済み", "完了"],
-    "categories": ["インフラ", "フロントエンド", "バックエンド"],
-    "milestones": ["v1.0.0"],
-    "customFields": ["影響範囲", "見積工数"]
+    "categories": [],
+    "milestones": [],
+    "customFields": []
   }
 }
 ```
@@ -173,14 +198,14 @@ Warnings:
 
 | ID | 決定 | 理由 |
 | --- | --- | --- |
-| J-1 | `noop` の Action も**必ず含める** | 人間向けとは逆。消費側が「一致している」と「マニフェストに無い」を区別できる必要がある。`--show-unchanged` は人間向け出力にのみ効く |
-| J-2 | `request`（実際に飛ぶ HTTP リクエスト）を含める | 「何が起きるか」の最も正確な表現。PR コメントに貼るだけでなく、監査・不具合報告にそのまま使える |
-| J-3 | `Secret` は `"***"` にシリアライズされる | `Secret.toJSON()` がマスクを返すので、`request.params` に載っていても漏れない（NFR-3 / AC-10） |
-| J-4 | 未解決の `Ref` はそのまま `{"$ref":{...}}` として出す | 適用前に ID が存在しないという事実を、偽の値で埋めずに表現する |
-| J-5 | `formatVersion` は整数。**破壊的変更のときだけ**上げる | キーの追加は上げない。消費側は未知のキーを無視する前提で書けばよい |
-| J-6 | stdout には JSON **だけ**を書く | `| jq` が素通しで動く。進捗・警告・ログは stderr（[CLI 仕様](cli-and-web-ui.md#13-標準出力と標準エラー出力)） |
+| PO-2 | `noop` の Action も**必ず含める** | 人間向けとは逆。消費側が「一致している」と「マニフェストに無い」を区別できる必要がある。`--show-unchanged` は人間向け出力にのみ効く |
+| PO-3 | `request`（実際に飛ぶ HTTP リクエスト）を含める | 「何が起きるか」の最も正確な表現。PR コメントに貼るだけでなく、監査・不具合報告にそのまま使える |
+| PO-4 | `Secret` は `"***"` にシリアライズされる | `Secret.toJSON()` がマスクを返すので、`request.params` に載っていても漏れない（NFR-3 / AC-10） |
+| PO-5 | 未解決の `Ref` はそのまま `{"$ref":{...}}` として出す | 適用前に ID が存在しないという事実を、偽の値で埋めずに表現する |
+| PO-6 | `formatVersion` は整数。**破壊的変更のときだけ**上げる | キーの追加は上げない。消費側は未知のキーを無視する前提で書けばよい |
+| PO-7 | stdout には JSON **だけ**を書く | `\| jq` が素通しで動く。進捗・警告・ログは stderr（[CLI 仕様](cli-and-web-ui.md#13-標準出力と標準エラー出力)） |
 
-J-2 は「実装の詳細を晒す」という見方もできるが、本ツールの `plan` の約束は
+PO-3 は「実装の詳細を晒す」という見方もできるが、本ツールの `plan` の約束は
 「apply で何が起きるか」であり、飛ぶリクエストこそがその答えである。
 中断レポート（FR-4.4）で失敗したリクエストを示すときも同じ構造を使える。
 
@@ -200,25 +225,26 @@ JSON 出力は「壊れない限りバージョンを上げない」ほうが消
 Blueprint: PROJ_A (example.backlog.com)
 ...（plan と同じ本体）...
 
-Plan: 4 to add, 2 to change, 1 to destroy, 9 unchanged.
-Write requests: 8 (estimated 8s)
+Plan: 5 to add, 3 to change, 1 to destroy, 5 unchanged.
+Write requests: 9 (estimated 9s)
 
 Do you want to apply these changes?
   Only "yes" will be accepted to confirm.
 
   Enter a value: yes
 
-[1/8] + project      PROJ_A ... done
-[2/8] ↻ refresh      reading back default issue types ... done
-[3/8] ~ issueType    "調査" ... done
+[ 1/10] + project        PROJ_A ... done
+[ 2/10] ↻ refresh        reading back default issue types and statuses ... done
+[ 3/10] ~ issueType      "バグ" ... done
+[ 4/10] ~ issueType      "調査" ... done
 ...
-Apply complete. 4 added, 2 changed, 1 destroyed.
+Apply complete. 5 added, 3 changed, 1 destroyed.
 ```
 
 ### 3.2 中断時（FR-4.4）
 
 ```
-[5/8] - issueType    "要望" ... failed
+[ 5/10] - issueType      "要望" ... failed
 
 ERROR  DELETE /api/v2/projects/PROJ_A/issueTypes/1234
   400  deletedTargetIssueTypeId and substituteIssueTypeId are the same.
@@ -226,16 +252,18 @@ ERROR  DELETE /api/v2/projects/PROJ_A/issueTypes/1234
 Apply aborted. Nothing has been rolled back.
 
 Applied (4):
-  + project      PROJ_A
+  + project        PROJ_A
   ↻ refresh
-  ~ issueType    "調査"
-  + status       "レビュー中"
+  ~ issueType      "バグ"
+  ~ issueType      "調査"
 Failed (1):
-  - issueType    "要望"
-Not applied (3):
-  ~ statusOrder  未対応, 処理中, レビュー中, 処理済み, 完了
-  + webhook      "Slack 通知"
-  ...
+  - issueType      "要望"
+Not applied (5):
+  + status         "レビュー中"
+  ~ statusOrder    未対応, 処理中, レビュー中, 処理済み, 完了
+  + projectTeam    "開発チーム"
+  + projectMember  "suzuki"
+  + webhook        "Slack 通知"
 
 Re-run apply with the same manifest to continue. Already applied changes become no-ops.
 ```
@@ -254,14 +282,14 @@ plan の構造に `result` と実行結果を足したもの。
   "formatVersion": 1,
   "result": "aborted",
   "summary": { "...": "plan と同じ" },
-  "applied": ["project/create/PROJ_A", "project/refresh", "issueTypes/update/調査"],
+  "applied": ["project/create/PROJ_A", "project/refresh", "issueTypes/update/バグ", "issueTypes/update/調査"],
   "failed": {
     "id": "issueTypes/delete/要望",
     "request": { "method": "DELETE", "path": "/api/v2/projects/PROJ_A/issueTypes/1234" },
     "status": 400,
     "errors": [{ "message": "deletedTargetIssueTypeId and substituteIssueTypeId are the same." }]
   },
-  "pending": ["statuses/reorder", "webhooks/create/Slack 通知"],
+  "pending": ["statuses/create/レビュー中", "statuses/reorder", "projectTeams/create/開発チーム", "projectMembers/create/suzuki", "webhooks/create/Slack 通知"],
   "actions": ["...", "plan と同じ配列"]
 }
 ```
@@ -278,9 +306,10 @@ plan の構造に `result` と実行結果を足したもの。
 
 | ID | 決定 | 採らなかった案と理由 |
 | --- | --- | --- |
-| — | 記号ベースの人間向け出力 | 表形式（長い値と日本語幅で崩れる）/ セクション別（行数が増え、更新系の件数が読みにくい） |
-| — | `noop` は人間向けでは隠し、集計に出す | 常に表示。推奨形の雛形ほど一致行が支配的になり、起きることが埋もれる |
-| J-1 | JSON には `noop` も含める | 人間向けと同じ扱い。消費側が「一致」と「未記述」を区別できない |
-| J-2 | JSON に HTTP リクエストを含める | 含めない。plan の約束（何が起きるか）を最も正確に表す情報を落とすことになる |
-| J-5 | `formatVersion` は破壊的変更時のみ | CLI の semver に追随。消費側がバージョン対応表を持つ羽目になる |
-| — | apply の JSON は最終結果1つ | JSON Lines で逐次。消費者は CI であり、途中経過を求めていない |
+| PO-1 | `oldname` のリネームは `~` | `+`。リクエストが1しか増えない理由を説明できず、`oldname` を書いた効果が plan で見えない |
+| PO-8 | 記号ベースの人間向け出力 | 表形式（長い値と日本語幅で崩れる）/ セクション別（行数が増え、更新系の件数が読みにくい） |
+| PO-9 | `noop` は人間向けでは隠し、集計に出す | 常に表示。推奨形の雛形ほど一致行が支配的になり、起きることが埋もれる |
+| PO-2 | JSON には `noop` も含める | 人間向けと同じ扱い。消費側が「一致」と「未記述」を区別できない |
+| PO-3 | JSON に HTTP リクエストを含める | 含めない。plan の約束（何が起きるか）を最も正確に表す情報を落とすことになる |
+| PO-6 | `formatVersion` は破壊的変更時のみ | CLI の semver に追随。消費側がバージョン対応表を持つ羽目になる |
+| PO-10 | apply の JSON は最終結果1つ | JSON Lines で逐次。消費者は CI であり、途中経過を求めていない |

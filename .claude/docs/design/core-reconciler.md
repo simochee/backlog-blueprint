@@ -77,6 +77,8 @@ type ResourceKind =
   | 'webhook'
 
 type Op = 'create' | 'update' | 'delete' | 'reorder' | 'refresh' | 'noop'
+
+type Phase = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8   // 要件定義 §6 の適用順序
 ```
 
 `access` は3つの `ResourceKind` に分解する（`projectTeam` / `projectMember` / `projectAdministrator`）。
@@ -227,14 +229,14 @@ V-C1 のメッセージは利用者に直せるものではなく、バグ報告
 > 「管理者から外す」操作の差分を出せないため、実測で確認する。
 > 存在しない場合、管理者の削除は表現できず、`administrators` は追加専用になる。
 
-### 4.2 R-1: フェーズ1直後の再取得
+### 4.2 RF-1: フェーズ1直後の再取得
 
 新規プロジェクトでは、既定の課題種別4件の ID が `POST /projects` の成功後にしか分からない。
 そこで**プロジェクト作成の直後に1回だけ GET し直す**。
 
 | 決定 | 内容 |
 | --- | --- |
-| R-1 | プロジェクトが存在しない場合に限り、`project/create` の直後に `op: 'refresh'` の Action を1件挿入する。`/projects/:key/issueTypes` と `/projects/:key/statuses` を取得し、解決表に流し込む |
+| RF-1 | プロジェクトが存在しない場合に限り、`project/create` の直後に `op: 'refresh'` の Action を1件挿入する。`/projects/:key/issueTypes` と `/projects/:key/statuses` を取得し、解決表に流し込む |
 
 `refresh` は GET なので `writeRequest: false`。所要時間の見積もりにも、
 更新系のレート制限の消費にも数えない。
@@ -322,6 +324,75 @@ interface Reconciler<Desired, Snapshot> {
 
 Executor は `writeRequest: false` の Action を実行せず読み飛ばす。
 
+### 6.2 `oldname` の解釈
+
+要件定義 O-1〜O-3 を Action に落とすと、判定は3分岐になる。
+
+| スナップショットの状態 | 生成する Action |
+| --- | --- |
+| `name` と同名のリソースが存在する | 差分があれば `update`、無ければ `noop`。`oldname` は無視する |
+| `name` は無いが `oldname` と同名が存在する | `update`（改名 + 他フィールドの更新を1リクエストに乗せる） |
+| どちらも存在しない | `create` |
+
+1行目で `oldname` を無視するのが冪等性（NFR-4 / O-3）の要。
+1回目の適用で改名が済むと2回目は `name` 側に当たるので、`oldname` の対象が
+消えていてもエラーにならず、`noop` に落ちる。
+
+2行目が `create` ではなく `update` になることは plan の描画にも効く
+（[PO-1](plan-output.md#po-1-oldname-によるリネームは--ではなく--で表す)）。
+
+`oldname` が複数の要素から同じリソースを指す場合は V-A17 が静的に弾く。
+
+### 6.3 `access` の差分算出
+
+フェーズ7だけリソースが3種（`projectTeam` / `projectMember` / `projectAdministrator`）に
+分かれ、取得方法にも罠があるので個別に定める。
+
+| 対象 | あるべき集合 | 現状 | 生成する Action |
+| --- | --- | --- | --- |
+| チーム | `access.teams` | `GET /projects/:key/teams` | 差集合で `create` / `delete` |
+| 個人参加 | `access.members` ∪（`access.administrators` のうち未参加の人） | `GET /projects/:key/users?excludeGroupMembers=true` | 同上 |
+| 管理者 | `access.administrators` | `GET /projects/:key/administrators` | 同上 |
+
+**現状の取得で `excludeGroupMembers=true` を外すと壊れる。**
+既定（false）ではチーム経由の参加者も返るため、差集合を取ると
+チームの所属者を個人として削除する Action を生んでしまう（要件定義 §2.6）。
+
+#### L-4 と A-4 の関係
+
+要件定義 L-4（冗長な記述をツール側で畳む）は、`access` について2つのことを言っているが、
+**ツールの挙動としては別物**なので設計上は分けて扱う。
+
+| L-4 の項目 | 設計上の扱い |
+| --- | --- |
+| チーム経由で参加済みの人を `members` に書かせない | **畳まない。** 書かれたら個人参加の Action を出す。V-A16 で警告するだけ（A-4 が明示） |
+| `administrators` の自動参加も重複を打たない | **畳む。** 既に個人参加している人には参加 Action を出さない |
+
+前者を黙って畳むと、`members` に書いたのに個人参加として登録されない、という
+マニフェストと現実の食い違いが生まれる。A-4 が「書いても動く」と決めているのはそのため。
+L-4 が言う「書かせない」は、ツールが無視するという意味ではなく、警告で誘導するという意味。
+
+> `要検証` — `administrators` の人がチーム経由でのみ参加している場合に、
+> プロジェクト管理者を付与できるかは未確認。
+> [API 制約](../research/backlog-api-constraints.md#プロジェクトメンバーチーム) が確認したのは
+> 「未参加のユーザーには付与できない」ことだけである。
+> 確認できるまでは安全側に倒し、**個人参加していない管理者には必ず個人参加の Action を出す**。
+> チーム経由で足りるなら、これは1リクエストの無駄で済む。
+
+### 6.4 `webhooks` の差分算出
+
+| 項目 | 規則 |
+| --- | --- |
+| `events` の比較 | 名前をすべて数値に解決してから、**順序を無視した集合として**比較する。同じイベントを名前と数値で書いても差分にならない |
+| `events: all` | `allEvent: true` として比較する。全イベントを列挙した指定とは**別物**として扱う（API 上の表現が違い、将来イベントが増えたときの挙動も違う） |
+| `hookUrl` | 差分判定は `Secret.reveal()` の実値で行い、表示だけマスクする |
+
+### 6.5 `settings` の差分算出
+
+マニフェストに**書かれたキーだけ**を比較する（[K-3](manifest-schema.md#k-3-省略されたキーは現状維持)）。
+1つでも差があれば `PATCH /projects/:key` を1件出す。
+`settings` は1リクエストに全項目が乗る（L-3）ので、差分の数に関わらず Action は常に0件か1件。
+
 ## 7. Executor
 
 ```ts
@@ -375,6 +446,6 @@ state ファイルを持たない（要求設計 §6 非スコープ）ので、
 | C-2 | `plan()` は純粋関数 | plan の中で GET する。FR-3.1 が実装の注意事項になり、テストに実 API が要る |
 | C-3 | 全順序リスト。DAG なし | 依存グラフ + トポロジカルソート。直列実行なので利得がゼロで、要件定義 §6 の表とコードの対応が失われる |
 | C-4 | 進捗は `AsyncIterable` | core にロガー／コールバックを渡す。CLI と Web の表現差が core に漏れる |
-| R-1 | 再取得点は `op: refresh` の1箇所 | 既定リソースの ID を推測する。ステータスだけ推測できる非対称を説明できない |
+| RF-1 | 再取得点は `op: refresh` の1箇所 | 既定リソースの ID を推測する。ステータスだけ推測できる非対称を説明できない |
 | X-3 | レート制限は常に本文 API | Node ではヘッダを読む。Web でだけ起きる不具合ができる |
 | — | `Secret` クラスでマスク | 出力時にキー名でマスク。対象の追加漏れがそのまま漏洩になる |
