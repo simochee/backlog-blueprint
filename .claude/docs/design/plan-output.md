@@ -266,11 +266,17 @@ Not applied (5):
   + webhook        "Slack 通知"
 
 Re-run apply with the same manifest to continue. Already applied changes become no-ops.
+The project must still have zero issues at that point.
 ```
 
-最後の1行が要点。state ファイルを持たない設計（非スコープ）なので、
+最後の2行が要点。state ファイルを持たない設計（非スコープ）なので、
 **中断からの再開手段は「同じマニフェストでもう一度 apply する」以外に無い**。
 冪等（NFR-4）だからそれで足りることを、中断した本人に必ず伝える。
+
+ただし無条件ではない。再実行までの間に誰かが課題を1件でも作ると V-B3 で止まり、
+**そのプロジェクトは二度とツールで触れなくなる**
+（[適用対象の限定 §7.3](validation-pipeline.md#73-中断後の再開は保証されない)）。
+「続きから進む」とだけ書いて、その条件を書かないのは嘘になる。
 
 ### 3.3 JSON
 
