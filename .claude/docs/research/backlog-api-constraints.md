@@ -264,6 +264,22 @@ plan の段階で所要時間を見積もって提示し、apply 中は進捗を
 今後もイベントが増える。番号が連番でも網羅的でもないことが、
 マニフェストで名前も書けるようにする理由になっている。
 
+## Git リポジトリ
+
+| 操作 | 可否 |
+| --- | --- |
+| 一覧取得 `GET /projects/:key/git/repositories` | できる |
+| 個別取得 `GET /projects/:key/git/repositories/:repo` | できる |
+| プルリクエストの作成・更新・コメント | できる |
+| **リポジトリの作成・更新・削除** | **エンドポイントが存在しない**（実測・ドキュメントとも） |
+
+1プロジェクトに複数のリポジトリを持てることは実測で確認した。
+返却されるのは `id` `name` `description` `httpUrl` `sshUrl` `hookUrl` `displayOrder`
+`pushedAt` `created` `updated` `createdUser` `updatedUser`。
+
+**Git 機能はスペース／プラン単位で無効化され得る（実測）。**
+無効なスペースでは参照系も `msg.featureRestrictedError.title.git`（code 5）を返す。
+
 ## その他の関連 API
 
 | 用途 | エンドポイント |
