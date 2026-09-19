@@ -83,6 +83,24 @@ const applyOptions = (options: RawOptions, io: Io): ApplyOptions => ({
   autoApprove: options["autoApprove"] === true,
 });
 
+/**
+ * コマンドの外に例外を出さない。commander の `parseAsync` まで抜けた例外は
+ * commander のものと区別が付かず、握りつぶすと原因を出さないまま 1 で終わる。
+ */
+const runCommand = async <T extends CommonOptions>(
+  options: T,
+  deps: Deps,
+  run: (options: T, deps: Deps) => Promise<number>,
+): Promise<number> => {
+  try {
+    return await run(options, deps);
+  } catch (error) {
+    deps.io.err(deps.output.failure(error, { color: options.color.stderr }));
+
+    return EXIT_ERROR;
+  }
+};
+
 const isHandled = (error: unknown): boolean => {
   const { code } = error as { code?: unknown };
 
@@ -111,19 +129,19 @@ export const runCli = async (argv: string[], deps: Deps): Promise<number> => {
   withCommonOptions(
     program.command("validate").description("Validate a manifest without contacting Backlog"),
   ).action(async (options: RawOptions) => {
-    code = await runValidate(commonOptions(options, deps.io), deps);
+    code = await runCommand(commonOptions(options, deps.io), deps, runValidate);
   });
 
   withCommonOptions(program.command("plan").description("Show what apply would do (read-only)"))
     .option("--show-unchanged", "Show actions that change nothing")
     .action(async (options: RawOptions) => {
-      code = await runPlan(planOptions(options, deps.io), deps);
+      code = await runCommand(planOptions(options, deps.io), deps, runPlan);
     });
 
   withCommonOptions(program.command("apply").description("Apply the manifest to Backlog"))
     .option("-y, --auto-approve", "Skip the confirmation prompt")
     .action(async (options: RawOptions) => {
-      code = await runApply(applyOptions(options, deps.io), deps);
+      code = await runCommand(applyOptions(options, deps.io), deps, runApply);
     });
 
   try {

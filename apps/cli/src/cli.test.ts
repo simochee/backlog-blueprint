@@ -313,6 +313,13 @@ describe("§1.5 終了コード", () => {
     ).resolves.toBe(1);
   });
 
+  it("マニフェストを読めないと原因を標準エラー出力に書いて 1 で終わる", async () => {
+    const io = fakeIo();
+
+    await expect(runCli(["plan", "-f", "no-such-manifest.yaml"], deps(io))).resolves.toBe(1);
+    expect(io.stderr).toContain("failure:");
+  });
+
   it("plan は取得に失敗すると 1 で終わる", async () => {
     const io = fakeIo();
 
