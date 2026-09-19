@@ -90,13 +90,18 @@ strict parse（V-A1）でここだけエラーにすると、「スキーマを�
 `Action.id` は中断レポート（FR-4.4）と `--output json` の `applied[]` / `pending[]` が追うもので、
 マスクすると「どこまで適用されたか」を表せなくなる。`{$ref:<kind>:<name>}` の解決にも平文が要る。
 
-つまり `request.params` と `changes` はマスクできるが、`id` / `name` / `target` /
-`provides[].name` / `request.path` の埋め込みは**できない**。E-1 が「すべての文字列値」と
-言っているので、ここが例外であることを明記する。
+**同定名はどこでも包まない。`request.params` と `changes` も含む。**
+`id` / `Action.name` / `target` / `provides[].name` / `request.path` の埋め込みには
+平文が要る（上記の理由）ので、同じ `Action` の中で `params.name` だけを `***` にしても、
+**守られていると誤解させるだけで実値は隣に並んでいる**。一貫して平文にし、V-A25 で警告する。
+
+包めるのは**同定名ではない文字列**だけである（`templateSummary` / `templateDescription` /
+`description` / `hookUrl` / `unit` / `items` / マイルストーンの日付 / プロジェクト名 など）。
+E-1 が「すべての文字列値」と言っているので、ここが例外であることを明記する。
 
 **`key`（プロジェクトキー）も対象に含める。** `Action.id` と更新時の `request.path` に平文で出る。
 `request.params.key` だけを包むと、params が `***` で path に実キーが出る状態になり、
-**マスクされていると誤解させるぶん一貫した平文より悪い**。
+**マスクされていると誤解させるぶん一貫した平文より悪い**。各リソースの `name` も同じ理由で包まない。
 
 **トップレベルの `name`（プロジェクト名）は対象外。** プロジェクトを指す同定キーは `key` であり、
 `name` は `request.params` と `changes` にしか載らない。つまり包めるので、E-4 のとおりマスクする。

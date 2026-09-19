@@ -173,7 +173,7 @@ PO-3 の利点（そのまま監査・不具合報告に使える）ごと損な
 | V-B3 | 対象プロジェクトの課題件数が0（**確認できた**うえで0） | `GET /projects/:key` → `GET /issues/count` | エラー |
 | V-B4 | `access` のユーザー ID がスペースに存在する | `GET /users` | エラー |
 | V-B5 | `access` のチーム名がスペースに存在する | `GET /teams` | エラー |
-| V-A6 | 既定ステータス（ID 1〜4）の名前がすべて `statuses` に含まれる | `GET /projects/:key/statuses` | エラー |
+| V-A6 | 既定ステータス（ID 1〜4）の名前がすべて `statuses` に含まれる。**既存プロジェクトはスナップショットの ID 1〜4、未作成は[日英2組の表](../research/backlog-api-constraints.md#既定リソースの表示名)で判定する**（どちらの組に一致しても通す） | `GET /projects/:key/statuses` | エラー |
 | V-A6a | 既定ステータスに `color` / `oldname` が無い | 同上 | エラー |
 | V-A8 | カスタムステータスの色が10色パレットに含まれる | 同上 | エラー |
 | V-A14 | ステータスの並びが API の順序制約を満たす | 同上 | エラー |
