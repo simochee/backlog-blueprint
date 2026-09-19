@@ -174,3 +174,18 @@ describe("環境変数から展開した値", () => {
     expect(JSON.stringify(action?.changes)).not.toContain("社外秘カテゴリー");
   });
 });
+
+describe("冪等性（NFR-4）", () => {
+  it("適用後の現状に同じマニフェストを当てると全部 noop になる", () => {
+    const desired: Category[] = [
+      { name: "インフラ" },
+      { name: "フロントエンド", oldname: "フロント" },
+    ];
+    const applied: CategoriesSnapshot = [
+      { id: 11, name: "インフラ" },
+      { id: 12, name: "フロントエンド" },
+    ];
+
+    expect(plan(desired, applied).every(({ op }) => op === "noop")).toBe(true);
+  });
+});

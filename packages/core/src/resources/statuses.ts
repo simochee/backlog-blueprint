@@ -15,7 +15,10 @@ export type StatusesSnapshot = ExistingStatus[];
  */
 const LAST_DEFAULT_STATUS_ID = 4;
 
-/** 削除したステータスの課題の振替先は「未対応」で固定（§5.2） */
+/**
+ * 振替先を既定ステータスの探索で決めない。表示名はスペースの言語設定で変わるので
+ * 名前では引けず、ID 1 は全プロジェクト共通の固定値である（§5.2 / API 制約）。
+ */
 const SUBSTITUTE_STATUS_ID = 1;
 
 export const DEFAULT_STATUSES: ExistingStatus[] = [

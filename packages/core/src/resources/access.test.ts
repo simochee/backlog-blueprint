@@ -239,3 +239,22 @@ describe("応答の検査", () => {
     ).rejects.toThrow("userId");
   });
 });
+
+describe("冪等性（NFR-4）", () => {
+  it("適用後の現状に同じマニフェストを当てると全部 noop になる", () => {
+    const actions = planOf(
+      {
+        teams: ["開発チーム"],
+        members: ["suzuki"],
+        administrators: ["yamada"],
+      },
+      {
+        teams: [joined(developers)],
+        members: [suzuki, yamada],
+        administrators: [yamada],
+      },
+    );
+
+    expect(actions.every(({ op }) => op === "noop")).toBe(true);
+  });
+});

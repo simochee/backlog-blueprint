@@ -264,3 +264,18 @@ describe("環境変数から展開した値", () => {
     expect(JSON.stringify(actions)).not.toContain("社外秘の説明");
   });
 });
+
+describe("冪等性（NFR-4）", () => {
+  it("適用後の現状に同じマニフェストを当てると全部 noop になる", () => {
+    const desired: Milestone[] = [
+      { name: "v1.0", description: "最初のリリース", startDate: "2026-10-01" },
+      { name: "v2.0", releaseDueDate: "2026-12-31", oldname: "v1.5" },
+    ];
+    const applied: MilestonesSnapshot = [
+      { id: 21, name: "v1.0", description: "最初のリリース", startDate: "2026-10-01" },
+      { id: 22, name: "v2.0", releaseDueDate: "2026-12-31" },
+    ];
+
+    expect(plan(desired, applied).every(({ op }) => op === "noop")).toBe(true);
+  });
+});

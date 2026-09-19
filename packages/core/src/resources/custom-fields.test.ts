@@ -465,3 +465,22 @@ describe("カスタム属性の型の変更", () => {
     ]);
   });
 });
+
+describe("冪等性（NFR-4）", () => {
+  it("適用後の現状に同じマニフェストを当てると全部 noop になる", () => {
+    const desired: CustomField[] = [
+      { name: "見積工数", type: "number", min: 0, max: 40, unit: "h" },
+      { name: "環境", type: "singleList", items: ["本番", "検証"], required: true },
+      { name: "検収日", type: "date", applicableIssueTypes: ["タスク"] },
+    ];
+    const applied: Existing[] = [
+      { id: 31, name: "見積工数", typeId: 3, min: 0, max: 40, unit: "h" },
+      { id: 32, name: "環境", typeId: 5, items: ["本番", "検証"], required: true },
+      { id: 33, name: "検収日", typeId: 4, applicableIssueTypes: [101] },
+    ];
+
+    expect(
+      plan(desired, applied, [{ id: 101, name: "タスク" }]).every(({ op }) => op === "noop"),
+    ).toBe(true);
+  });
+});

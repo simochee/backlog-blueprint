@@ -293,3 +293,20 @@ describe("環境変数から展開した値", () => {
     expect(JSON.stringify(actions)).not.toContain("社外秘の手順");
   });
 });
+
+describe("冪等性（NFR-4）", () => {
+  it("適用後の現状に同じマニフェストを当てると全部 noop になる", () => {
+    const desired: IssueType[] = [
+      { name: "タスク", color: "#7ea800" },
+      { name: "バグ", color: "#990000", templateSummary: "【不具合】" },
+      { name: "調査", color: "#2779ca", oldname: "その他", templateDescription: "手順:" },
+    ];
+    const applied: ExistingIssueType[] = [
+      { id: 11, name: "タスク", color: "#7ea800" },
+      { id: 12, name: "バグ", color: "#990000", templateSummary: "【不具合】" },
+      { id: 14, name: "調査", color: "#2779ca", templateDescription: "手順:" },
+    ];
+
+    expect(plan(desired, applied).every(({ op }) => op === "noop")).toBe(true);
+  });
+});

@@ -64,7 +64,7 @@ describe("未作成のプロジェクト", () => {
     expect(refresh?.request).toBeUndefined();
   });
 
-  it("作成した ID は解決表にプロジェクト名で登録される", () => {
+  it("作成した ID は解決表にプロジェクトキーで登録される", () => {
     const [create] = projectReconciler.plan(desired(), { exists: false }, fixedPlanContext());
 
     expect(create?.provides).toEqual([{ kind: "project", name: "PROJ_A" }]);
@@ -212,5 +212,25 @@ describe("送るものと前後差分の対応（PO-11）", () => {
     expect(update?.changes?.map(({ field }) => field)).toEqual(
       Object.keys(update?.request?.params ?? {}),
     );
+  });
+});
+
+describe("冪等性（NFR-4）", () => {
+  it("適用後の現状に同じマニフェストを当てると何も起きない", () => {
+    const settings = {
+      textFormattingRule: "markdown" as const,
+      chartEnabled: true,
+      useWiki: false,
+      subtaskingEnabled: true,
+    };
+    const applied = existing({ name: "プロジェクトB", settings });
+
+    const actions = projectReconciler.plan(
+      desired({ name: "プロジェクトB", settings }),
+      applied,
+      fixedPlanContext(),
+    );
+
+    expect(actions.every(({ op }) => op === "noop")).toBe(true);
   });
 });
