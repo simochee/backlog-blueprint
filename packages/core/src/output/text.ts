@@ -1,4 +1,5 @@
 import { type Action } from "../action";
+import { type ExecutionEvent } from "../execution";
 import { resolvePath } from "../ref";
 import { type ResolutionTable } from "../resolution";
 import { actionLine, changeLines } from "./action-line";
@@ -16,10 +17,13 @@ const CHANGE_INDENT = "      ";
 
 export type TextOptions = { showUnchanged?: boolean; color?: boolean };
 
-const formatDuration = (seconds: number): string =>
+/** 60 秒以上は `2m 30s`（§1.3）。CLI と Web が同じ形で出す（NFR-6） */
+export const formatDuration = (seconds: number): string =>
   seconds < SECONDS_PER_MINUTE
     ? `${seconds}s`
     : `${Math.floor(seconds / SECONDS_PER_MINUTE)}m ${seconds % SECONDS_PER_MINUTE}s`;
+
+export const NO_CHANGES = "No changes. The project already matches the manifest.";
 
 const paragraphs = (blocks: string[]): string =>
   `${blocks.filter((block) => block !== "").join("\n\n")}\n`;
@@ -36,10 +40,7 @@ export const renderPlanText = (report: PlanReport, options: TextOptions = {}): s
   const warnings = renderWarnings(report.diagnostics, { paint });
 
   if (!summary.hasChanges) {
-    return paragraphs([
-      `${header(report)}\nNo changes. The project already matches the manifest.`,
-      warnings,
-    ]);
+    return paragraphs([`${header(report)}\n${NO_CHANGES}`, warnings]);
   }
 
   const shown =
@@ -72,6 +73,22 @@ export const APPLY_CONFIRMATION = [
  * 受けたときだけである（§3.1 / core §7.1）。
  */
 export type ProgressOutcome = "done" | "failed" | { waitingSeconds: number };
+
+/**
+ * `waiting` を捨てない。捨てると、429 を受けて待っている間 apply が黙って止まって
+ * 見える（§3.1）。
+ */
+export const progressOutcome = (event: ExecutionEvent): ProgressOutcome | undefined => {
+  if (event.type === "actionSucceeded") {
+    return "done";
+  }
+
+  if (event.type === "actionFailed") {
+    return "failed";
+  }
+
+  return event.type === "waiting" ? { waitingSeconds: event.seconds } : undefined;
+};
 
 export type ProgressLine = {
   /** `ExecutionEvent.actionStarted` の添字は0始まりなので、ここで +1 する（core §7） */

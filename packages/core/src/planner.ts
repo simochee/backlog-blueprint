@@ -30,7 +30,7 @@ const projectPath = (projectKey: string): string => `/api/v2/projects/${projectK
 const issueCountPath = (projectId: number): string =>
   `/api/v2/issues/count?projectId[]=${projectId}`;
 
-const readUpdateRateLimit = async (get: ReadContext["get"]): Promise<RateLimit> => {
+export const readUpdateRateLimit = async (get: ReadContext["get"]): Promise<RateLimit> => {
   const body = asRecord(await get(RATE_LIMIT_PATH));
   const update = asRecord(asRecord(body["rateLimit"])["update"]);
 

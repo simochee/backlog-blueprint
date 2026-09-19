@@ -28,7 +28,7 @@ describe("接続の判定", () => {
   it("接続できると更新系レート制限の残量が分かる", async () => {
     const { connection } = await connect(get());
 
-    expect(connection?.updateRateLimit).toStrictEqual({ limit: 150, remaining: 148 });
+    expect(connection?.updateRateLimit).toStrictEqual({ limit: 150, remaining: 148, reset: 0 });
   });
 
   it("スペース管理者でなければ先へ進ませない", async () => {

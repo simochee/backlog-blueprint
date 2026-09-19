@@ -1,9 +1,9 @@
 import {
+  progressOutcome,
   renderProgress,
   type Action,
   type ApplyOutcome,
   type ExecutionEvent,
-  type ProgressOutcome,
 } from "@backlog-blueprint/core";
 
 type Started = { index: number; total: number; action: Action };
@@ -22,24 +22,8 @@ export const idleProgress: ApplyProgress = { total: 0, completed: 0, lines: [], 
 
 export const rejectedProgress: ApplyProgress = { ...idleProgress, outcome: { result: "rejected" } };
 
-/**
- * `waiting` を行にする。捨てると、429 を受けて待っている間 apply が黙って止まって
- * 見える（plan の出力仕様 §3.1）。
- */
-const outcomeOf = (event: ExecutionEvent): ProgressOutcome | undefined => {
-  if (event.type === "actionSucceeded") {
-    return "done";
-  }
-
-  if (event.type === "actionFailed") {
-    return "failed";
-  }
-
-  return event.type === "waiting" ? { waitingSeconds: event.seconds } : undefined;
-};
-
 const withLine = (state: ApplyProgress, event: ExecutionEvent): ApplyProgress => {
-  const outcome = outcomeOf(event);
+  const outcome = progressOutcome(event);
 
   if (state.started === undefined || outcome === undefined) {
     return state;

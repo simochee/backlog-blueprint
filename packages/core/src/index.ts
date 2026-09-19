@@ -1,3 +1,4 @@
+export { asRecord, requiredNumber, requiredString } from "./api-response";
 export { execute } from "./executor";
 export {
   CUSTOM_FIELD_TYPE_IDS,
@@ -17,10 +18,13 @@ export {
   colored,
   displayPath,
   executedActions,
+  formatDuration,
   formatValue,
+  NO_CHANGES,
   painter,
   plain,
   planJson,
+  progressOutcome,
   renderApplyAbort,
   renderApplyComplete,
   renderApplyJson,
@@ -39,7 +43,7 @@ export {
   webhookEventLabel,
 } from "./output";
 export { seedResolutions } from "./plan";
-export { buildPlan, createPlan, readSpaceSnapshot } from "./planner";
+export { buildPlan, createPlan, readSpaceSnapshot, readUpdateRateLimit } from "./planner";
 export { embedRef, resolutionKey, resolvePath, resolveRef, resolveRequest } from "./ref";
 export { RESOURCE_KINDS } from "./resource";
 export { accessReconciler } from "./resources/access";

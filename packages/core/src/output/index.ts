@@ -13,6 +13,9 @@ export { executedActions, summarize } from "./report";
 export {
   APPLY_CANCELLED,
   APPLY_CONFIRMATION,
+  formatDuration,
+  NO_CHANGES,
+  progressOutcome,
   renderApplyAbort,
   renderApplyComplete,
   renderApplyResult,

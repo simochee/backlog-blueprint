@@ -1,4 +1,6 @@
 import {
+  formatDuration,
+  NO_CHANGES,
   renderHttpFailure,
   renderPlanJson,
   renderWarnings,
@@ -70,9 +72,7 @@ export const PlanStep = ({
 
   return (
     <div className="step-body">
-      {summary.hasChanges ? null : (
-        <p className="panel-hint">No changes. The project already matches the manifest.</p>
-      )}
+      {summary.hasChanges ? null : <p className="panel-hint">{NO_CHANGES}</p>}
       <ul className="action-list">
         {shown.map((action) => (
           <ActionRow action={action} key={action.id} />
@@ -109,8 +109,8 @@ export const PlanStep = ({
           <dd>{summary.writeRequests}</dd>
         </div>
         <div className="summary-item">
-          <dt>Estimated seconds</dt>
-          <dd>{summary.estimatedSeconds}</dd>
+          <dt>Estimated</dt>
+          <dd>{formatDuration(summary.estimatedSeconds)}</dd>
         </div>
       </dl>
       <div className="actions">
