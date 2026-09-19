@@ -119,6 +119,13 @@ V-A18 は、引用符の付け忘れで `color: null` になった場合に
 | V-A20 | カスタム属性の `min` ≤ `max` | エラー |
 | V-A22 | 各リソースの `name` / `oldname` に `}` を含まない | エラー |
 | V-A24 | `webhooks[].events` の数値が既知の activityTypeId である | 警告 |
+| V-A25 | 同定名に `${ENV}` を使っていない | 警告 |
+
+V-A25 は、マスクできない場所に秘匿値を書いたことを利用者に知らせる
+（[E-7](manifest-schema.md#e-7-同定名は-secret-にできない)）。同定名は解決表のキーと
+`Action.id` を兼ねるため構造的に `Secret` にできず、`--output json` と text の両方に平文で出る。
+エラーにしないのは、プロジェクト名やカテゴリー名を環境ごとに変える運用が普通にありうるため。
+判定に要るのは S2 が返す展開経路の集合だけなので S4 に置く。
 
 V-A24 は W-4 後半（未知の数値は警告）の置き場所である。S3 は前方互換のため数値を無条件に通すので
 （[K-7 の `events` の型](manifest-schema.md#11-webhooks)）、既知の一覧に無い数値をここで拾う。
@@ -170,7 +177,7 @@ PO-3 の利点（そのまま監査・不具合報告に使える）ごと損な
 | V-A6a | 既定ステータスに `color` / `oldname` が無い | 同上 | エラー |
 | V-A8 | カスタムステータスの色が10色パレットに含まれる | 同上 | エラー |
 | V-A14 | ステータスの並びが API の順序制約を満たす | 同上 | エラー |
-| V-A12 | `grandchildIssueEnabled` が真なら `subtaskingEnabled` も真。省略時は現状の値で判定する | `GET /projects/:key` | エラー |
+| V-A12 | `grandchildIssueEnabled` が真なら `subtaskingEnabled` も真。省略時は現状の値で判定し、**プロジェクトが未作成なら現状が無いのでエラー** | `GET /projects/:key` | エラー |
 
 **V-A6 / V-A6a / V-A8 / V-A14 がここに来る理由。**
 [API 制約](../research/backlog-api-constraints.md#ステータス) が

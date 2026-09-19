@@ -355,6 +355,7 @@ FR-2 の具体。**すべて適用開始前に判定する。**
 | V-A22 | 課題種別・ステータス・カテゴリー・マイルストーン・カスタム属性・Webhook の `name` / `oldname` に `}` を含まない | エラー |
 | V-A23 | Yaml として妥当である | エラー |
 | V-A24 | `webhooks[].events` の数値が既知の activityTypeId である | 警告 |
+| V-A25 | 同定名（`name` / `oldname` / `access` の各要素 / `applicableIssueTypes[]`）に `${ENV}` を使っていない | 警告 |
 
 **V-A6 と V-A9 が依頼者要求 R-2 の中核。** いずれも実 API で裏を取った。
 
