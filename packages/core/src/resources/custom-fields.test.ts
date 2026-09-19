@@ -226,6 +226,32 @@ describe("カスタム属性の適用課題種別", () => {
     expect(actions.map(({ op }) => op)).toEqual(["noop"]);
   });
 
+  it("絞られているカスタム属性から適用課題種別を消すと、絞りの解除が差分になる", () => {
+    const [action] = plan(
+      [{ name: "環境", type: "text" }],
+      [{ id: 31, name: "環境", typeId: 1, applicableIssueTypes: [101] }],
+      [{ id: 101, name: "バグ" }],
+    );
+
+    expect(action).toMatchObject({ op: "update" });
+    expect(action?.changes).toContainEqual({
+      field: "applicableIssueTypes",
+      before: ["バグ"],
+      after: [],
+    });
+    expect(action?.request?.params.applicableIssueTypes).toEqual([]);
+  });
+
+  it("もともと絞られていなければ、適用課題種別を書かなくても何も起きない", () => {
+    const actions = plan(
+      [{ name: "環境", type: "text" }],
+      [{ id: 31, name: "環境", typeId: 1, applicableIssueTypes: [] }],
+      [{ id: 101, name: "バグ" }],
+    );
+
+    expect(actions.map(({ op }) => op)).toEqual(["noop"]);
+  });
+
   it("前後差分には課題種別の名前が並び、送信には参照が載る", () => {
     const [action] = plan(
       [{ name: "環境", type: "text", applicableIssueTypes: ["バグ"] }],

@@ -152,15 +152,19 @@ const sameValue = (before: Value | null, after: Value | null) => {
 };
 
 /**
- * 送信は課題種別の ID を要求する（API 制約）が、差分は名前のまま持つ。ID は適用の
+ * 送信は課題種別の ID を要求する（API 制約）が、差分は名前のまま持つ（PO-12）。ID は適用の
  * 途中でしか分からないものが混ざるため、参照をそのまま前後差分に置くと
  * 「何がどう変わるのか」が読めなくなる。`statuses` の displayOrder と同じ扱い。
+ *
+ * 空の配列を「送らない」に畳まない。`applicableIssueTypes` は配列キーなので
+ * 省略は空配列であり（K-1）、空は絞りの解除を意味する（§9）。畳むと、既に絞られている
+ * カスタム属性からキーを消しても絞りが残る。
  */
-const paramsOf = (changes: Change[], applicableIssueTypes: string[]) => ({
+const paramsOf = (changes: Change[], applicableIssueTypes: string[] | undefined) => ({
   ...Object.fromEntries(
     changes.filter(({ field }) => field !== APPLICABLE).map(({ field, after }) => [field, after]),
   ),
-  ...(applicableIssueTypes.length === 0
+  ...(applicableIssueTypes === undefined
     ? {}
     : {
         applicableIssueTypes: applicableIssueTypes.map((name) => ({
@@ -258,15 +262,18 @@ export const customFieldsReconciler: Reconciler<CustomField[], CustomFieldsSnaps
         existing === undefined
           ? undefined
           : applicableNames(existing.applicableIssueTypes, issueTypes);
-      const applicableMatches =
-        applicable.length === 0 || (current !== undefined && sameNames(current, applicable));
+      const applicableMatches = current !== undefined && sameNames(current, applicable);
+      /**
+       * 絞りを解除するときだけ、空の配列を差分にも送信にも載せる（§9）。新しく作る
+       * カスタム属性には解除する絞りが無いので、書かれていないキーは送らない（K-3）。
+       * 課題種別の名前は同定名なので包まない（E-7）。
+       */
+      const filters = applicable.length > 0 || (current !== undefined && current.length > 0);
       const changes = [
         ...sealChanges(declared, basePath(index), seal),
-        ...(applicable.length === 0
-          ? []
-          : [{ field: APPLICABLE, before: current ?? null, after: applicable }]),
+        ...(filters ? [{ field: APPLICABLE, before: current ?? null, after: applicable }] : []),
       ];
-      const params = paramsOf(changes, applicable);
+      const params = paramsOf(changes, filters ? applicable : undefined);
 
       if (found !== undefined && recreated) {
         kept.add(found.id);
