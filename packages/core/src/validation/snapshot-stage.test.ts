@@ -319,10 +319,11 @@ describe("絞りの解除（V-B10）", () => {
     ).toEqual(["V-B10"]);
   });
 
-  it("作り直す道を案内する", () => {
+  it("1回の apply では組めない手順を案内しない", () => {
     const [diagnostic] = validate(declared(), withCustomFields([limited]));
 
-    expect(diagnostic?.hint).toContain("create it again");
-    expect(diagnostic?.hint).toContain("oldname");
+    expect(diagnostic?.hint).toContain("apply again");
+    expect(diagnostic?.hint).toContain("under a different name");
+    expect(diagnostic?.hint).not.toContain("oldname");
   });
 });

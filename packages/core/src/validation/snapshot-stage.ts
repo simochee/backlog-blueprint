@@ -246,7 +246,7 @@ const applicableIssueTypes = (
         "V-B10",
         `customFields/${index}/applicableIssueTypes`,
         `the custom field "${declared.name}" is limited to specific issue types, and that limit cannot be lifted: an empty list never reaches Backlog, so the limit would stay while the plan claims it is gone`,
-        `delete the custom field and create it again instead. oldname moves the current one to a different name`,
+        `remove this custom field from the manifest and apply, then add it back and apply again, or declare it under a different name so the current one is deleted and the new one is created without the limit`,
       ),
     ];
   });
