@@ -302,7 +302,7 @@ Yaml を GUI フォームから生成する機能、既存プロジェクトか�
 | NFR-2 | `429` を受けたら `X-RateLimit-Reset` まで待って再試行する（上限回数あり） | レート制限超過で失敗させない |
 | NFR-3 | API キーをログ・計画出力・エラーメッセージに出さない | CI ログへの漏洩を防ぐ |
 | NFR-4 | 同じマニフェストを2回適用しても結果が変わらない（冪等） | 中断後の再実行を安全にする |
-| NFR-5 | core パッケージは `fetch` 以外のランタイム依存を持たない | Node とブラウザで同一ロジックを動かすため |
+| NFR-5 | core パッケージは `fetch` 以外のランタイム依存を持たない。**Nulab 公式パッケージは例外として許容する**が、core 自身には入れず送信層に置く | Node とブラウザで同一ロジックを動かすため。core を依存ゼロに保つと、`types: []` と `fetch` の ambient 宣言だけで「Node 専用 API を書いたら型検査が落ちる」状態を作れる |
 | NFR-6 | 検証・計画のロジックは CLI と Web UI で同一のコードを使う | 「CLI では通るが Web では落ちる」を構造的に作らない |
 | NFR-7 | **マニフェストを置いたリポジトリへの push 権限が、実質的にスペース管理者権限になる**ことを README で警告する | 実装では防げない。CI に置く API キーはスペース管理者のものなので、そのリポジトリに push できる人は任意のプロジェクト設定を書き換えられる。[先行事例](../design/syntax-reference-github.md#33-設定リポジトリへの-push-権限が管理者権限になる)でも同じ警告が出ている |
 | NFR-8 | リソース種別ごとに独立した reconciler（現状取得 → 差分算出）として実装し、**適用は全リソース共通の Executor が `Action[]` に対して行う** | リソース追加が「ファイルを1つ足して適用順序に並べる」だけで済む。`Action` を唯一の実行単位にすることで、「plan に出ないのに apply で起きる」が各 reconciler の行儀ではなく構造として消える。レート制限・再試行・進捗・中断レポートも1箇所に集まる（[理由](../design/core-reconciler.md#c-1-reconciler-は-read-と-plan-だけを持ちapply-は持たない)） |
@@ -342,6 +342,7 @@ FR-2 の具体。**すべて適用開始前に判定する。**
 | V-A19 | マイルストーンの `startDate` が `releaseDueDate` 以前である | エラー |
 | V-A20 | カスタム属性の `min` が `max` 以下である | エラー |
 | V-A21 | 個別の ID を持たないスキーマ上の型・制約（enum・`minLength`・数値範囲・日付パターンなど）に適合する | エラー |
+| V-A22 | `name` / `oldname` に `}` を含まない | エラー |
 
 **V-A6 と V-A9 が依頼者要求 R-2 の中核。** いずれも実 API で裏を取った。
 
@@ -432,12 +433,33 @@ ERROR [V-B3] key: project already has issues
 
 ```
 packages/
-  core/    パース・検証・plan 算出・apply 実行
-           fetch のみに依存し、Node とブラウザの両方で動く
-  cli/     npx backlog-blueprint（環境変数・ファイル IO・終了コード）
-  web/     Vite SPA。static hosting に配置
-  schema/  JSON Schema の生成物
+  core/            パース・検証・plan 算出・apply 実行
+                   依存ゼロ。fetch は ambient 宣言で型だけ持つ
+  backlog-client/  backlog-js を包み、core に get / send を注入する送信層
+  cli/             npx backlog-blueprint（環境変数・ファイル IO・終了コード）
+  web/             Vite SPA。static hosting に配置
+  schema/          JSON Schema の生成物
 ```
+
+### 7.0 送信層を core から切り離す
+
+`ReadContext.get` / `ExecuteContext.send` は関数として注入する。実体は
+`backlog-client` が [backlog-js](https://github.com/nulab/backlog-js)（Nulab 公式・MIT）で組み、
+cli と web の両方が同じものを使う。
+
+| 得られるもの | 内容 |
+| --- | --- |
+| FR-5.1a | backlog-js が API キーを `Backlog-API-Key` ヘッダで送る。クエリに載る経路が実装に無い |
+| 本文の形式 | form-urlencoded と配列の `key[]` 表記が公式クライアントの実装として確定する（[API 制約](../research/backlog-api-constraints.md#リクエストの形式)） |
+| PO-3 | 低レベルの `request({ method, path, params })` があるので、計画した `HttpRequest` をそのまま渡せる。plan に出した内容と実際に送る内容が同一になる |
+| NFR-5 | core の依存はゼロのまま。`qs` を含む型定義が core のプログラムに入らないので、Node 専用 API を弾くガードが無効化されない |
+
+**採らなかった案: core に直接入れる。** パッケージは1つ減るが、`.d.ts` が1枚でも
+core のプログラムに入ると `/// <reference types="node" />` 経由で `@types/node` が
+紛れ込み、NFR-5 の型ガードが黙って無効になる。
+
+**採らなかった案: form-urlencoded の組み立てを自前で書く。** 依存は増えないが、
+Backlog が本文の形式を変えたときに追随する責任を自分で持つことになる。
 
 検証・計画ロジックを core に閉じ込め、cli と web は「入出力の違い」だけを担う。
 Go CLI + TypeScript Web という案は、検証ロジックを2回実装することになり

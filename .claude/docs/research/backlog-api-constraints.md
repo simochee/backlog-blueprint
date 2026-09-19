@@ -39,6 +39,22 @@
 そのためブラウザからは `X-RateLimit-*` ヘッダを読めない。
 レート制限の残量をブラウザで観測する手段は、`GET /api/v2/rateLimit`（本文で返る）だけになる。
 
+## リクエストの形式
+
+出典は [backlog-js](https://github.com/nulab/backlog-js)（Nulab 公式クライアント・MIT）の
+実装。実 API を叩いて確かめたものではなく、公式クライアントが実際に何を送っているかを読んだもの。
+
+| 項目 | 内容 |
+| --- | --- |
+| 認証 | `Backlog-API-Key` ヘッダ。クエリパラメータには載せない（FR-5.1a と一致） |
+| 更新系の本文 | `Content-Type: application/x-www-form-urlencoded` |
+| 配列パラメータ | `qs.stringify(params, { arrayFormat: 'brackets' })`。`statusId[]=1&statusId[]=2` の形 |
+| 低レベル API | `request({ method, path, params })` が公開されている。型付きのエンドポイント別メソッドを経由せずに任意のパスを叩ける |
+| 実行環境 | `globalThis.fetch` を使う。差し替えも可能。ブラウザ向けビルドがある |
+
+本文書が配列パラメータを一貫して `statusId[]` `applicableIssueTypes[]` `activityTypeIds[]` と
+`[]` 付きで記録しているのは、この `arrayFormat: 'brackets'` に対応する。
+
 ## レート制限
 
 | 項目 | 内容 |
@@ -316,6 +332,7 @@ plan の段階で所要時間を見積もって提示し、apply 中は進捗を
 | 課題種別の色 | 既定4つの色を実測で確定 |
 | 課題種別の下限 | 最低1件。振替先を自分自身にはできない |
 | CORS プリフライトと API キーの渡し方 | `Backlog-API-Key` ヘッダで可。`expose-headers` が無くレート制限ヘッダは読めない |
+| 更新系リクエストの本文の形式 | form-urlencoded、配列は `key[]` の繰り返し（[リクエストの形式](#リクエストの形式)） |
 | 管理者付与の前提 | 事前のプロジェクト参加が必須 |
 | カテゴリー・マイルストーンの表示順 | いずれも作成順 |
 | `GET /projects/:key/administrators` の存在 | **存在する。** ユーザー配列を返す |
