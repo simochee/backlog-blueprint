@@ -8,7 +8,38 @@ export {
   STATUS_COLORS,
   normalizeManifest,
 } from "./manifest";
+export {
+  actionLine,
+  APPLY_CANCELLED,
+  APPLY_CONFIRMATION,
+  applyJson,
+  changeLines,
+  colored,
+  displayPath,
+  executedActions,
+  formatValue,
+  painter,
+  plain,
+  planJson,
+  renderApplyAbort,
+  renderApplyComplete,
+  renderApplyJson,
+  renderApplyResult,
+  renderDiagnostics,
+  renderHttpFailure,
+  renderPlanJson,
+  renderPlanText,
+  renderProgress,
+  renderValidateJson,
+  renderWarnings,
+  sameValue,
+  styleOf,
+  summarize,
+  validateJson,
+  webhookEventLabel,
+} from "./output";
 export { seedResolutions } from "./plan";
+export { buildPlan, createPlan, readSpaceSnapshot } from "./planner";
 export { embedRef, resolutionKey, resolvePath, resolveRef, resolveRequest } from "./ref";
 export { RESOURCE_KINDS } from "./resource";
 export { accessReconciler } from "./resources/access";
@@ -28,13 +59,17 @@ export {
   statusesReconciler,
 } from "./resources/statuses";
 export { webhooksReconciler } from "./resources/webhooks";
+export { declaredOrder, FIXED_ORDER_SECTIONS, resultingOrder } from "./resulting-order";
 export { Secret, sealChanges, sealFields, sealer } from "./secret";
+export { authenticateExecutor } from "./validation/auth-stage";
 export { expandEnvironment, hasEnvSentinel, UNRESOLVED_ENV_ID } from "./validation/expand-stage";
 export { blocksNextStage, hasError, orderDiagnostics } from "./validation/gate";
+export { failureDetail, failureStatus } from "./validation/http-failure";
 export { validateManifest } from "./validation/pipeline";
+export { validatePlan } from "./validation/plan-stage";
 export { schemaStage, validateSchema } from "./validation/schema-stage";
 export { validateStaticSemantics } from "./validation/semantic-stage";
-export { validateAgainstSnapshot } from "./validation/snapshot-stage";
+export { unconfirmedIssueCount, validateAgainstSnapshot } from "./validation/snapshot-stage";
 export {
   childPath,
   instancePathTokens,
@@ -70,7 +105,36 @@ export type {
   Status,
   Webhook,
 } from "./manifest";
+export type {
+  ActionFailure,
+  ActionJson,
+  ApplyJson,
+  ApplyOptions,
+  ApplyOutcome,
+  DiagnosticOptions,
+  FailedJson,
+  LineVariant,
+  Paint,
+  PlanJson,
+  PlanReport,
+  ProgressLine,
+  ResultingOrder,
+  Style,
+  Summary,
+  TextOptions,
+  ValidateJson,
+  ValidateReport,
+  ValueFormat,
+} from "./output";
 export type { ResourceSnapshots } from "./plan";
+export type {
+  BuildPlanOptions,
+  CreatePlanOptions,
+  CreatePlanResult,
+  Plan,
+  SpaceSnapshotInput,
+  SpaceSnapshotResult,
+} from "./planner";
 export type { ResolveResult } from "./ref";
 export type { PlanContext, ReadContext, Reconciler } from "./reconciler";
 export type { ResolutionKey, ResolutionTable } from "./resolution";
@@ -83,10 +147,13 @@ export type { ExistingMilestone, MilestonesSnapshot } from "./resources/mileston
 export type { ProjectDesired, ProjectSettingsSnapshot, ProjectSnapshot } from "./resources/project";
 export type { ExistingStatus, StatusesSnapshot } from "./resources/statuses";
 export type { ExistingWebhook, WebhooksSnapshot } from "./resources/webhooks";
+export type { FixedOrderSection, ResourceOrder } from "./resulting-order";
 export type { Seal } from "./secret";
+export type { AuthStageResult } from "./validation/auth-stage";
 export type { RateLimit, Snapshot } from "./snapshot";
 export type { Environment, ExpandOptions, ExpandStageResult } from "./validation/expand-stage";
 export type { SchemaStage, ValidateManifestOptions, ValidationResult } from "./validation/pipeline";
+export type { PlanStageInput } from "./validation/plan-stage";
 export type { SchemaStageOptions } from "./validation/schema-stage";
 export type { SnapshotStageInput } from "./validation/snapshot-stage";
 export type { ParsedDocument, SourceMap, SourcePosition } from "./validation/source-map";
