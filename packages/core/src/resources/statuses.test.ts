@@ -76,7 +76,10 @@ describe("既定ステータス", () => {
       op: "update",
       target: 5,
       request: { method: "PATCH", path: "/api/v2/projects/PROJ_A/statuses/5" },
-      changes: [{ field: "color", before: "#ea2c00", after: "#3b9dbd" }],
+      changes: [
+        { field: "name", before: "未対応", after: "未対応" },
+        { field: "color", before: "#ea2c00", after: "#3b9dbd" },
+      ],
     });
   });
 });
@@ -238,5 +241,19 @@ describe("冪等性", () => {
     ];
 
     expect(plan(desired, applied).every(({ op }) => op === "noop")).toBe(true);
+  });
+});
+
+describe("送るものと前後差分の対応（PO-11）", () => {
+  it("作成でもリクエストに載る項目がすべて前後差分に並ぶ", () => {
+    const [create] = plan([{ name: "レビュー中", color: "#3b9dbd" }], []);
+
+    expect(create?.changes).toEqual([
+      { field: "name", before: null, after: "レビュー中" },
+      { field: "color", before: null, after: "#3b9dbd" },
+    ]);
+    expect(create?.changes?.map(({ field }) => field)).toEqual(
+      Object.keys(create?.request?.params ?? {}),
+    );
   });
 });

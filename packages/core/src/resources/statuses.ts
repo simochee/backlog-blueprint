@@ -42,13 +42,25 @@ const declaredFields = (desired: Status): Record<string, Value> => ({
   ...(desired.color === undefined ? {} : { color: desired.color }),
 });
 
-const changesOf = (desired: Status, existing: ExistingStatus): Change[] => {
-  const before: Record<string, Value> = { name: existing.name, color: existing.color };
+/**
+ * 値が変わらない項目も落とさない（PO-11）。落とすと JSON から「送るが変わらない項目」が
+ * 消え、`request.params` と突き合わせられなくなる。
+ */
+const changesOf = (desired: Status, existing: ExistingStatus | undefined): Change[] => {
+  const before: Record<string, Value | undefined> = {
+    name: existing?.name,
+    color: existing?.color,
+  };
 
-  return Object.entries(declaredFields(desired))
-    .filter(([field, after]) => before[field] !== after)
-    .map(([field, after]) => ({ field, before: before[field] ?? null, after }));
+  return Object.entries(declaredFields(desired)).map(([field, after]) => ({
+    field,
+    before: before[field] ?? null,
+    after,
+  }));
 };
+
+const differs = (changes: Change[]): boolean =>
+  changes.some(({ before, after }) => before !== after);
 
 /**
  * 新規カスタムは「完了」の直前に挿入される（実測）。末尾に付くと見なすと、
@@ -101,10 +113,10 @@ export const statusesReconciler: Reconciler<Status[], StatusesSnapshot> = {
         kept.add(sameName.name);
         resulting.push(sameName.id);
 
-        const changes = isDefaultStatus(sameName) ? [] : changesOf(item, sameName);
+        const changes = changesOf(item, sameName);
 
         updates.push(
-          changes.length === 0
+          isDefaultStatus(sameName) || !differs(changes)
             ? {
                 id: `statuses/noop/${item.name}`,
                 phase: 3,
@@ -179,6 +191,7 @@ export const statusesReconciler: Reconciler<Status[], StatusesSnapshot> = {
           params: sealFields(declaredFields(item), basePath(index), seal),
         },
         provides: [{ kind: "status", name: item.name }],
+        changes: sealChanges(changesOf(item, undefined), basePath(index), seal),
         writeRequest: true,
       });
     }

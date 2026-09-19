@@ -62,6 +62,11 @@ const declaredFields = (desired: IssueType): Record<string, Value> => ({
     : { templateDescription: desired.templateDescription }),
 });
 
+/**
+ * 値が変わらない項目も落とさない（PO-11）。落とすと JSON から「送るが変わらない項目」が
+ * 消え、`request.params` と突き合わせられなくなる。描画側が変わった行だけを描くのは
+ * 絞り込みであって、データの間引きではない。
+ */
 const changesOf = (desired: IssueType, existing: ExistingIssueType | undefined): Change[] => {
   const before: Record<string, Value | undefined> = {
     name: existing?.name,
@@ -70,10 +75,15 @@ const changesOf = (desired: IssueType, existing: ExistingIssueType | undefined):
     templateDescription: existing?.templateDescription,
   };
 
-  return Object.entries(declaredFields(desired))
-    .filter(([field, after]) => before[field] !== after)
-    .map(([field, after]) => ({ field, before: before[field] ?? null, after }));
+  return Object.entries(declaredFields(desired)).map(([field, after]) => ({
+    field,
+    before: before[field] ?? null,
+    after,
+  }));
 };
+
+const differs = (changes: Change[]): boolean =>
+  changes.some(({ before, after }) => before !== after);
 
 /**
  * 既定枠を引き継ぐときも `op` は `create` にする。PO-1 が `oldname` のリネームを `~` で
@@ -183,8 +193,9 @@ const planProject = (
       kept.add(sameName.name);
 
       updates.push(
-        changesOf(item, sameName).length === 0
-          ? {
+        differs(changesOf(item, sameName))
+          ? updateAction(item, index, sameName)
+          : {
               id: `issueTypes/noop/${item.name}`,
               phase: 2,
               kind: "issueType",
@@ -192,8 +203,7 @@ const planProject = (
               name: item.name,
               target: sameName.id,
               writeRequest: false,
-            }
-          : updateAction(item, index, sameName),
+            },
       );
 
       continue;

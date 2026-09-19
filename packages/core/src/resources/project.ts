@@ -26,19 +26,6 @@ const projectPath = (key: string): string => `${projectsPath}/${key}`;
 const settingsKeys = (settings: Settings): (keyof Settings)[] =>
   Object.keys(settings) as (keyof Settings)[];
 
-const settingsChanges = (
-  desired: Settings,
-  current: ProjectSettingsSnapshot,
-  seal: Seal,
-): Change[] =>
-  settingsKeys(desired)
-    .filter((key) => current[key] !== desired[key])
-    .map((key) => ({
-      field: `settings.${key}`,
-      before: current[key] ?? null,
-      after: seal(`settings/${key}`, desired[key] ?? null),
-    }));
-
 const settingsParams = (settings: Settings, seal: Seal): Record<string, Value> => {
   const params: Record<string, Value> = {};
 
@@ -52,6 +39,24 @@ const settingsParams = (settings: Settings, seal: Seal): Record<string, Value> =
 
   return params;
 };
+
+/**
+ * 値が変わらない項目も落とさず、`field` はリクエストのキー名のまま置く（PO-11）。
+ * `settings.useWiki` のように表示用の名前を付けると、`request.params` と
+ * 突き合わせられなくなる。突き合わせられることが PO-11 の理由そのものである。
+ */
+const changesOf = (
+  params: Record<string, Value>,
+  current: ProjectSettingsSnapshot & { name?: Value },
+): Change[] =>
+  Object.entries(params).map(([field, after]) => ({
+    field,
+    before: current[field as keyof Settings] ?? null,
+    after,
+  }));
+
+const differs = (changes: Change[]): boolean =>
+  changes.some(({ before, after }) => before !== after);
 
 export const projectReconciler: Reconciler<ProjectDesired, ProjectSnapshot> = {
   kind: "project",
@@ -71,14 +76,13 @@ export const projectReconciler: Reconciler<ProjectDesired, ProjectSnapshot> = {
     const seal = sealer(ctx.isSecret);
 
     if (snapshot.exists) {
-      const changes = [
-        ...(snapshot.name === desired.name
-          ? []
-          : [{ field: "name", before: snapshot.name, after: seal("name", desired.name) }]),
-        ...settingsChanges(desired.settings, snapshot.settings, seal),
-      ];
+      const params = {
+        name: seal("name", desired.name),
+        ...settingsParams(desired.settings, seal),
+      };
+      const changes = changesOf(params, { ...snapshot.settings, name: snapshot.name });
 
-      if (changes.length === 0) {
+      if (!differs(changes)) {
         return [
           {
             id: `project/noop/${desired.key}`,
@@ -100,16 +104,18 @@ export const projectReconciler: Reconciler<ProjectDesired, ProjectSnapshot> = {
           op: "update",
           name: desired.key,
           target: snapshot.id,
-          request: {
-            method: "PATCH",
-            path: projectPath(desired.key),
-            params: { name: seal("name", desired.name), ...settingsParams(desired.settings, seal) },
-          },
+          request: { method: "PATCH", path: projectPath(desired.key), params },
           changes,
           writeRequest: true,
         },
       ];
     }
+
+    const params = {
+      key: seal("key", desired.key),
+      name: seal("name", desired.name),
+      ...settingsParams(desired.settings, seal),
+    };
 
     const create: Action = {
       id: `project/create/${desired.key}`,
@@ -117,16 +123,9 @@ export const projectReconciler: Reconciler<ProjectDesired, ProjectSnapshot> = {
       kind: "project",
       op: "create",
       name: desired.key,
-      request: {
-        method: "POST",
-        path: projectsPath,
-        params: {
-          key: seal("key", desired.key),
-          name: seal("name", desired.name),
-          ...settingsParams(desired.settings, seal),
-        },
-      },
+      request: { method: "POST", path: projectsPath, params },
       provides: [{ kind: "project", name: desired.key }],
+      changes: changesOf(params, {}),
       writeRequest: true,
     };
 

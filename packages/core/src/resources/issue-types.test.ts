@@ -133,15 +133,20 @@ describe("差分の算出", () => {
     expect(actions[0]?.request).toBeUndefined();
   });
 
-  it("違う項目だけが前後差分として並ぶ", () => {
+  it("前後差分にはリクエストに載る項目がすべて並ぶ", () => {
     const actions = plan(
       [{ name: "バグ", color: "#990000", templateSummary: "【不具合】" }],
       [{ id: 12, name: "バグ", color: "#990000" }],
     );
 
     expect(actions[0]?.changes).toEqual([
+      { field: "name", before: "バグ", after: "バグ" },
+      { field: "color", before: "#990000", after: "#990000" },
       { field: "templateSummary", before: null, after: "【不具合】" },
     ]);
+    expect(Object.keys(actions[0]?.request?.params ?? {})).toEqual(
+      actions[0]?.changes?.map(({ field }) => field),
+    );
   });
 
   it("書かれていないテンプレートは現状が残っていても差分にならない", () => {

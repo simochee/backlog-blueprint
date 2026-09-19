@@ -110,7 +110,8 @@ describe("settings", () => {
     );
 
     expect(actions[0]?.changes).toEqual([
-      { field: "settings.useWiki", before: true, after: false },
+      { field: "name", before: "プロジェクトA", after: "プロジェクトA" },
+      { field: "useWiki", before: true, after: false },
     ]);
   });
 
@@ -183,5 +184,33 @@ describe("環境変数から展開した値", () => {
 
     expect(actions[0]?.request?.params.textFormattingRule).toBeInstanceOf(Secret);
     expect(actions[0]?.request?.params.name).toBe("プロジェクトA");
+  });
+});
+
+describe("送るものと前後差分の対応（PO-11）", () => {
+  it("作成でもリクエストに載る項目がすべて前後差分に並ぶ", () => {
+    const [create] = projectReconciler.plan(
+      desired({ settings: { useWiki: true } }),
+      { exists: false },
+      fixedPlanContext(),
+    );
+
+    expect(create?.changes).toEqual([
+      { field: "key", before: null, after: "PROJ_A" },
+      { field: "name", before: null, after: "プロジェクトA" },
+      { field: "useWiki", before: null, after: true },
+    ]);
+  });
+
+  it("前後差分の項目名はリクエストのキー名と一致する", () => {
+    const [update] = projectReconciler.plan(
+      desired({ settings: { useWiki: true, chartEnabled: false } }),
+      existing({ settings: { useWiki: false } }),
+      fixedPlanContext(),
+    );
+
+    expect(update?.changes?.map(({ field }) => field)).toEqual(
+      Object.keys(update?.request?.params ?? {}),
+    );
   });
 });
