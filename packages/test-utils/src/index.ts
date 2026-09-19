@@ -1,5 +1,9 @@
 import {
+  normalizeManifest,
   type ExecuteContext,
+  type Manifest,
+  type ManifestInput,
+  type PlanContext,
   type ReadContext,
   type ResolvedHttpRequest,
   type Snapshot,
@@ -42,3 +46,22 @@ export const recordingSend = (
     },
   };
 };
+
+export const fixedManifest = (overrides: Partial<ManifestInput> = {}): Manifest =>
+  normalizeManifest({ key: "PROJ_A", name: "プロジェクトA", ...overrides });
+
+export const fixedReadContext = (
+  responses: Record<string, unknown>,
+  overrides: Partial<Omit<ReadContext, "get">> = {},
+): ReadContext => ({
+  projectKey: "PROJ_A",
+  snapshot: fixedSnapshot(),
+  get: fixedGet(responses),
+  ...overrides,
+});
+
+export const fixedPlanContext = (overrides: Partial<PlanContext> = {}): PlanContext => ({
+  manifest: fixedManifest(),
+  snapshot: fixedSnapshot(),
+  ...overrides,
+});
