@@ -21,6 +21,12 @@ export type OutputContext = ToolContext & { space: string };
 export type RenderOptions = { color: boolean };
 
 /**
+ * `Nothing has been applied.` を添えるのは `apply` だけ（要件定義 §5.3）。
+ * `validate` と `plan` はもともと何も適用しない。
+ */
+export type DiagnosticsOptions = RenderOptions & { nothingApplied?: boolean };
+
+/**
  * S5〜S7 を走らせて計画を組み立てた結果。`resolutions` を持つのは、apply が
  * `ExecuteContext` を組むのに既存リソースの名前 → ID が要るため（core §3.2）。
  * `resultingOrder` は JSON 出力が持つ項目（plan の出力仕様 §2.1）。
@@ -52,7 +58,7 @@ export type BuildPlan = (input: {
  * `--output json` の stdout を汚さない保証（PO-7）が描画側にも分かれる。
  */
 export type Output = {
-  diagnostics: (diagnostics: Diagnostic[], options: RenderOptions) => string;
+  diagnostics: (diagnostics: Diagnostic[], options: DiagnosticsOptions) => string;
   failure: (error: unknown, options: RenderOptions) => string;
   validateJson: (input: { context: ToolContext; diagnostics: Diagnostic[] }) => string;
   plan: (

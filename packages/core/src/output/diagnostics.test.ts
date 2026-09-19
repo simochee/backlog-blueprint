@@ -25,7 +25,9 @@ const hasIssues: Diagnostic = {
 describe("検証結果の出力", () => {
   it("検証 ID とマニフェスト上の位置、詳細、直し方を並べる", () => {
     expect(renderDiagnostics([missingStatus, hasIssues])).toBe(
-      `ERROR [V-A6] statuses: default statuses cannot be deleted
+      `2 validation errors.
+
+ERROR [V-A6] statuses: default statuses cannot be deleted
   missing default status: 処理済み
   → add "処理済み" to statuses, or rename it with oldname
 
@@ -87,5 +89,33 @@ ERROR [V-B3] key: project already has issues
 
   it("警告の節に検証エラーは混ぜない", () => {
     expect(renderWarnings([missingStatus])).toBe("");
+  });
+});
+
+const firstLine = (text: string) => text.split("\n")[0];
+
+describe("検証エラーの集計行", () => {
+  it("エラーが1件なら単数で数える", () => {
+    expect(firstLine(renderDiagnostics([missingStatus]))).toBe("1 validation error.");
+  });
+
+  it("適用が絡むときだけ、何も適用されていないことを添える", () => {
+    expect(firstLine(renderDiagnostics([missingStatus], { nothingApplied: true }))).toBe(
+      "1 validation error. Nothing has been applied.",
+    );
+  });
+
+  it("警告しか無いときは集計行を出さない", () => {
+    const warning: Diagnostic = { ...missingStatus, severity: "warning" };
+
+    expect(firstLine(renderDiagnostics([warning]))).toBe(
+      "WARNING [V-A6] statuses: default statuses cannot be deleted",
+    );
+  });
+
+  it("警告は検証エラーとして数えない", () => {
+    const warning: Diagnostic = { ...hasIssues, severity: "warning" };
+
+    expect(firstLine(renderDiagnostics([missingStatus, warning]))).toBe("1 validation error.");
   });
 });

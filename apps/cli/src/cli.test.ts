@@ -64,6 +64,14 @@ const anAction = (overrides: Partial<Action> = {}): Action => ({
   ...overrides,
 });
 
+const violation = (): Diagnostic => ({
+  id: "V-B2",
+  severity: "error",
+  stage: "auth",
+  path: "",
+  message: "not a space administrator",
+});
+
 const aWarning = (): Diagnostic => ({
   id: "V-A15",
   severity: "warning",
@@ -73,8 +81,8 @@ const aWarning = (): Diagnostic => ({
 });
 
 const fakeOutput: Output = {
-  diagnostics: (diagnostics, { color }) =>
-    `diagnostics(color=${color}) ${diagnostics.map(({ id, severity }) => `${id}:${severity}`).join(",")}\n`,
+  diagnostics: (diagnostics, { color, nothingApplied }) =>
+    `diagnostics(color=${color},nothingApplied=${nothingApplied === true}) ${diagnostics.map(({ id, severity }) => `${id}:${severity}`).join(",")}\n`,
   failure: (error) => `failure:${JSON.stringify(error)}\n`,
   validateJson: ({ diagnostics }) => `${JSON.stringify({ diagnostics: diagnostics.length })}\n`,
   plan: (_input, { color, showUnchanged }) =>
@@ -300,16 +308,9 @@ describe("§1.5 終了コード", () => {
 
   it("plan は検証違反があると 1 で終わる", async () => {
     const io = fakeIo();
-    const violation: Diagnostic = {
-      id: "V-B2",
-      severity: "error",
-      stage: "auth",
-      path: "",
-      message: "not a space administrator",
-    };
 
     await expect(
-      runCli(["plan", "-f", "-"], deps(io, { plan: fakePlan({ diagnostics: [violation] }) })),
+      runCli(["plan", "-f", "-"], deps(io, { plan: fakePlan({ diagnostics: [violation()] }) })),
     ).resolves.toBe(1);
   });
 
@@ -542,6 +543,35 @@ describe("§1.3 標準出力と標準エラー出力", () => {
   });
 });
 
+describe("検証エラーの集計行", () => {
+  it("apply では何も適用していないことを添える", async () => {
+    const io = fakeIo();
+
+    await runCli(
+      ["apply", "-f", "-", "--auto-approve"],
+      deps(io, { plan: fakePlan({ diagnostics: [violation()] }) }),
+    );
+
+    expect(io.stderr).toContain("nothingApplied=true");
+  });
+
+  it("plan では添えない", async () => {
+    const io = fakeIo();
+
+    await runCli(["plan", "-f", "-"], deps(io, { plan: fakePlan({ diagnostics: [violation()] }) }));
+
+    expect(io.stderr).toContain("nothingApplied=false");
+  });
+
+  it("validate では添えない", async () => {
+    const io = fakeIo({ stdin: "key: proj a\nname: x\n" });
+
+    await runCli(["validate", "-f", "-"], deps(io));
+
+    expect(io.stderr).toContain("nothingApplied=false");
+  });
+});
+
 describe("表示の切り替え", () => {
   it("--show-unchanged は描画に渡る", async () => {
     const io = fakeIo();
@@ -603,7 +633,7 @@ describe("表示の切り替え", () => {
       deps(io, { plan: fakePlan({ diagnostics: [aWarning()] }) }),
     );
 
-    expect(io.stderr).toContain("diagnostics(color=true)");
+    expect(io.stderr).toContain("diagnostics(color=true,");
   });
 
   it("標準エラー出力をパイプすると診断から色が消える", async () => {
@@ -614,7 +644,7 @@ describe("表示の切り替え", () => {
       deps(io, { plan: fakePlan({ diagnostics: [aWarning()] }) }),
     );
 
-    expect(io.stderr).toContain("diagnostics(color=false)");
+    expect(io.stderr).toContain("diagnostics(color=false,");
   });
 });
 

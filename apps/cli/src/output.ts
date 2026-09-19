@@ -42,8 +42,8 @@ export const createOutput = (): Output => {
   let started: Started | undefined;
 
   return {
-    diagnostics: (diagnostics, { color }) =>
-      block(renderDiagnostics(diagnostics, { paint: painter(color) })),
+    diagnostics: (diagnostics, { color, nothingApplied }) =>
+      block(renderDiagnostics(diagnostics, { paint: painter(color), nothingApplied })),
 
     failure: (error, { color }) => block(renderHttpFailure(error, { color })),
 

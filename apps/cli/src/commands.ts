@@ -21,6 +21,7 @@ import { type Io } from "./io";
 import { readManifest } from "./manifest-source";
 import {
   type BuildPlan,
+  type DiagnosticsOptions,
   type Output,
   type OutputContext,
   type PlanResult,
@@ -77,6 +78,11 @@ const bodyRender = ({ color }: CommonOptions): RenderOptions => ({ color: color.
 
 const noticeRender = ({ color }: CommonOptions): RenderOptions => ({ color: color.stderr });
 
+const applyNotice = (options: CommonOptions): DiagnosticsOptions => ({
+  ...noticeRender(options),
+  nothingApplied: true,
+});
+
 const validateStatically = async (
   options: CommonOptions,
   deps: Deps,
@@ -118,13 +124,16 @@ export const runValidate = async (options: CommonOptions, deps: Deps): Promise<n
   return hasError(diagnostics) ? EXIT_ERROR : EXIT_SUCCESS;
 };
 
-const prepare = async (options: CommonOptions, deps: Deps): Promise<Prepared> => {
+const prepare = async (
+  options: CommonOptions,
+  deps: Deps,
+  notice: DiagnosticsOptions,
+): Promise<Prepared> => {
   const { io, output } = deps;
-  const render = noticeRender(options);
   const statically = await validateStatically(options, deps, "error");
 
   if (statically.manifest === undefined) {
-    io.err(output.diagnostics(statically.diagnostics, render));
+    io.err(output.diagnostics(statically.diagnostics, notice));
 
     return { ok: false, code: EXIT_ERROR };
   }
@@ -153,7 +162,7 @@ const prepare = async (options: CommonOptions, deps: Deps): Promise<Prepared> =>
     const diagnostics = orderDiagnostics([...statically.diagnostics, ...built.diagnostics]);
 
     if (built.plan === undefined || hasError(diagnostics)) {
-      io.err(output.diagnostics(diagnostics, render));
+      io.err(output.diagnostics(diagnostics, notice));
 
       return { ok: false, code: EXIT_ERROR };
     }
@@ -166,7 +175,7 @@ const prepare = async (options: CommonOptions, deps: Deps): Promise<Prepared> =>
       manifest: statically.manifest,
     };
   } catch (error) {
-    io.err(output.failure(error, render));
+    io.err(output.failure(error, notice));
 
     return { ok: false, code: EXIT_ERROR };
   }
@@ -183,7 +192,7 @@ const echoWarnings = (plan: PlanResult, options: CommonOptions, deps: Deps): voi
 };
 
 export const runPlan = async (options: PlanOptions, deps: Deps): Promise<number> => {
-  const prepared = await prepare(options, deps);
+  const prepared = await prepare(options, deps, noticeRender(options));
 
   if (!prepared.ok) {
     return prepared.code;
@@ -257,7 +266,7 @@ const runExecution = async (
 };
 
 export const runApply = async (options: ApplyOptions, deps: Deps): Promise<number> => {
-  const prepared = await prepare(options, deps);
+  const prepared = await prepare(options, deps, applyNotice(options));
 
   if (!prepared.ok) {
     return prepared.code;

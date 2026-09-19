@@ -27,7 +27,23 @@ const headline = ({ message }: Diagnostic): string => message.split("\n")[0] ?? 
 const indent = (width: number, lines: string[]): string[] =>
   lines.map((line) => `${" ".repeat(width)}${line}`);
 
-export type DiagnosticOptions = { paint?: Paint };
+/**
+ * `Nothing has been applied.` を添えるかは呼び出し側が決める（要件定義 §5.3）。
+ * `validate` と `plan` はもともと何も適用しないので、そこで言うと意味をなさない。
+ */
+export type DiagnosticOptions = { paint?: Paint; nothingApplied?: boolean };
+
+const errorSummary = (diagnostics: Diagnostic[], nothingApplied: boolean): string[] => {
+  const count = diagnostics.filter(({ severity }) => severity === "error").length;
+
+  if (count === 0) {
+    return [];
+  }
+
+  const errors = count === 1 ? "1 validation error." : `${count} validation errors.`;
+
+  return [nothingApplied ? `${errors} Nothing has been applied.` : errors];
+};
 
 /**
  * 並べ替えをここでもう一度行う。`orderDiagnostics` は冪等なので、呼び出し側が
@@ -35,10 +51,11 @@ export type DiagnosticOptions = { paint?: Paint };
  */
 export const renderDiagnostics = (
   diagnostics: Diagnostic[],
-  { paint = plain }: DiagnosticOptions = {},
+  { paint = plain, nothingApplied = false }: DiagnosticOptions = {},
 ): string =>
-  orderDiagnostics(diagnostics)
-    .map((diagnostic) =>
+  [
+    ...errorSummary(diagnostics, nothingApplied),
+    ...orderDiagnostics(diagnostics).map((diagnostic) =>
       [
         paint(
           diagnostic.severity,
@@ -46,8 +63,8 @@ export const renderDiagnostics = (
         ),
         ...indent(2, messageLines(diagnostic, true)),
       ].join("\n"),
-    )
-    .join("\n\n");
+    ),
+  ].join("\n\n");
 
 export const renderWarnings = (
   diagnostics: Diagnostic[],
