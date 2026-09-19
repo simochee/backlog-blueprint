@@ -302,7 +302,17 @@ Yaml を GUI フォームから生成する機能、既存プロジェクトか�
 | NFR-2 | `429` を受けたら `X-RateLimit-Reset` まで待って再試行する（上限回数あり） | レート制限超過で失敗させない |
 | NFR-3 | API キーをログ・計画出力・エラーメッセージに出さない | CI ログへの漏洩を防ぐ |
 | NFR-4 | 同じマニフェストを2回適用しても結果が変わらない（冪等） | 中断後の再実行を安全にする |
-| NFR-5 | core パッケージは `fetch` 以外のランタイム依存を持たない。**Nulab 公式パッケージは例外として許容する**が、core 自身には入れず送信層に置く | Node とブラウザで同一ロジックを動かすため。core を依存ゼロに保つと、`types: []` と `fetch` の ambient 宣言だけで「Node 専用 API を書いたら型検査が落ちる」状態を作れる |
+| NFR-5 | core パッケージは**プラットフォーム固有の API を使わない**。使ってよいのは ECMAScript の標準と `fetch` だけで、`node:*` / `process` / `Buffer` も `document` / `window` / `localStorage` も書けない。npm 依存は**どの実行環境でも動くもの**に限って許す | Node とブラウザで同一ロジックを動かすため。禁じたいのは実行環境への依存であって、パッケージの数ではない |
+
+NFR-5 は `packages/core` の tsconfig で担保する。`types: []` と `lib: ["ES2022"]` に
+`fetch` の ambient 宣言だけを足した状態を保ち、**Node 専用 API を書くと型検査が落ちる**。
+`types: []` が止めるのは自動読み込みだけなので、依存の `.d.ts` に
+`/// <reference types="node" />` が1つでもあればこのガードは黙って無効になる。
+**core に依存を足すときは、足した後にガードが生きていることを必ず確かめる。**
+
+Nulab 公式の [backlog-js](https://github.com/nulab/backlog-js) は core に入れず
+`packages/backlog-client` に置く（[§7.0](#70-送信層を-core-から切り離す)）。
+core が要求するのは注入される関数だけで、送信の実体を知る必要がないため。
 | NFR-6 | 検証・計画のロジックは CLI と Web UI で同一のコードを使う | 「CLI では通るが Web では落ちる」を構造的に作らない |
 | NFR-7 | **マニフェストを置いたリポジトリへの push 権限が、実質的にスペース管理者権限になる**ことを README で警告する | 実装では防げない。CI に置く API キーはスペース管理者のものなので、そのリポジトリに push できる人は任意のプロジェクト設定を書き換えられる。[先行事例](../design/syntax-reference-github.md#33-設定リポジトリへの-push-権限が管理者権限になる)でも同じ警告が出ている |
 | NFR-8 | リソース種別ごとに独立した reconciler（現状取得 → 差分算出）として実装し、**適用は全リソース共通の Executor が `Action[]` に対して行う** | リソース追加が「ファイルを1つ足して適用順序に並べる」だけで済む。`Action` を唯一の実行単位にすることで、「plan に出ないのに apply で起きる」が各 reconciler の行儀ではなく構造として消える。レート制限・再試行・進捗・中断レポートも1箇所に集まる（[理由](../design/core-reconciler.md#c-1-reconciler-は-read-と-plan-だけを持ちapply-は持たない)） |
@@ -434,7 +444,7 @@ ERROR [V-B3] key: project already has issues
 ```
 packages/
   core/            パース・検証・plan 算出・apply 実行
-                   依存ゼロ。fetch は ambient 宣言で型だけ持つ
+                   プラットフォーム固有 API を使わない。fetch は ambient 宣言で型だけ持つ
   backlog-client/  backlog-js を包み、core に get / send を注入する送信層
   cli/             npx backlog-blueprint（環境変数・ファイル IO・終了コード）
   web/             Vite SPA。static hosting に配置
@@ -452,11 +462,12 @@ cli と web の両方が同じものを使う。
 | FR-5.1a | backlog-js が API キーを `Backlog-API-Key` ヘッダで送る。クエリに載る経路が実装に無い |
 | 本文の形式 | form-urlencoded と配列の `key[]` 表記が公式クライアントの実装として確定する（[API 制約](../research/backlog-api-constraints.md#リクエストの形式)） |
 | PO-3 | 低レベルの `request({ method, path, params })` があるので、計画した `HttpRequest` をそのまま渡せる。plan に出した内容と実際に送る内容が同一になる |
-| NFR-5 | core の依存はゼロのまま。`qs` を含む型定義が core のプログラムに入らないので、Node 専用 API を弾くガードが無効化されない |
+| NFR-5 | `qs` を含む型定義が core のプログラムに入らないので、Node 専用 API を弾くガードが無効化されない |
 
-**採らなかった案: core に直接入れる。** パッケージは1つ減るが、`.d.ts` が1枚でも
+**採らなかった案: core に直接入れる。** パッケージは1つ減るが、`.d.ts` が
 core のプログラムに入ると `/// <reference types="node" />` 経由で `@types/node` が
-紛れ込み、NFR-5 の型ガードが黙って無効になる。
+紛れ込み、NFR-5 の型ガードが黙って無効になりうる。core が持つ依存は、
+マニフェストのスキーマ定義（M-1）のように**そこに無ければ成立しないもの**だけに絞る。
 
 **採らなかった案: form-urlencoded の組み立てを自前で書く。** 依存は増えないが、
 Backlog が本文の形式を変えたときに追随する責任を自分で持つことになる。
