@@ -334,7 +334,10 @@ describe("受け入れ基準", () => {
     expect(io.stdout).toContain("Applied (8):");
     expect(io.stdout).toContain("Failed (1):");
     expect(io.stdout).toContain("Not applied (9):");
-    expect(io.stdout).toContain("Re-run apply with the same manifest to continue.");
+    expect(io.stdout).toContain(
+      "Re-run apply with the same manifest to continue. Already applied changes become no-ops.",
+    );
+    expect(io.stdout).toContain("The project must still have zero issues at that point.");
     expect(backlog.project("PROJ_A")?.categories).toEqual([]);
     expect(backlog.project("PROJ_A")?.webhooks).toEqual([]);
   });
