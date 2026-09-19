@@ -103,6 +103,9 @@ importers:
         specifier: workspace:*
         version: link:../../packages/core
     devDependencies:
+      '@backlog-blueprint/schema':
+        specifier: workspace:*
+        version: link:../../packages/schema
       '@backlog-blueprint/test-utils':
         specifier: workspace:*
         version: link:../../packages/test-utils

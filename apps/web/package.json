@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
+    "dev": "vite --configLoader runner",
+    "build": "vite build --configLoader runner",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests"
   },
@@ -14,6 +14,7 @@
     "@backlog-blueprint/core": "workspace:*"
   },
   "devDependencies": {
+    "@backlog-blueprint/schema": "workspace:*",
     "@backlog-blueprint/test-utils": "workspace:*",
     "@backlog-blueprint/tsconfigs": "workspace:*",
     "typescript": "catalog:",
