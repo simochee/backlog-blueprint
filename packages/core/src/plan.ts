@@ -47,8 +47,15 @@ export const seedResolutions = (snapshots: ResourceSnapshots): ResolutionTable =
     }
   }
 
-  for (const { id, name } of snapshots.statuses) {
-    put(`status:${name}`, id);
+  /**
+   * 未作成のプロジェクトの既定ステータスは登録しない。表示名はスペースの言語設定で
+   * 変わり、計画が選んだ組は推測でしかない（API 制約「既定リソースの表示名」）。
+   * 実名は RF-1 の `refresh` が登録する。
+   */
+  if (snapshots.statuses.source === "project") {
+    for (const { id, name } of snapshots.statuses.statuses) {
+      put(`status:${name}`, id);
+    }
   }
 
   for (const { id, name } of snapshots.categories) {

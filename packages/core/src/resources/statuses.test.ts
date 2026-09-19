@@ -2,10 +2,19 @@ import { describe, expect, it } from "vitest";
 
 import { fixedPlanContext, fixedReadContext, fixedSnapshot } from "../../../test-utils/src/index";
 import { type Status } from "../manifest";
-import { DEFAULT_STATUSES, statusesReconciler, type ExistingStatus } from "./statuses";
+import {
+  DEFAULT_STATUSES_EN,
+  DEFAULT_STATUSES_JA,
+  matchDefaultStatuses,
+  statusesReconciler,
+  type ExistingStatus,
+} from "./statuses";
 
 const plan = (desired: Status[], snapshot: ExistingStatus[]) =>
-  statusesReconciler.plan(desired, snapshot, fixedPlanContext());
+  statusesReconciler.plan(desired, { source: "project", statuses: snapshot }, fixedPlanContext());
+
+const planNewProject = (desired: Status[]) =>
+  statusesReconciler.plan(desired, { source: "defaults" }, fixedPlanContext());
 
 const defaults: Status[] = [
   { name: "未対応" },
@@ -14,21 +23,15 @@ const defaults: Status[] = [
   { name: "完了" },
 ];
 
-const englishDefaults: ExistingStatus[] = [
-  { id: 1, name: "Open", color: "#ed8077" },
-  { id: 2, name: "In Progress", color: "#4488c5" },
-  { id: 3, name: "Resolved", color: "#5eb5a6" },
-  { id: 4, name: "Closed", color: "#b0be3c" },
-];
+const englishDefaults = DEFAULT_STATUSES_EN;
 
 describe("現状の取得", () => {
-  it("未作成のプロジェクトでも既定4件の ID は 1〜4 で分かっている", async () => {
+  it("未作成のプロジェクトでは、既定4件の表示名を取得せずに枠だけを持つ", async () => {
     const snapshot = await statusesReconciler.read(
       fixedReadContext({}, { snapshot: fixedSnapshot({ project: { exists: false } }) }),
     );
 
-    expect(snapshot.map(({ id }) => id)).toEqual([1, 2, 3, 4]);
-    expect(snapshot).toEqual(DEFAULT_STATUSES);
+    expect(snapshot).toEqual({ source: "defaults" });
   });
 
   it("既存プロジェクトのステータスは GET の応答から読む", async () => {
@@ -40,13 +43,16 @@ describe("現状の取得", () => {
       }),
     );
 
-    expect(snapshot).toEqual([{ id: 1, name: "未対応", color: "#ed8077" }]);
+    expect(snapshot).toEqual({
+      source: "project",
+      statuses: [{ id: 1, name: "未対応", color: "#ed8077" }],
+    });
   });
 });
 
 describe("既定ステータス", () => {
   it("既定の4件には何も起きない", () => {
-    const actions = plan(defaults, DEFAULT_STATUSES);
+    const actions = plan(defaults, DEFAULT_STATUSES_JA);
 
     expect(actions.every(({ writeRequest }) => writeRequest === false)).toBe(true);
   });
@@ -94,7 +100,7 @@ describe("oldname の解釈", () => {
         { name: "レビュー中", color: "#3b9dbd", oldname: "確認中" },
         ...defaults.slice(3),
       ],
-      [...DEFAULT_STATUSES, review, { id: 6, name: "確認中", color: "#eda62a" }],
+      [...DEFAULT_STATUSES_JA, review, { id: 6, name: "確認中", color: "#eda62a" }],
     );
 
     expect(actions.find(({ name }) => name === "レビュー中")).toMatchObject({ op: "noop" });
@@ -108,7 +114,7 @@ describe("oldname の解釈", () => {
         { name: "レビュー中", color: "#3b9dbd", oldname: "確認中" },
         ...defaults.slice(3),
       ],
-      [...DEFAULT_STATUSES, { id: 6, name: "確認中", color: "#3b9dbd" }],
+      [...DEFAULT_STATUSES_JA, { id: 6, name: "確認中", color: "#3b9dbd" }],
     );
 
     expect(actions.find(({ name }) => name === "レビュー中")).toMatchObject({
@@ -126,7 +132,7 @@ describe("oldname の解釈", () => {
         { name: "レビュー中", color: "#3b9dbd", oldname: "確認中" },
         ...defaults.slice(3),
       ],
-      [...DEFAULT_STATUSES, { id: 6, name: "確認中", color: "#3b9dbd" }],
+      [...DEFAULT_STATUSES_JA, { id: 6, name: "確認中", color: "#3b9dbd" }],
     );
 
     expect(actions.find(({ name }) => name === "レビュー中")?.provides).toEqual([
@@ -141,7 +147,7 @@ describe("oldname の解釈", () => {
         { name: "レビュー中", color: "#3b9dbd", oldname: "確認中" },
         ...defaults.slice(3),
       ],
-      DEFAULT_STATUSES,
+      DEFAULT_STATUSES_JA,
     );
 
     expect(actions[0]).toMatchObject({
@@ -160,7 +166,7 @@ describe("oldname の解釈", () => {
 describe("削除", () => {
   it("定義に無いカスタムは未対応へ振り替えて削除する", () => {
     const actions = plan(defaults, [
-      ...DEFAULT_STATUSES,
+      ...DEFAULT_STATUSES_JA,
       { id: 5, name: "レビュー中", color: "#3b9dbd" },
     ]);
 
@@ -178,7 +184,7 @@ describe("削除", () => {
 
 describe("表示順", () => {
   it("計画には必ず表示順の Action が1件だけ、最後に並ぶ", () => {
-    const actions = plan(defaults, DEFAULT_STATUSES);
+    const actions = plan(defaults, DEFAULT_STATUSES_JA);
     const reorders = actions.filter(({ id }) => id === "statuses/reorder");
 
     expect(reorders).toHaveLength(1);
@@ -188,7 +194,7 @@ describe("表示順", () => {
   it("新規カスタムは完了の直前に入るので、全ステータスを1リクエストで並べ直す", () => {
     const actions = plan(
       [...defaults.slice(0, 2), { name: "レビュー中", color: "#3b9dbd" }, ...defaults.slice(2)],
-      DEFAULT_STATUSES,
+      DEFAULT_STATUSES_JA,
     );
 
     expect(actions.at(-1)).toMatchObject({
@@ -214,7 +220,7 @@ describe("表示順", () => {
   it("挿入位置が記述順と同じなら並べ直さない", () => {
     const actions = plan(
       [...defaults.slice(0, 3), { name: "レビュー中", color: "#3b9dbd" }, ...defaults.slice(3)],
-      DEFAULT_STATUSES,
+      DEFAULT_STATUSES_JA,
     );
 
     expect(actions.at(-1)).toMatchObject({
@@ -265,5 +271,54 @@ describe("応答の検査", () => {
         fixedReadContext({ "/api/v2/projects/PROJ_A/statuses": [{ id: 1, name: "未対応" }] }),
       ),
     ).rejects.toThrow("color");
+  });
+});
+
+describe("未作成のプロジェクトの既定ステータス", () => {
+  const englishNames: Status[] = DEFAULT_STATUSES_EN.map(({ name }) => ({ name }));
+
+  it("日本語の既定名で書けば、既定4件には何も起きない", () => {
+    const actions = planNewProject(defaults);
+
+    expect(actions.every(({ op }) => op === "noop")).toBe(true);
+  });
+
+  it("英語の既定名で書いても、既定4件には何も起きない", () => {
+    const actions = planNewProject(englishNames);
+
+    expect(actions.every(({ op }) => op === "noop")).toBe(true);
+  });
+
+  it("英語の既定名は ID 1〜4 の既定として引き当てられる", () => {
+    const actions = planNewProject(englishNames);
+
+    expect(actions.filter(({ op }) => op === "noop").map(({ target }) => target)).toEqual([
+      1,
+      2,
+      3,
+      4,
+      undefined,
+    ]);
+  });
+
+  it("英語の既定名に足したカスタムだけが作成される", () => {
+    const actions = planNewProject([
+      ...englishNames.slice(0, 3),
+      { name: "In Review", color: "#3b9dbd" },
+      ...englishNames.slice(3),
+    ]);
+
+    expect(actions.filter(({ op }) => op === "create").map(({ name }) => name)).toEqual([
+      "In Review",
+    ]);
+  });
+
+  it("どちらかの組の既定名がすべて揃っていれば既定として扱う", () => {
+    expect(matchDefaultStatuses(defaults.map(({ name }) => name))).toEqual(DEFAULT_STATUSES_JA);
+    expect(matchDefaultStatuses(englishNames.map(({ name }) => name))).toEqual(DEFAULT_STATUSES_EN);
+  });
+
+  it("2つの組を混ぜて書いたマニフェストはどちらの組にも一致しない", () => {
+    expect(matchDefaultStatuses(["未対応", "In Progress", "処理済み", "Closed"])).toBeUndefined();
   });
 });

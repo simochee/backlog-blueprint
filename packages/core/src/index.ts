@@ -21,7 +21,12 @@ export {
 } from "./resources/issue-types";
 export { milestonesReconciler } from "./resources/milestones";
 export { projectReconciler } from "./resources/project";
-export { DEFAULT_STATUSES, statusesReconciler } from "./resources/statuses";
+export {
+  DEFAULT_STATUSES_EN,
+  DEFAULT_STATUSES_JA,
+  matchDefaultStatuses,
+  statusesReconciler,
+} from "./resources/statuses";
 export { webhooksReconciler } from "./resources/webhooks";
 export { Secret, sealChanges, sealFields, sealer } from "./secret";
 export { expandEnvironment, hasEnvSentinel, UNRESOLVED_ENV_ID } from "./validation/expand-stage";

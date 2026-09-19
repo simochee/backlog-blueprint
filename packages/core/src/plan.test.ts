@@ -9,7 +9,7 @@ const snapshots = (overrides: Partial<ResourceSnapshots> = {}): ResourceSnapshot
   projectKey: "PROJ_A",
   project: { exists: true, id: 100, name: "プロジェクトA", settings: {} },
   issueTypes: { source: "project", issueTypes: [{ id: 101, name: "タスク", color: "#7ea800" }] },
-  statuses: [{ id: 1, name: "未対応", color: "#ed8077" }],
+  statuses: { source: "project", statuses: [{ id: 1, name: "未対応", color: "#ed8077" }] },
   categories: [{ id: 21, name: "インフラ" }],
   milestones: [{ id: 31, name: "v1.0" }],
   customFields: { customFields: [], issueTypes: [] },
@@ -48,7 +48,7 @@ describe("解決表の初期登録", () => {
       snapshots({
         project: { exists: false },
         issueTypes: { source: "defaults", slots: 4 },
-        statuses: [],
+        statuses: { source: "defaults" },
         categories: [],
         milestones: [],
         access: {
