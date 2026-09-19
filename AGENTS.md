@@ -116,9 +116,17 @@ backlog-js とその型定義を `packages/core` に入れない。
 
   | ヘルパ | 用途 |
   | --- | --- |
-  | `fixedSnapshot(overrides?)` | `Snapshot` を固定値で組み立てる |
-  | `fixedGet(responses)` | `ReadContext['get']` を path → 応答の表で差し替える |
-  | `recordingSend(respond?)` | `ExecuteContext['send']` を差し替え、送られた `ResolvedHttpRequest` を記録する |
+  | `fixedSnapshot(overrides?)` | フェーズ0の `Snapshot` を固定値で組み立てる |
+  | `fixedResourceSnapshots(overrides?)` | 各 reconciler の `read()` が返す `ResourceSnapshots` を固定値で組み立てる |
+  | `fixedManifest(overrides?)` | 正規化済みの `Manifest` を固定値で組み立てる |
+  | `fixedGet(responses)` | `ReadContext['get']` を path → 応答の表で差し替える。表に無い path は失敗する |
+  | `fixedSpaceResponses(overrides?)` | 課題0件の既存プロジェクトに対する GET の応答をひととおり持つ表 |
+  | `httpFailure(failure)` | 応答の表に「その path では `HttpFailure` を投げる」と書く |
+  | `recordingGet(responses)` | `fixedGet` に加えて、取得した path を `requested` に記録する |
+  | `recordingSend(respond?)` | `ExecuteContext['send']` を差し替え、送られた `ResolvedHttpRequest` を `sent` に記録する |
+  | `fixedReadContext(responses, overrides?)` | `ReadContext` を組み立てる |
+  | `fixedPlanContext(overrides?)` | `PlanContext` を組み立てる |
+  | `secretPaths(...paths)` | `PlanContext['isSecret']` を、展開された path の集合で差し替える |
 
 - 足りないヘルパは `packages/test-utils` に足してから使う。
 - **`packages/core` からは相対 path で読む。** core の devDependencies に
