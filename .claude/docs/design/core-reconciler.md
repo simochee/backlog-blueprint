@@ -142,9 +142,19 @@ class Secret {
   #value: string
   toString() { return '***' }
   toJSON()   { return '***' }
-  reveal()   { return this.#value }   // HTTP 送信の直前だけが呼ぶ
+  reveal()   { return this.#value }   // 送信の直前と、値を外に出さない比較だけが呼ぶ
 }
 ```
+
+`reveal()` を呼んでよいのは2種類だけである。
+
+1. **HTTP 送信の直前**（シリアライズする層）
+2. **値を外に出さない比較**。差分判定（§6.4 の `hookUrl`）と、描画側で「前後が同じ項目を描かない」を決めるとき。
+   どちらも**結果の真偽だけが外に出て、実値はその関数から出ない**
+
+2 を許すのは、比較を `Secret` のまま行う手段が無いためである。`===` は必ず偽になるので、
+禁じると「`${ENV}` 由来の値が現状と同じでも毎回 `update` が出る」ことになり、NFR-4 と AC-8 が壊れる。
+**呼び出しの数を増やさないことではなく、実値が関数の外へ出ないことが守りたい不変条件**である。
 
 `${ENV}` で展開された値（E-4）は必ず `Secret` になる。
 `toString` / `toJSON` がマスクを返すので、**マスクし忘れるという書き方ができない**。
@@ -525,7 +535,7 @@ CLI は行を書き、Web UI は state を更新する。core にコールバッ
 
 ```ts
 type HttpFailure = {
-  status?: number                  // HTTP まで到達しなかった失敗では無い（§7.2 / PO-7）
+  status?: number                  // HTTP まで到達しなかった失敗では無い（plan の出力仕様 §3.3 / PO-5）
   errors: { message: string }[]
 }
 ```
