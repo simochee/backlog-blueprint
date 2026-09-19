@@ -188,17 +188,23 @@ describe("受け入れ基準", () => {
       chartEnabled: true,
       useWiki: true,
     });
-    expect(project?.issueTypes.map(({ name, color }) => ({ name, color }))).toEqual([
-      { name: "タスク", color: "#7ea800" },
-      { name: "バグ", color: "#990000" },
-      { name: "調査", color: "#2779ca" },
+    expect(
+      project?.issueTypes.map(({ name, color, templateSummary }) => ({
+        name,
+        color,
+        templateSummary,
+      })),
+    ).toEqual([
+      { name: "タスク", color: "#7ea800", templateSummary: null },
+      { name: "バグ", color: "#990000", templateSummary: "【不具合】" },
+      { name: "調査", color: "#2779ca", templateSummary: null },
     ]);
-    expect(project?.statuses.map(({ name }) => name)).toEqual([
-      "未対応",
-      "処理中",
-      "レビュー中",
-      "処理済み",
-      "完了",
+    expect(project?.statuses.map(({ name, color }) => ({ name, color }))).toEqual([
+      { name: "未対応", color: "#ed8077" },
+      { name: "処理中", color: "#4488c5" },
+      { name: "レビュー中", color: "#3b9dbd" },
+      { name: "処理済み", color: "#5eb5a6" },
+      { name: "完了", color: "#b0be3c" },
     ]);
     expect(project?.categories.map(({ name }) => name)).toEqual(["フロントエンド", "バックエンド"]);
     expect(project?.milestones).toEqual([
