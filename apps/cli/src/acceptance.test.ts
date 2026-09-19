@@ -368,11 +368,11 @@ describe("受け入れ基準", () => {
   it("plan / apply の出力とログのどこにも API キーが現れない", async () => {
     const planned = plan(space(), MANIFEST, ["--output", "json"]);
 
-    await planned.code;
+    await expect(planned.code).resolves.toBe(2);
 
     const applied = apply(space(), MANIFEST, ["--output", "json"]);
 
-    await applied.code;
+    await expect(applied.code).resolves.toBe(0);
 
     const aborted = apply(
       space({
@@ -388,9 +388,10 @@ describe("受け入れ基準", () => {
       MANIFEST,
     );
 
-    await aborted.code;
+    await expect(aborted.code).resolves.toBe(1);
 
     for (const io of [planned.io, applied.io, aborted.io]) {
+      expect(io.stdout).not.toBe("");
       expect(io.stdout).not.toContain(API_KEY);
       expect(io.stderr).not.toContain(API_KEY);
     }
