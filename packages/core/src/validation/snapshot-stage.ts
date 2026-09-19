@@ -42,16 +42,23 @@ export const validateAgainstSnapshot = ({
   /**
    * 未作成のプロジェクトで省略された場合もエラーにする。送らないキーの値を決めるのは
    * Backlog であり、ツールがその既定を持たない（K-3）以上、真であることを確認できない。
+   * 現状が無いことと、現状が偽であることは別なのでメッセージも分ける。
    */
-  const undeclared = subtaskingEnabled === undefined;
+  const message = (): string => {
+    if (subtaskingEnabled !== undefined) {
+      return "grandchildIssueEnabled requires subtaskingEnabled to be true";
+    }
+
+    return project.exists
+      ? `grandchildIssueEnabled requires subtaskingEnabled, which is not declared and is not enabled on ${manifest.key}`
+      : `grandchildIssueEnabled requires subtaskingEnabled, which is not declared, and ${manifest.key} does not exist yet, so its current value cannot be read`;
+  };
 
   return [
     snapshotDiagnostic(
       "V-A12",
       "settings/grandchildIssueEnabled",
-      undeclared
-        ? `grandchildIssueEnabled requires subtaskingEnabled, which is not declared and is not enabled on ${manifest.key}`
-        : "grandchildIssueEnabled requires subtaskingEnabled to be true",
+      message(),
       "set settings.subtaskingEnabled to true, or set settings.grandchildIssueEnabled to false",
     ),
   ];

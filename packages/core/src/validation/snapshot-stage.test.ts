@@ -52,6 +52,13 @@ describe("孫課題の設定（V-A12）", () => {
     expect(idsOf({ grandchildIssueEnabled: true }, { exists: false })).toEqual(["V-A12"]);
   });
 
+  it("未作成のプロジェクトには、現状が無効だとは言わず、読めないと言う", () => {
+    const [diagnostic] = validate({ grandchildIssueEnabled: true }, { exists: false });
+
+    expect(diagnostic?.message).toContain("does not exist yet");
+    expect(diagnostic?.message).not.toContain("is not enabled on");
+  });
+
   it("孫課題を有効にしていなければ何も判定しない", () => {
     expect(idsOf({ subtaskingEnabled: false }, existing())).toEqual([]);
   });
