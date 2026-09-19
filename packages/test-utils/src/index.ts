@@ -19,7 +19,6 @@ import {
 export const fixedSnapshot = (overrides: Partial<Snapshot> = {}): Snapshot => ({
   executor: { id: 1, roleType: 1 },
   updateRateLimit: { limit: 150, remaining: 150, reset: 0 },
-  space: { lang: "ja" },
   project: { exists: true, id: 100, issueCount: 0 },
   ...overrides,
 });
