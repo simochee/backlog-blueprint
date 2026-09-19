@@ -1,3 +1,10 @@
+/**
+ * `packages/core` のテストはこのファイルを相対 path で読む。core の
+ * devDependencies に `@backlog-blueprint/test-utils` を足すと、test-utils → core の
+ * 依存と合わせてワークスペースの循環になり、turbo が
+ * `Cyclic dependency detected` でタスクを組めなくなる（実測）。
+ * 相対 import はその循環を作らないための形であって、書き忘れではない。
+ */
 import {
   normalizeManifest,
   type ExecuteContext,

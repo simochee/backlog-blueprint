@@ -121,6 +121,9 @@ backlog-js とその型定義を `packages/core` に入れない。
   | `recordingSend(respond?)` | `ExecuteContext['send']` を差し替え、送られた `ResolvedHttpRequest` を記録する |
 
 - 足りないヘルパは `packages/test-utils` に足してから使う。
+- **`packages/core` からは相対 path で読む。** core の devDependencies に
+  `@backlog-blueprint/test-utils` を足すと turbo がワークスペースの循環を検出して
+  すべてのタスクが組めなくなる（test-utils は core に依存しているため）。
 
 ## メッセージとコミットログの言語
 
