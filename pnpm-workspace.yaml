@@ -8,11 +8,16 @@ allowBuilds:
 catalog:
   "@sinclair/typebox": ^0.34.52
   "@types/node": ^24.10.1
+  '@types/react': ^19.3.0
+  '@types/react-dom': ^19.3.0
+  '@vitejs/plugin-react': ^6.1.1
   ajv: ^8.20.0
   backlog-js: ^0.20.1
   commander: ^15.0.0
   oxfmt: ^0.68.0
   oxlint: ^1.83.0
+  react: ^19.3.0
+  react-dom: ^19.3.0
   turbo: ~2.10.13
   typescript: ^5.9.3
   vite: ^7.1.14

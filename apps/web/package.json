@@ -11,12 +11,17 @@
   },
   "dependencies": {
     "@backlog-blueprint/backlog-client": "workspace:*",
-    "@backlog-blueprint/core": "workspace:*"
+    "@backlog-blueprint/core": "workspace:*",
+    "react": "catalog:",
+    "react-dom": "catalog:"
   },
   "devDependencies": {
     "@backlog-blueprint/schema": "workspace:*",
     "@backlog-blueprint/test-utils": "workspace:*",
     "@backlog-blueprint/tsconfigs": "workspace:*",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:"
