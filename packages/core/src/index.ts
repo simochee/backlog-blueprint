@@ -24,7 +24,7 @@ export { Secret, sealChanges, sealFields, sealer } from "./secret";
 export { expandEnvironment, hasEnvSentinel, UNRESOLVED_ENV_ID } from "./validation/expand-stage";
 export { blocksNextStage, hasError, orderDiagnostics } from "./validation/gate";
 export { validateManifest } from "./validation/pipeline";
-export { validateSchema } from "./validation/schema-stage";
+export { schemaStage, validateSchema } from "./validation/schema-stage";
 export { validateStaticSemantics } from "./validation/semantic-stage";
 export { validateAgainstSnapshot } from "./validation/snapshot-stage";
 export {

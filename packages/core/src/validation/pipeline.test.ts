@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { type Diagnostic } from "../diagnostic";
 import { validateManifest, type SchemaStage } from "./pipeline";
+import { schemaStage } from "./schema-stage";
 
 const acceptingSchemaStage: SchemaStage = () => [];
 
@@ -167,5 +168,27 @@ describe("展開した値の経路", () => {
 
     expect([...result.expandedPaths]).toEqual(["webhooks/0/hookUrl"]);
     expect(result.manifest?.webhooks[0]?.hookUrl).toBe("https://hooks.example/abc");
+  });
+});
+
+describe("スキーマステージの配線", () => {
+  it("引用符を忘れた色は、位置つきで V-A18 として報告される", () => {
+    const { diagnostics } = validateManifest({
+      text: "key: PROJ_A\nname: プロジェクトA\nissueTypes:\n  - name: バグ\n    color: #990000\n",
+      schemaStage,
+    });
+
+    expect(diagnostics).toEqual([
+      expect.objectContaining({ id: "V-A18", path: "issueTypes/0/color", line: 5 }),
+    ]);
+  });
+
+  it("明示的に書かれた null は V-A18 にならない", () => {
+    const { diagnostics } = validateManifest({
+      text: "key: PROJ_A\nname: プロジェクトA\nissueTypes:\n  - name: バグ\n    color: null\n",
+      schemaStage,
+    });
+
+    expect(diagnostics.every(({ id }) => id === "V-A21")).toBe(true);
   });
 });

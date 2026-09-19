@@ -2,6 +2,7 @@ import { Ajv2020, type ErrorObject } from "ajv/dist/2020.js";
 
 import { type Diagnostic } from "../diagnostic";
 import { DATE_PATTERN, ManifestSchema } from "../manifest";
+import { type SchemaStage } from "./pipeline";
 import { instancePathTokens, pathFromInstancePath, type SourceMap } from "./source-map";
 
 export type SchemaStageOptions = {
@@ -333,3 +334,11 @@ export const validateSchema = (
       return isFirst;
     });
 };
+
+/**
+ * パイプラインに渡す形をここに置く。呼び出し側が `validateSchema(parsed.value)` と
+ * 書いてしまうと、位置（DG-5）と V-A18 の判定に要る `isEmptySource`（Y-3）が
+ * 黙って落ちる。落ちても検証は動くので、テストでも気付けない。
+ */
+export const schemaStage: SchemaStage = (parsed) =>
+  validateSchema(parsed.value, { source: parsed.source });
