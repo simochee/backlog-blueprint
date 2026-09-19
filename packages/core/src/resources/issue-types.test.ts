@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { fixedPlanContext, fixedReadContext, fixedSnapshot } from "../../../test-utils/src/index";
+import {
+  fixedPlanContext,
+  fixedReadContext,
+  fixedSnapshot,
+  secretPaths,
+} from "../../../test-utils/src/index";
+import { Secret } from "../secret";
 import { type IssueType } from "../manifest";
 import { DEFAULT_ISSUE_TYPES, issueTypesReconciler, type ExistingIssueType } from "./issue-types";
 
@@ -181,5 +187,18 @@ describe("未作成のプロジェクト", () => {
         params: { substituteIssueTypeId: { $ref: { kind: "issueType", name: "調査" } } },
       },
     });
+  });
+});
+
+describe("環境変数から展開した値", () => {
+  it("課題テンプレートが ${ENV} 由来なら計画に実値が現れない", () => {
+    const actions = issueTypesReconciler.plan(
+      [{ name: "バグ", color: "#990000", templateDescription: "社外秘の手順" }],
+      [],
+      fixedPlanContext({ isSecret: secretPaths("issueTypes/0/templateDescription") }),
+    );
+
+    expect(actions[0]?.request?.params.templateDescription).toBeInstanceOf(Secret);
+    expect(JSON.stringify(actions)).not.toContain("社外秘の手順");
   });
 });

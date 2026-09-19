@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { fixedPlanContext, fixedReadContext, fixedSnapshot } from "../../../test-utils/src/index";
+import {
+  fixedPlanContext,
+  fixedReadContext,
+  fixedSnapshot,
+  secretPaths,
+} from "../../../test-utils/src/index";
+import { Secret } from "../secret";
 import { type CustomField } from "../manifest";
 import { customFieldsReconciler, type CustomFieldsSnapshot } from "./custom-fields";
 
@@ -299,5 +305,18 @@ describe("カスタム属性の oldname", () => {
     );
 
     expect(actions.map(({ op }) => op)).toEqual(["noop"]);
+  });
+});
+
+describe("環境変数から展開した値", () => {
+  it("説明が ${ENV} 由来なら計画に実値が現れない", () => {
+    const actions = customFieldsReconciler.plan(
+      [{ name: "顧客名", type: "text", description: "社外秘の説明" }],
+      [],
+      fixedPlanContext({ isSecret: secretPaths("customFields/0/description") }),
+    );
+
+    expect(actions[0]?.request?.params.description).toBeInstanceOf(Secret);
+    expect(JSON.stringify(actions)).not.toContain("社外秘の説明");
   });
 });

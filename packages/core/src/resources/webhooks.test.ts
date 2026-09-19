@@ -1,20 +1,35 @@
 import { describe, expect, it } from "vitest";
 
-import { fixedPlanContext, fixedReadContext, fixedSnapshot } from "../../../test-utils/src/index";
+import {
+  fixedPlanContext,
+  fixedReadContext,
+  fixedSnapshot,
+  secretPaths,
+} from "../../../test-utils/src/index";
+import { type Webhook } from "../manifest";
 import { Secret } from "../secret";
+import { type Value } from "../value";
 import { WEBHOOK_EVENTS } from "../webhook-events";
-import { webhooksReconciler, type DesiredWebhook, type WebhooksSnapshot } from "./webhooks";
+import { webhooksReconciler, type WebhooksSnapshot } from "./webhooks";
 
-const plan = (desired: DesiredWebhook[], snapshot: WebhooksSnapshot) =>
-  webhooksReconciler.plan(desired, snapshot, fixedPlanContext());
+const plan = (
+  desired: Webhook[],
+  snapshot: WebhooksSnapshot,
+  isSecret: (path: string) => boolean = () => false,
+) => webhooksReconciler.plan(desired, snapshot, fixedPlanContext({ isSecret }));
+
+const SLACK_URL = "https://hooks.example.test/T0/B0";
 
 const slack: WebhooksSnapshot[number] = {
   id: 41,
   name: "Slack 通知",
-  hookUrl: "https://hooks.example.test/T0/B0",
+  hookUrl: new Secret(SLACK_URL),
   allEvent: false,
   activityTypeIds: [1, 2],
 };
+
+const shown = (value: Value | null | undefined) =>
+  value instanceof Secret ? value.reveal() : value;
 
 describe("Webhook の現状取得", () => {
   it("Webhook は通知イベントの指定ごと取得する", async () => {
@@ -25,7 +40,7 @@ describe("Webhook の現状取得", () => {
             id: 41,
             name: "Slack 通知",
             description: "課題の追加・更新を Slack に流す",
-            hookUrl: "https://hooks.example.test/T0/B0",
+            hookUrl: SLACK_URL,
             allEvent: false,
             activityTypeIds: [1, 2],
           },
@@ -33,16 +48,23 @@ describe("Webhook の現状取得", () => {
       }),
     );
 
-    expect(snapshot).toEqual([
+    expect(
+      snapshot.map(({ hookUrl, ...rest }) => ({ ...rest, hookUrl: hookUrl.reveal() })),
+    ).toEqual([
       {
         id: 41,
         name: "Slack 通知",
         description: "課題の追加・更新を Slack に流す",
-        hookUrl: "https://hooks.example.test/T0/B0",
+        hookUrl: SLACK_URL,
         allEvent: false,
         activityTypeIds: [1, 2],
       },
     ]);
+  });
+
+  it("登録済みの hookUrl は取得の時点でマスクされる", () => {
+    expect(JSON.stringify(slack)).not.toContain("T0/B0");
+    expect(JSON.stringify(slack)).toContain(String.raw`"hookUrl":"***"`);
   });
 
   it("プロジェクトが未作成なら取得を行わず、空のスナップショットになる", async () => {
@@ -60,7 +82,7 @@ describe("Webhook の通知イベント", () => {
       [
         {
           name: "Slack 通知",
-          hookUrl: "https://hooks.example.test/T0/B0",
+          hookUrl: SLACK_URL,
           events: ["issueCreated", "issueUpdated"],
         },
       ],
@@ -69,7 +91,7 @@ describe("Webhook の通知イベント", () => {
 
     expect(action?.request?.params).toEqual({
       name: "Slack 通知",
-      hookUrl: "https://hooks.example.test/T0/B0",
+      hookUrl: SLACK_URL,
       allEvent: false,
       activityTypeIds: [1, 2],
     });
@@ -77,13 +99,7 @@ describe("Webhook の通知イベント", () => {
 
   it("同じイベントを名前と数値で書いても差分にならない", () => {
     const actions = plan(
-      [
-        {
-          name: "Slack 通知",
-          hookUrl: slack.hookUrl,
-          events: ["issueCreated", 2],
-        },
-      ],
+      [{ name: "Slack 通知", hookUrl: SLACK_URL, events: ["issueCreated", 2] }],
       [slack],
     );
 
@@ -92,7 +108,7 @@ describe("Webhook の通知イベント", () => {
 
   it("イベントの並び順が違っても差分にならない", () => {
     const actions = plan(
-      [{ name: "Slack 通知", hookUrl: slack.hookUrl, events: ["issueUpdated", "issueCreated"] }],
+      [{ name: "Slack 通知", hookUrl: SLACK_URL, events: ["issueUpdated", "issueCreated"] }],
       [slack],
     );
 
@@ -100,42 +116,27 @@ describe("Webhook の通知イベント", () => {
   });
 
   it("イベントが増えれば更新される", () => {
-    const actions = plan(
+    const [action] = plan(
       [
         {
           name: "Slack 通知",
-          hookUrl: slack.hookUrl,
+          hookUrl: SLACK_URL,
           events: ["issueCreated", "issueUpdated", "issueCommented"],
         },
       ],
       [slack],
     );
 
-    expect(actions).toEqual([
-      {
-        id: "webhooks/update/Slack 通知",
-        phase: 8,
-        kind: "webhook",
-        op: "update",
-        name: "Slack 通知",
-        target: 41,
-        request: {
-          method: "PATCH",
-          path: "/api/v2/projects/PROJ_A/webhooks/41",
-          params: {
-            name: "Slack 通知",
-            hookUrl: slack.hookUrl,
-            allEvent: false,
-            activityTypeIds: [1, 2, 3],
-          },
-        },
-        changes: [
-          { field: "name", before: "Slack 通知", after: "Slack 通知" },
-          { field: "hookUrl", before: slack.hookUrl, after: slack.hookUrl },
-          { field: "events", before: [1, 2], after: [1, 2, 3] },
-        ],
-        writeRequest: true,
-      },
+    expect(action?.op).toBe("update");
+    expect(action?.target).toBe(41);
+    expect(action?.request?.path).toBe("/api/v2/projects/PROJ_A/webhooks/41");
+    expect(action?.request?.params.activityTypeIds).toEqual([1, 2, 3]);
+    expect(
+      action?.changes?.map(({ field, before, after }) => [field, shown(before), shown(after)]),
+    ).toEqual([
+      ["name", "Slack 通知", "Slack 通知"],
+      ["hookUrl", SLACK_URL, SLACK_URL],
+      ["events", [1, 2], [1, 2, 3]],
     ]);
   });
 
@@ -166,13 +167,13 @@ describe("Webhook の通知イベント", () => {
     const audit: WebhooksSnapshot[number] = {
       id: 42,
       name: "監査ログ",
-      hookUrl: "https://audit.example.test",
+      hookUrl: new Secret("https://audit.example.test"),
       allEvent: true,
       activityTypeIds: [],
     };
 
     const actions = plan(
-      [{ name: "監査ログ", hookUrl: audit.hookUrl, events: [...everyEvent] }],
+      [{ name: "監査ログ", hookUrl: "https://audit.example.test", events: [...everyEvent] }],
       [audit],
     );
 
@@ -184,12 +185,15 @@ describe("Webhook の通知イベント", () => {
     const audit: WebhooksSnapshot[number] = {
       id: 42,
       name: "監査ログ",
-      hookUrl: "https://audit.example.test",
+      hookUrl: new Secret("https://audit.example.test"),
       allEvent: true,
       activityTypeIds: [],
     };
 
-    const actions = plan([{ name: "監査ログ", hookUrl: audit.hookUrl, events: "all" }], [audit]);
+    const actions = plan(
+      [{ name: "監査ログ", hookUrl: "https://audit.example.test", events: "all" }],
+      [audit],
+    );
 
     expect(actions.map(({ op }) => op)).toEqual(["noop"]);
   });
@@ -198,8 +202,9 @@ describe("Webhook の通知イベント", () => {
 describe("Webhook の hookUrl", () => {
   it("環境変数から展開した hookUrl は実値で突き合わせる", () => {
     const actions = plan(
-      [{ name: "Slack 通知", hookUrl: new Secret(slack.hookUrl), events: [1, 2] }],
+      [{ name: "Slack 通知", hookUrl: SLACK_URL, events: [1, 2] }],
       [slack],
+      secretPaths("webhooks/0/hookUrl"),
     );
 
     expect(actions.map(({ op }) => op)).toEqual(["noop"]);
@@ -207,14 +212,9 @@ describe("Webhook の hookUrl", () => {
 
   it("環境変数から展開した hookUrl が違えば更新される", () => {
     const actions = plan(
-      [
-        {
-          name: "Slack 通知",
-          hookUrl: new Secret("https://hooks.example.test/T1/B1"),
-          events: [1, 2],
-        },
-      ],
+      [{ name: "Slack 通知", hookUrl: "https://hooks.example.test/T1/B1", events: [1, 2] }],
       [slack],
+      secretPaths("webhooks/0/hookUrl"),
     );
 
     expect(actions.map(({ op }) => op)).toEqual(["update"]);
@@ -222,18 +222,40 @@ describe("Webhook の hookUrl", () => {
 
   it("環境変数から展開した hookUrl は出力に実値が現れない", () => {
     const [action] = plan(
-      [
-        {
-          name: "Slack 通知",
-          hookUrl: new Secret("https://hooks.example.test/T1/B1"),
-          events: [1, 2],
-        },
-      ],
+      [{ name: "Slack 通知", hookUrl: "https://hooks.example.test/T1/B1", events: [1, 2] }],
       [slack],
+      secretPaths("webhooks/0/hookUrl"),
     );
 
     expect(JSON.stringify(action)).not.toContain("T1/B1");
     expect(JSON.stringify(action)).toContain(String.raw`"hookUrl":"***"`);
+  });
+
+  it("Yaml に直接書かれた hookUrl はマスクされない", () => {
+    const [action] = plan(
+      [{ name: "Slack 通知", hookUrl: "https://hooks.example.test/T1/B1", events: [1, 2] }],
+      [slack],
+    );
+
+    expect(action?.request?.params.hookUrl).toBe("https://hooks.example.test/T1/B1");
+  });
+
+  it("環境変数から展開した name や description も同じようにマスクされる", () => {
+    const [action] = plan(
+      [
+        {
+          name: "Slack 通知",
+          description: "秘密の説明",
+          hookUrl: SLACK_URL,
+          events: [1, 2],
+        },
+      ],
+      [],
+      secretPaths("webhooks/0/description"),
+    );
+
+    expect(action?.request?.params.description).toBeInstanceOf(Secret);
+    expect(JSON.stringify(action)).not.toContain("秘密の説明");
   });
 });
 
@@ -244,7 +266,7 @@ describe("Webhook の差分", () => {
         {
           name: "Slack 通知",
           description: "課題の追加・更新を Slack に流す",
-          hookUrl: "https://hooks.example.test/T0/B0",
+          hookUrl: SLACK_URL,
           events: ["issueCreated"],
         },
       ],
@@ -264,7 +286,7 @@ describe("Webhook の差分", () => {
           params: {
             name: "Slack 通知",
             description: "課題の追加・更新を Slack に流す",
-            hookUrl: "https://hooks.example.test/T0/B0",
+            hookUrl: SLACK_URL,
             allEvent: false,
             activityTypeIds: [1],
           },
@@ -273,7 +295,7 @@ describe("Webhook の差分", () => {
         changes: [
           { field: "name", before: null, after: "Slack 通知" },
           { field: "description", before: null, after: "課題の追加・更新を Slack に流す" },
-          { field: "hookUrl", before: null, after: "https://hooks.example.test/T0/B0" },
+          { field: "hookUrl", before: null, after: SLACK_URL },
           { field: "events", before: null, after: [1] },
         ],
         writeRequest: true,
@@ -301,10 +323,7 @@ describe("Webhook の差分", () => {
   });
 
   it("Webhook には oldname が無いので、名前を変えると作成と削除になる", () => {
-    const actions = plan(
-      [{ name: "Slack 通知 v2", hookUrl: slack.hookUrl, events: [1, 2] }],
-      [slack],
-    );
+    const actions = plan([{ name: "Slack 通知 v2", hookUrl: SLACK_URL, events: [1, 2] }], [slack]);
 
     expect(actions.map(({ op, name }) => [op, name])).toEqual([
       ["create", "Slack 通知 v2"],
@@ -313,15 +332,11 @@ describe("Webhook の差分", () => {
   });
 
   it("適用済みのマニフェストをもう一度計画しても更新リクエストは出ない", () => {
-    const desired: DesiredWebhook[] = [
-      {
-        name: "Slack 通知",
-        hookUrl: new Secret(slack.hookUrl),
-        events: ["issueCreated", "issueUpdated"],
-      },
+    const desired: Webhook[] = [
+      { name: "Slack 通知", hookUrl: SLACK_URL, events: ["issueCreated", "issueUpdated"] },
     ];
 
-    const actions = plan(desired, [slack]);
+    const actions = plan(desired, [slack], secretPaths("webhooks/0/hookUrl"));
 
     expect(actions.every(({ writeRequest }) => !writeRequest)).toBe(true);
   });

@@ -12,6 +12,7 @@ import {
 export const fixedSnapshot = (overrides: Partial<Snapshot> = {}): Snapshot => ({
   executor: { id: 1, roleType: 1 },
   updateRateLimit: { limit: 150, remaining: 150, reset: 0 },
+  space: { lang: "ja" },
   project: { exists: true, id: 100, issueCount: 0 },
   ...overrides,
 });
@@ -63,5 +64,17 @@ export const fixedReadContext = (
 export const fixedPlanContext = (overrides: Partial<PlanContext> = {}): PlanContext => ({
   manifest: fixedManifest(),
   snapshot: fixedSnapshot(),
+  isSecret: () => false,
   ...overrides,
 });
+
+/**
+ * 展開された path を集合で受ける。`${ENV}` 由来かどうかを述語で書かせると、
+ * テストごとに「どの path が秘匿か」の表現が変わり、S2 が返す `expandedPaths`
+ * （E-6）と同じ形で書けているかが読み取れなくなる。
+ */
+export const secretPaths = (...paths: string[]): PlanContext["isSecret"] => {
+  const expanded = new Set(paths);
+
+  return (path) => expanded.has(path);
+};

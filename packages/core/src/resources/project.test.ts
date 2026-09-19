@@ -5,7 +5,9 @@ import {
   fixedPlanContext,
   fixedReadContext,
   fixedSnapshot,
+  secretPaths,
 } from "../../../test-utils/src/index";
+import { Secret } from "../secret";
 import { projectReconciler, type ProjectSnapshot } from "./project";
 
 const missingProject = fixedSnapshot({ project: { exists: false } });
@@ -157,5 +159,29 @@ describe("settings", () => {
 
     expect(actions[0]).toMatchObject({ op: "noop", writeRequest: false });
     expect(actions[0]?.request).toBeUndefined();
+  });
+});
+
+describe("環境変数から展開した値", () => {
+  it("プロジェクト名が ${ENV} 由来なら計画に実値が現れない", () => {
+    const actions = projectReconciler.plan(
+      desired({ name: "極秘プロジェクト" }),
+      { exists: false },
+      fixedPlanContext({ isSecret: secretPaths("name") }),
+    );
+
+    expect(actions[0]?.request?.params.name).toBeInstanceOf(Secret);
+    expect(JSON.stringify(actions)).not.toContain("極秘プロジェクト");
+  });
+
+  it("基本設定の値が ${ENV} 由来ならその値だけが包まれる", () => {
+    const actions = projectReconciler.plan(
+      desired({ name: "プロジェクトA", settings: { textFormattingRule: "markdown" } }),
+      existing(),
+      fixedPlanContext({ isSecret: secretPaths("settings/textFormattingRule") }),
+    );
+
+    expect(actions[0]?.request?.params.textFormattingRule).toBeInstanceOf(Secret);
+    expect(actions[0]?.request?.params.name).toBe("プロジェクトA");
   });
 });

@@ -1,6 +1,7 @@
 import { type Action, type Change } from "../action";
 import { type Manifest, type Settings } from "../manifest";
 import { type Reconciler } from "../reconciler";
+import { sealer, type Seal } from "../secret";
 import { type Value } from "../value";
 
 export type ProjectDesired = Pick<Manifest, "key" | "name" | "settings">;
@@ -25,23 +26,27 @@ const projectPath = (key: string): string => `${projectsPath}/${key}`;
 const settingsKeys = (settings: Settings): (keyof Settings)[] =>
   Object.keys(settings) as (keyof Settings)[];
 
-const settingsChanges = (desired: Settings, current: ProjectSettingsSnapshot): Change[] =>
+const settingsChanges = (
+  desired: Settings,
+  current: ProjectSettingsSnapshot,
+  seal: Seal,
+): Change[] =>
   settingsKeys(desired)
     .filter((key) => current[key] !== desired[key])
     .map((key) => ({
       field: `settings.${key}`,
       before: current[key] ?? null,
-      after: desired[key] ?? null,
+      after: seal(`settings/${key}`, desired[key] ?? null),
     }));
 
-const settingsParams = (settings: Settings): Record<string, Value> => {
+const settingsParams = (settings: Settings, seal: Seal): Record<string, Value> => {
   const params: Record<string, Value> = {};
 
   for (const key of settingsKeys(settings)) {
     const value = settings[key];
 
     if (value !== undefined) {
-      params[key] = value;
+      params[key] = seal(`settings/${key}`, value);
     }
   }
 
@@ -62,13 +67,15 @@ export const projectReconciler: Reconciler<ProjectDesired, ProjectSnapshot> = {
     return { exists: true, id: project.id, name: project.name, settings: project };
   },
 
-  plan(desired, snapshot) {
+  plan(desired, snapshot, ctx) {
+    const seal = sealer(ctx.isSecret);
+
     if (snapshot.exists) {
       const changes = [
         ...(snapshot.name === desired.name
           ? []
-          : [{ field: "name", before: snapshot.name, after: desired.name }]),
-        ...settingsChanges(desired.settings, snapshot.settings),
+          : [{ field: "name", before: snapshot.name, after: seal("name", desired.name) }]),
+        ...settingsChanges(desired.settings, snapshot.settings, seal),
       ];
 
       if (changes.length === 0) {
@@ -96,7 +103,7 @@ export const projectReconciler: Reconciler<ProjectDesired, ProjectSnapshot> = {
           request: {
             method: "PATCH",
             path: projectPath(desired.key),
-            params: { name: desired.name, ...settingsParams(desired.settings) },
+            params: { name: seal("name", desired.name), ...settingsParams(desired.settings, seal) },
           },
           changes,
           writeRequest: true,
@@ -113,7 +120,11 @@ export const projectReconciler: Reconciler<ProjectDesired, ProjectSnapshot> = {
       request: {
         method: "POST",
         path: projectsPath,
-        params: { key: desired.key, name: desired.name, ...settingsParams(desired.settings) },
+        params: {
+          key: seal("key", desired.key),
+          name: seal("name", desired.name),
+          ...settingsParams(desired.settings, seal),
+        },
       },
       provides: [{ kind: "project", name: desired.key }],
       writeRequest: true,

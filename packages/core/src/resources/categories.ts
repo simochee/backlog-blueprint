@@ -1,6 +1,7 @@
 import { type Action, type Change } from "../action";
 import { type Category } from "../manifest";
 import { type Reconciler } from "../reconciler";
+import { sealChanges, sealFields, sealer } from "../secret";
 
 export type ExistingCategory = {
   id: number;
@@ -12,6 +13,8 @@ export type CategoriesSnapshot = ExistingCategory[];
 const collectionPath = (projectKey: string) => `/api/v2/projects/${projectKey}/categories`;
 
 const memberPath = (projectKey: string, id: number) => `${collectionPath(projectKey)}/${id}`;
+
+const basePath = (index: number) => `categories/${index}`;
 
 const findExisting = (snapshot: CategoriesSnapshot, { name, oldname }: Category) =>
   snapshot.find((category) => category.name === name) ??
@@ -35,13 +38,15 @@ export const categoriesReconciler: Reconciler<Category[], CategoriesSnapshot> = 
     return categories.map(({ id, name }) => ({ id, name }));
   },
 
-  plan: (desired, snapshot, { manifest }) => {
+  plan: (desired, snapshot, { manifest, isSecret }) => {
+    const seal = sealer(isSecret);
     const creates: Action[] = [];
     const updates: Action[] = [];
     const kept = new Set<number>();
 
-    for (const category of desired) {
+    for (const [index, category] of desired.entries()) {
       const existing = findExisting(snapshot, category);
+      const fields = sealFields({ name: category.name }, basePath(index), seal);
 
       if (existing === undefined) {
         creates.push({
@@ -53,10 +58,10 @@ export const categoriesReconciler: Reconciler<Category[], CategoriesSnapshot> = 
           request: {
             method: "POST",
             path: collectionPath(manifest.key),
-            params: { name: category.name },
+            params: fields,
           },
           provides: [{ kind: "category", name: category.name }],
-          changes: changesOf(category.name, undefined),
+          changes: sealChanges(changesOf(category.name, undefined), basePath(index), seal),
           writeRequest: true,
         });
 
@@ -89,10 +94,10 @@ export const categoriesReconciler: Reconciler<Category[], CategoriesSnapshot> = 
         request: {
           method: "PATCH",
           path: memberPath(manifest.key, existing.id),
-          params: { name: category.name },
+          params: fields,
         },
         provides: [{ kind: "category", name: category.name }],
-        changes: changesOf(category.name, existing),
+        changes: sealChanges(changesOf(category.name, existing), basePath(index), seal),
         notes: [{ type: "renamed", from: existing.name }],
         writeRequest: true,
       });

@@ -1,6 +1,7 @@
 import { type Action, type Change } from "../action";
 import { CUSTOM_FIELD_TYPE_IDS, INITIAL_VALUE_TYPE_IDS, type CustomField } from "../manifest";
 import { type Reconciler } from "../reconciler";
+import { sealChanges, sealer } from "../secret";
 import { type Value } from "../value";
 
 type CustomFieldFields = {
@@ -44,6 +45,8 @@ const FIELDS = [
 const collectionPath = (projectKey: string) => `/api/v2/projects/${projectKey}/customFields`;
 
 const memberPath = (projectKey: string, id: number) => `${collectionPath(projectKey)}/${id}`;
+
+const basePath = (index: number) => `customFields/${index}`;
 
 /**
  * 日付型の `min` / `max` / `initialDate` は `yyyy-MM-dd` の文字列で、数値型の
@@ -164,14 +167,20 @@ export const customFieldsReconciler: Reconciler<CustomField[], CustomFieldsSnaps
     }));
   },
 
-  plan: (desired, snapshot, { manifest }) => {
+  plan: (desired, snapshot, { manifest, isSecret }) => {
+    const seal = sealer(isSecret);
     const creates: Action[] = [];
     const updates: Action[] = [];
     const kept = new Set<number>();
 
-    for (const customField of desired) {
+    for (const [index, customField] of desired.entries()) {
       const existing = findExisting(snapshot, customField);
-      const changes = changesOf(fieldsOf(customField), existing);
+      /**
+       * 一致の判定は包む前の値で行う。`Secret` は `===` で一致しないので、包んだ値を
+       * 比べると `${ENV}` を書いたカスタム属性が毎回 update になり NFR-4 が崩れる。
+       */
+      const declared = changesOf(fieldsOf(customField), existing);
+      const changes = sealChanges(declared, basePath(index), seal);
       const params = paramsOf(changes, customField.applicableIssueTypes ?? []);
 
       if (existing === undefined) {
@@ -192,7 +201,7 @@ export const customFieldsReconciler: Reconciler<CustomField[], CustomFieldsSnaps
 
       kept.add(existing.id);
 
-      if (changes.every(({ before, after }) => sameValue(before, after))) {
+      if (declared.every(({ before, after }) => sameValue(before, after))) {
         updates.push({
           id: `customFields/noop/${customField.name}`,
           phase: 6,

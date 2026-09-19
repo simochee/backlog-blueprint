@@ -1,6 +1,7 @@
 import { type Action, type Change } from "../action";
 import { type IssueType } from "../manifest";
 import { embedRef } from "../ref";
+import { sealChanges, sealFields, sealer } from "../secret";
 import { type IdOrRef, type Ref, type Value } from "../value";
 import { type Reconciler } from "../reconciler";
 
@@ -36,6 +37,8 @@ const issueTypeRef = (name: string): Ref => ({ $ref: { kind: "issueType", name }
 
 const targetOf = (existing: ExistingIssueType): IdOrRef =>
   existing.id ?? issueTypeRef(existing.name);
+
+const basePath = (index: number): string => `issueTypes/${index}`;
 
 const pathOf = (key: string, existing: ExistingIssueType): string =>
   `${issueTypesPath(key)}/${existing.id ?? embedRef(issueTypeRef(existing.name))}`;
@@ -91,12 +94,13 @@ export const issueTypesReconciler: Reconciler<IssueType[], IssueTypesSnapshot> =
 
   plan(desired, snapshot, ctx) {
     const { key } = ctx.manifest;
+    const seal = sealer(ctx.isSecret);
     const byName = new Map(snapshot.map((issueType) => [issueType.name, issueType]));
     const kept = new Set<string>();
     const creates: Action[] = [];
     const updates: Action[] = [];
 
-    const updateAction = (item: IssueType, existing: ExistingIssueType): Action => ({
+    const updateAction = (item: IssueType, index: number, existing: ExistingIssueType): Action => ({
       id: `issueTypes/update/${item.name}`,
       phase: 2,
       kind: "issueType",
@@ -106,9 +110,9 @@ export const issueTypesReconciler: Reconciler<IssueType[], IssueTypesSnapshot> =
       request: {
         method: "PATCH",
         path: pathOf(key, existing),
-        params: declaredFields(item),
+        params: sealFields(declaredFields(item), basePath(index), seal),
       },
-      changes: changesOf(item, existing),
+      changes: sealChanges(changesOf(item, existing), basePath(index), seal),
       ...(existing.name === item.name
         ? {}
         : {
@@ -118,7 +122,7 @@ export const issueTypesReconciler: Reconciler<IssueType[], IssueTypesSnapshot> =
       writeRequest: true,
     });
 
-    for (const item of desired) {
+    for (const [index, item] of desired.entries()) {
       const sameName = byName.get(item.name);
 
       if (sameName !== undefined) {
@@ -135,7 +139,7 @@ export const issueTypesReconciler: Reconciler<IssueType[], IssueTypesSnapshot> =
                 target: targetOf(sameName),
                 writeRequest: false,
               }
-            : updateAction(item, sameName),
+            : updateAction(item, index, sameName),
         );
 
         continue;
@@ -145,7 +149,7 @@ export const issueTypesReconciler: Reconciler<IssueType[], IssueTypesSnapshot> =
 
       if (renamed !== undefined) {
         kept.add(renamed.name);
-        updates.push(updateAction(item, renamed));
+        updates.push(updateAction(item, index, renamed));
 
         continue;
       }
@@ -156,7 +160,11 @@ export const issueTypesReconciler: Reconciler<IssueType[], IssueTypesSnapshot> =
         kind: "issueType",
         op: "create",
         name: item.name,
-        request: { method: "POST", path: issueTypesPath(key), params: declaredFields(item) },
+        request: {
+          method: "POST",
+          path: issueTypesPath(key),
+          params: sealFields(declaredFields(item), basePath(index), seal),
+        },
         provides: [{ kind: "issueType", name: item.name }],
         writeRequest: true,
       });

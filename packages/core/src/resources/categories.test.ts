@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { fixedPlanContext, fixedReadContext, fixedSnapshot } from "../../../test-utils/src/index";
+import {
+  fixedPlanContext,
+  fixedReadContext,
+  fixedSnapshot,
+  secretPaths,
+} from "../../../test-utils/src/index";
+import { Secret } from "../secret";
 import { type Category } from "../manifest";
 import { categoriesReconciler, type CategoriesSnapshot } from "./categories";
 
@@ -152,5 +158,19 @@ describe("カテゴリーの oldname", () => {
     const desired: Category[] = [{ name: "インフラ", oldname: "基盤" }];
 
     expect(plan(desired, [{ id: 11, name: "インフラ" }]).map(({ op }) => op)).toEqual(["noop"]);
+  });
+});
+
+describe("環境変数から展開した値", () => {
+  it("カテゴリー名が ${ENV} 由来ならリクエストにも差分にも実値が現れない", () => {
+    const [action] = categoriesReconciler.plan(
+      [{ name: "社外秘カテゴリー" }],
+      [],
+      fixedPlanContext({ isSecret: secretPaths("categories/0/name") }),
+    );
+
+    expect(action?.request?.params.name).toBeInstanceOf(Secret);
+    expect(JSON.stringify(action?.request)).not.toContain("社外秘カテゴリー");
+    expect(JSON.stringify(action?.changes)).not.toContain("社外秘カテゴリー");
   });
 });
