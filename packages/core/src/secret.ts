@@ -5,21 +5,21 @@
  * `reveal()` を呼んでよいのは HTTP 送信の直前と、差分判定（hookUrl の比較）だけ。
  */
 export class Secret {
-  readonly #value: string
+  readonly #value: string;
 
   constructor(value: string) {
-    this.#value = value
+    this.#value = value;
   }
 
   toString(): string {
-    return '***'
+    return "***";
   }
 
   toJSON(): string {
-    return '***'
+    return "***";
   }
 
   reveal(): string {
-    return this.#value
+    return this.#value;
   }
 }

@@ -11,25 +11,25 @@
  */
 
 interface FetchResponse {
-  readonly ok: boolean
-  readonly status: number
-  json(): Promise<unknown>
-  text(): Promise<string>
+  readonly ok: boolean;
+  readonly status: number;
+  json(): Promise<unknown>;
+  text(): Promise<string>;
 }
 
 interface FetchInit {
-  method?: 'GET' | 'POST' | 'PATCH' | 'DELETE'
-  headers?: Record<string, string>
-  body?: string
-  signal?: AbortSignal
+  method?: "GET" | "POST" | "PATCH" | "DELETE";
+  headers?: Record<string, string>;
+  body?: string;
+  signal?: AbortSignal;
 }
 
-declare function fetch(input: string, init?: FetchInit): Promise<FetchResponse>
+declare function fetch(input: string, init?: FetchInit): Promise<FetchResponse>;
 
 interface AbortSignal {
-  readonly aborted: boolean
+  readonly aborted: boolean;
 }
 
 declare const AbortSignal: {
-  timeout(milliseconds: number): AbortSignal
-}
+  timeout(milliseconds: number): AbortSignal;
+};

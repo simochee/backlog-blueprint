@@ -1,13 +1,13 @@
-import type { Action } from './action'
-import type { Manifest } from './manifest'
-import type { Phase, ResourceKind } from './resource'
-import type { Snapshot } from './snapshot'
+import { type Action } from "./action";
+import { type Manifest } from "./manifest";
+import { type Phase, type ResourceKind } from "./resource";
+import { type Snapshot } from "./snapshot";
 
 export type ReadContext = {
-  projectKey: string
-  snapshot: Snapshot
-  get: (path: string) => Promise<unknown>
-}
+  projectKey: string;
+  snapshot: Snapshot;
+  get: (path: string) => Promise<unknown>;
+};
 
 /**
  * HTTP クライアントを持たせない（C-2）。計画に要る GET は read() で出し切る決まりで、
@@ -15,9 +15,9 @@ export type ReadContext = {
  * 実装の注意事項に落ちる。
  */
 export type PlanContext = {
-  manifest: Manifest
-  snapshot: Snapshot
-}
+  manifest: Manifest;
+  snapshot: Snapshot;
+};
 
 /**
  * apply を生やさない（C-1）。適用は Action[] に対して共通の Executor が行う。
@@ -27,11 +27,11 @@ export type PlanContext = {
  * plan() は Promise を返さない。非同期にできると read() を経由しない取得を
  * 書く余地が戻ってくる。
  */
-export interface Reconciler<Desired, ResourceSnapshot> {
-  readonly kind: ResourceKind
-  readonly phase: Phase
+export type Reconciler<Desired, ResourceSnapshot> = {
+  readonly kind: ResourceKind;
+  readonly phase: Phase;
 
-  read(ctx: ReadContext): Promise<ResourceSnapshot>
+  read(ctx: ReadContext): Promise<ResourceSnapshot>;
 
-  plan(desired: Desired, snapshot: ResourceSnapshot, ctx: PlanContext): Action[]
-}
+  plan(desired: Desired, snapshot: ResourceSnapshot, ctx: PlanContext): Action[];
+};
