@@ -234,12 +234,11 @@ describe("カスタム属性の oldname", () => {
         request: {
           method: "PATCH",
           path: "/api/v2/projects/PROJ_A/customFields/31",
-          params: { name: "環境", typeId: 1, description: "デプロイ先" },
+          params: { name: "環境", description: "デプロイ先" },
         },
         provides: [{ kind: "customField", name: "環境" }],
         changes: [
           { field: "name", before: "環境名", after: "環境" },
-          { field: "typeId", before: 1, after: 1 },
           { field: "description", before: null, after: "デプロイ先" },
         ],
         notes: [{ type: "renamed", from: "環境名" }],
@@ -265,11 +264,10 @@ describe("カスタム属性の oldname", () => {
         request: {
           method: "PATCH",
           path: "/api/v2/projects/PROJ_A/customFields/31",
-          params: { name: "環境", typeId: 1, description: "デプロイ先" },
+          params: { name: "環境", description: "デプロイ先" },
         },
         changes: [
           { field: "name", before: "環境", after: "環境" },
-          { field: "typeId", before: 1, after: 1 },
           { field: "description", before: null, after: "デプロイ先" },
         ],
         writeRequest: true,
@@ -318,5 +316,54 @@ describe("環境変数から展開した値", () => {
 
     expect(actions[0]?.request?.params.description).toBeInstanceOf(Secret);
     expect(JSON.stringify(actions)).not.toContain("社外秘の説明");
+  });
+});
+
+describe("カスタム属性の型の変更", () => {
+  it("同名で型だけが変われば、削除と作成の2件になる", () => {
+    const actions = plan(
+      [{ name: "環境", type: "singleList", items: ["本番", "検証"] }],
+      [{ id: 31, name: "環境", typeId: 1 }],
+    );
+
+    expect(actions.map(({ op, name, target }) => [op, name, target])).toEqual([
+      ["create", "環境", undefined],
+      ["delete", "環境", 31],
+    ]);
+  });
+
+  it("作り直しの作成には型が載り、前の値は持たない", () => {
+    const [create] = plan(
+      [{ name: "環境", type: "singleList", items: ["本番"] }],
+      [{ id: 31, name: "環境", typeId: 1 }],
+    );
+
+    expect(create?.request).toEqual({
+      method: "POST",
+      path: "/api/v2/projects/PROJ_A/customFields",
+      params: { name: "環境", typeId: 5, items: ["本番"] },
+    });
+    expect(create?.changes?.every(({ before }) => before === null)).toBe(true);
+  });
+
+  it("型が同じなら作り直さない", () => {
+    const actions = plan(
+      [{ name: "環境", type: "text", description: "デプロイ先" }],
+      [{ id: 31, name: "環境", typeId: 1 }],
+    );
+
+    expect(actions.map(({ op }) => op)).toEqual(["update"]);
+  });
+
+  it("oldname で改名しながら型を変えても、削除と作成になる", () => {
+    const actions = plan(
+      [{ name: "環境", type: "number", oldname: "環境名" }],
+      [{ id: 31, name: "環境名", typeId: 1 }],
+    );
+
+    expect(actions.map(({ op, name }) => [op, name])).toEqual([
+      ["create", "環境"],
+      ["delete", "環境名"],
+    ]);
   });
 });

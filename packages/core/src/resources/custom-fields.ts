@@ -42,6 +42,13 @@ const FIELDS = [
   "allowAddItem",
 ] as const;
 
+/**
+ * `typeId` を更新のリクエストに載せない。`PATCH` のパラメータに無い（API 制約）ので、
+ * 載せても型は変わらない。載せたままにすると、型を変えたつもりの利用者に
+ * 「送ったのに変わらない」計画を見せることになる（§6.3a）。
+ */
+const UPDATABLE_FIELDS = FIELDS.filter((field) => field !== "typeId");
+
 const collectionPath = (projectKey: string) => `/api/v2/projects/${projectKey}/customFields`;
 
 const memberPath = (projectKey: string, id: number) => `${collectionPath(projectKey)}/${id}`;
@@ -95,12 +102,15 @@ const findExisting = (snapshot: CustomFieldsSnapshot, { name, oldname }: CustomF
 const changesOf = (
   desired: CustomFieldFields,
   existing: ExistingCustomField | undefined,
+  fields: readonly (keyof CustomFieldFields)[],
 ): Change[] =>
-  FIELDS.filter((field) => desired[field] !== undefined).map((field) => ({
-    field,
-    before: existing?.[field] ?? null,
-    after: desired[field] ?? null,
-  }));
+  fields
+    .filter((field) => desired[field] !== undefined)
+    .map((field) => ({
+      field,
+      before: existing?.[field] ?? null,
+      after: desired[field] ?? null,
+    }));
 
 const sameValue = (before: Value | null, after: Value | null) => {
   if (Array.isArray(before) && Array.isArray(after)) {
@@ -173,15 +183,33 @@ export const customFieldsReconciler: Reconciler<CustomField[], CustomFieldsSnaps
     const updates: Action[] = [];
     const kept = new Set<number>();
 
+    const replaced: ExistingCustomField[] = [];
+
     for (const [index, customField] of desired.entries()) {
-      const existing = findExisting(snapshot, customField);
+      const fields = fieldsOf(customField);
+      const found = findExisting(snapshot, customField);
+      /**
+       * 型が変わったら作り直す（§6.3a）。同名のまま `PATCH` すると、型は変わらないのに
+       * 成功が返り、マニフェストと現実が食い違ったまま apply が完了する。
+       */
+      const recreated = found !== undefined && found.typeId !== fields.typeId;
+      const existing = recreated ? undefined : found;
       /**
        * 一致の判定は包む前の値で行う。`Secret` は `===` で一致しないので、包んだ値を
        * 比べると `${ENV}` を書いたカスタム属性が毎回 update になり NFR-4 が崩れる。
        */
-      const declared = changesOf(fieldsOf(customField), existing);
+      const declared = changesOf(
+        fields,
+        existing,
+        existing === undefined ? FIELDS : UPDATABLE_FIELDS,
+      );
       const changes = sealChanges(declared, basePath(index), seal);
       const params = paramsOf(changes, customField.applicableIssueTypes ?? []);
+
+      if (found !== undefined && recreated) {
+        kept.add(found.id);
+        replaced.push(found);
+      }
 
       if (existing === undefined) {
         creates.push({
@@ -234,9 +262,8 @@ export const customFieldsReconciler: Reconciler<CustomField[], CustomFieldsSnaps
       });
     }
 
-    const deletes = snapshot
-      .filter(({ id }) => !kept.has(id))
-      .map((existing): Action => ({
+    const deletes = [...snapshot.filter(({ id }) => !kept.has(id)), ...replaced].map(
+      (existing): Action => ({
         id: `customFields/delete/${existing.name}`,
         phase: 6,
         kind: "customField",
@@ -249,7 +276,8 @@ export const customFieldsReconciler: Reconciler<CustomField[], CustomFieldsSnaps
           params: {},
         },
         writeRequest: true,
-      }));
+      }),
+    );
 
     return [...creates, ...updates, ...deletes];
   },
