@@ -217,9 +217,18 @@ V-C1 のメッセージはもともと利用者に直せるものではなくバ
 | 3 | ステータス | `statuses` | `/projects/:key/statuses` |
 | 4 | カテゴリー | `categories` | `/projects/:key/categories` |
 | 5 | マイルストーン | `milestones` | `/projects/:key/versions` |
-| 6 | カスタム属性 | `customFields` | `/projects/:key/customFields` |
+| 6 | カスタム属性 | `customFields` | `/projects/:key/customFields` / `/projects/:key/issueTypes` |
 | 7 | チーム・メンバー | `access` | `/projects/:key/users?excludeGroupMembers=true` / `/projects/:key/teams` / `/projects/:key/administrators` / `/users` / `/teams` |
 | 8 | Webhook | `webhooks` | `/projects/:key/webhooks` |
+
+フェーズ6が課題種別も取るのは、`applicableIssueTypes[]` の差分を出すためである。
+スナップショットが持つのは課題種別の **ID** で、マニフェストが書くのは**名前**なので、
+対応表が無いと突き合わせられない。取らずに比較を諦めると
+「`applicableIssueTypes` だけを変えても差分が出ない」という穴ができる。
+
+表のパスは省略形である。**実際に組み立てるパスは `/api/v2` を前置する**
+（[plan の出力仕様 §3.2](plan-output.md#32-中断時fr-44) の表記に合わせる）。
+送信層はこれをそのまま使うので、二重に前置しない。
 
 プロジェクトが存在しない場合、フェーズ2〜8 の GET は叩けない。
 スナップショットは「作成直後の初期状態」になる。
@@ -355,8 +364,13 @@ Executor は `writeRequest: false` の Action を実行せず読み飛ばす。
 | 対象 | あるべき集合 | 現状 | 生成する Action |
 | --- | --- | --- | --- |
 | チーム | `access.teams` | `GET /projects/:key/teams` | 差集合で `create` / `delete` |
-| 個人参加 | `access.members` ∪（`access.administrators` のうち未参加の人） | `GET /projects/:key/users?excludeGroupMembers=true` | 同上 |
+| 個人参加 | `access.members` ∪ `access.administrators` | `GET /projects/:key/users?excludeGroupMembers=true` | 同上 |
 | 管理者 | `access.administrators` | `GET /projects/:key/administrators` | 同上 |
+
+個人参加のあるべき集合に `administrators` を**丸ごと**含めるのが要点である。
+「`administrators` のうち未参加の人」と書くと追加側の結果は同じだが、**削除側が壊れる**。
+`members` に名前が無く既に個人参加している管理者が差集合に落ち、個人削除の Action が出てしまう。
+A-3 が言っているのは「未参加なら参加させる」であって「参加済みなら外す」ではない。
 
 **現状の取得で `excludeGroupMembers=true` を外すと壊れる。**
 既定（false）ではチーム経由の参加者も返るため、差集合を取ると
@@ -406,7 +420,7 @@ function execute(actions: Action[], ctx: ExecuteContext): AsyncIterable<Executio
 | イベント | 内容 |
 | --- | --- |
 | `started` | 総数 M |
-| `actionStarted` | N/M と Action |
+| `actionStarted` | 実行対象のうち何件目かと Action。**添字は 0 始まり**で、`[ 5/10]` のような表示は描画側が +1 する |
 | `actionSucceeded` | レスポンス、解決表への登録結果 |
 | `actionFailed` | API エラー、または HTTP まで到達しなかった失敗。直後に `aborted` |
 | `waiting` | レート制限による待機（残り秒数） |
