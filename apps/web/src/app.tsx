@@ -9,9 +9,11 @@ import {
   connectionStamp,
   fresh,
   manifestStamp,
+  marked,
   planStamp,
   type Derived,
   type Inputs,
+  type Mark,
 } from "./freshness";
 import { PASTED, preparePlan, type PlanAttempt } from "./plan";
 import { foldExecutionEvent, idleProgress, rejectedProgress } from "./progress";
@@ -52,7 +54,8 @@ export const App = () => {
   const [planAttempt, setPlanAttempt] = useState<Derived<PlanAttempt>>();
   const [connecting, setConnecting] = useState(false);
   const [planning, setPlanning] = useState(false);
-  const [confirming, setConfirming] = useState(false);
+  const [confirmingPlan, setConfirmingPlan] = useState<Mark>();
+  const [appliedPlan, setAppliedPlan] = useState<Mark>();
   const [run, setRun] = useState<ApplyRun>();
 
   const inputs: Inputs = { space, manifestText, revisions };
@@ -67,7 +70,8 @@ export const App = () => {
       ? undefined
       : { ...attempt.connection, client: activeClient };
   const validation = fresh(validated, manifestKey);
-  const plan = fresh(planAttempt, planKey);
+  const plan = marked(appliedPlan, planKey) ? undefined : fresh(planAttempt, planKey);
+  const confirming = marked(confirmingPlan, planKey);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -155,6 +159,7 @@ export const App = () => {
       return;
     }
 
+    const stamp = planKey;
     const { actions, resolutions, manifest } = plan.prepared.plan;
     const base = { resolutions, projectKey: manifest.key, space };
 
@@ -176,16 +181,22 @@ export const App = () => {
       setRun({ ...base, progress, running: false });
     } catch (error) {
       setRun({ ...base, progress, running: false, failure: error });
+    } finally {
+      /**
+       * 完了も中断も同じ1箇所で印を置く（WU-3 (b)）。終わり方ごとに書くと、
+       * 終わり方が1つ増えたときに書き忘れた経路だけ同じ計画を2度適用できる。
+       */
+      setAppliedPlan(stamp);
     }
   };
 
   const applyPlan = (): void => {
-    setConfirming(false);
+    setConfirmingPlan(undefined);
     void runApply();
   };
 
   const cancelApply = (): void => {
-    setConfirming(false);
+    setConfirmingPlan(undefined);
     setRun({
       progress: rejectedProgress,
       running: false,
@@ -241,7 +252,7 @@ export const App = () => {
       </Panel>
       <Panel
         enabled={plan !== undefined}
-        hint="Run Plan to see what apply would do. The plan is discarded whenever an input changes."
+        hint="Run Plan to see what apply would do. The plan is discarded whenever an input changes, and once it has been applied."
         step={3}
         title="Plan"
       >
@@ -249,7 +260,7 @@ export const App = () => {
           applying={run?.running === true}
           diagnostics={plan?.diagnostics ?? []}
           failure={plan?.failure}
-          onApply={() => setConfirming(true)}
+          onApply={() => setConfirmingPlan(planKey)}
           onShowUnchangedChange={setShowUnchanged}
           prepared={plan?.prepared}
           showUnchanged={showUnchanged}
