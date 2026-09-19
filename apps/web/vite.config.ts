@@ -12,10 +12,12 @@ import cliPackage from "../cli/package.json";
  * ルートの package.json は private で版を持たないので、npm に出る
  * `@simochee/backlog-blueprint` の版と一致しない。
  *
- * `package.json` の script に `--configLoader runner` が要る。既定のローダは
- * この設定ファイルを esbuild で束ねたうえで、ワークスペースのパッケージを
- * external にして Node に読ませる。core は相対 import に拡張子を書かない決まり
- * （AGENTS.md）なので、Node の ESM 解決では読めない。
+ * この設定を読むコマンドはすべて `--configLoader runner` を付ける（`dev` / `build` /
+ * `test`）。既定のローダはこのファイルを esbuild で束ねたうえで、ワークスペースの
+ * パッケージを external にして Node に読ませる。core は相対 import に拡張子を
+ * 書かない決まり（AGENTS.md）なので、Node の ESM 解決では読めない。
+ * 相対 path で `packages/schema/src` を直に読む案は、既定のローダで動く代わりに
+ * パッケージの公開面（B-1）を迂回するので採らない。
  */
 const schemaArtifact = (): Plugin => ({
   name: "backlog-blueprint:schema",
