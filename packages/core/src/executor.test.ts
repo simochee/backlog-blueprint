@@ -167,6 +167,23 @@ describe("適用の進行", () => {
     expect(ctx.resolutions.get("status:未対応")).toBe(1);
   });
 
+  it("既定の課題種別は名前と、返ってきた順の枠の両方で引けるようになる", async () => {
+    const { ctx } = harness();
+
+    await run([aRefresh()], ctx);
+
+    expect(ctx.resolutions.get("issueType:#0")).toBe(301);
+    expect(ctx.resolutions.get("issueType:#1")).toBe(302);
+  });
+
+  it("ステータスは ID が固定値なので枠では登録しない", async () => {
+    const { ctx } = harness();
+
+    await run([aRefresh()], ctx);
+
+    expect(ctx.resolutions.get("status:#0")).toBeUndefined();
+  });
+
   it("全件が成功すると finished で終わる", async () => {
     const { ctx } = harness();
     const events = await run([anAction()], ctx);

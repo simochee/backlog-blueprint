@@ -8,22 +8,36 @@ import {
 } from "../../../test-utils/src/index";
 import { Secret } from "../secret";
 import { type IssueType } from "../manifest";
-import { DEFAULT_ISSUE_TYPES, issueTypesReconciler, type ExistingIssueType } from "./issue-types";
+import {
+  DEFAULT_ISSUE_TYPE_SLOTS,
+  issueTypesReconciler,
+  type ExistingIssueType,
+} from "./issue-types";
 
 const plan = (desired: IssueType[], snapshot: ExistingIssueType[]) =>
-  issueTypesReconciler.plan(desired, snapshot, fixedPlanContext());
+  issueTypesReconciler.plan(
+    desired,
+    { source: "project", issueTypes: snapshot },
+    fixedPlanContext(),
+  );
+
+const planNewProject = (desired: IssueType[]) =>
+  issueTypesReconciler.plan(
+    desired,
+    { source: "defaults", slots: DEFAULT_ISSUE_TYPE_SLOTS },
+    fixedPlanContext(),
+  );
 
 const task: ExistingIssueType = { id: 11, name: "タスク", color: "#7ea800" };
 const other: ExistingIssueType = { id: 14, name: "その他", color: "#2779ca" };
 
 describe("現状の取得", () => {
-  it("未作成のプロジェクトでは既定4件が現状になり、ID は持たない", async () => {
+  it("未作成のプロジェクトでは既定4件を名前の無い枠として持つ", async () => {
     const snapshot = await issueTypesReconciler.read(
       fixedReadContext({}, { snapshot: fixedSnapshot({ project: { exists: false } }) }),
     );
 
-    expect(snapshot).toEqual(DEFAULT_ISSUE_TYPES);
-    expect(snapshot.every(({ id }) => id === undefined)).toBe(true);
+    expect(snapshot).toEqual({ source: "defaults", slots: 4 });
   });
 
   it("既存プロジェクトの課題種別は GET の応答から読み、テンプレート未設定は未設定のまま扱う", async () => {
@@ -41,15 +55,18 @@ describe("現状の取得", () => {
       }),
     );
 
-    expect(snapshot).toEqual([
-      {
-        id: 11,
-        name: "タスク",
-        color: "#7ea800",
-        templateSummary: undefined,
-        templateDescription: undefined,
-      },
-    ]);
+    expect(snapshot).toEqual({
+      source: "project",
+      issueTypes: [
+        {
+          id: 11,
+          name: "タスク",
+          color: "#7ea800",
+          templateSummary: undefined,
+          templateDescription: undefined,
+        },
+      ],
+    });
   });
 });
 
@@ -175,18 +192,87 @@ describe("削除", () => {
 });
 
 describe("未作成のプロジェクト", () => {
-  it("既定の課題種別は ID が分からないので、path も振替先も参照のまま計画する", () => {
-    const actions = plan([{ name: "調査", color: "#2779ca" }], DEFAULT_ISSUE_TYPES);
+  it("既定の枠は先頭から順にマニフェストの課題種別へ割り当てられる", () => {
+    const actions = planNewProject([
+      { name: "調査", color: "#2779ca" },
+      { name: "バグ", color: "#990000" },
+    ]);
 
+    expect(actions.slice(0, 2)).toMatchObject([
+      {
+        id: "issueTypes/create/調査",
+        op: "create",
+        target: { $ref: { kind: "issueType", name: "#0" } },
+        request: {
+          method: "PATCH",
+          path: "/api/v2/projects/PROJ_A/issueTypes/{$ref:issueType:#0}",
+          params: { name: "調査", color: "#2779ca" },
+        },
+        provides: [{ kind: "issueType", name: "調査" }],
+      },
+      {
+        id: "issueTypes/create/バグ",
+        op: "create",
+        target: { $ref: { kind: "issueType", name: "#1" } },
+      },
+    ]);
+  });
+
+  it("枠を引き継いでも、利用者が書いていない改名は注記しない", () => {
+    const [action] = planNewProject([{ name: "調査", color: "#2779ca" }]);
+
+    expect(action?.notes).toBeUndefined();
+    expect(action?.changes).toEqual([
+      { field: "name", before: null, after: "調査" },
+      { field: "color", before: null, after: "#2779ca" },
+    ]);
+  });
+
+  it("既定の枠より多く書けば、あふれた分は POST で作成される", () => {
+    const desired: IssueType[] = [
+      { name: "A", color: "#e30000" },
+      { name: "B", color: "#990000" },
+      { name: "C", color: "#934981" },
+      { name: "D", color: "#814fbc" },
+      { name: "E", color: "#2779ca" },
+    ];
+
+    const actions = planNewProject(desired);
+
+    expect(actions.map(({ op }) => op)).toEqual(["create", "create", "create", "create", "create"]);
+    expect(actions.at(-1)?.request?.method).toBe("POST");
+    expect(actions.at(-1)?.target).toBeUndefined();
+  });
+
+  it("既定の枠が余れば、余った枠を先頭の課題種別へ振り替えて削除する", () => {
+    const actions = planNewProject([{ name: "調査", color: "#2779ca" }]);
+
+    expect(actions.slice(1).map(({ id, op }) => [id, op])).toEqual([
+      ["issueTypes/delete/#1", "delete"],
+      ["issueTypes/delete/#2", "delete"],
+      ["issueTypes/delete/#3", "delete"],
+    ]);
     expect(actions.at(-1)).toMatchObject({
-      name: "その他",
-      op: "delete",
-      target: { $ref: { kind: "issueType", name: "その他" } },
+      target: { $ref: { kind: "issueType", name: "#3" } },
       request: {
-        path: "/api/v2/projects/PROJ_A/issueTypes/{$ref:issueType:その他}",
+        method: "DELETE",
+        path: "/api/v2/projects/PROJ_A/issueTypes/{$ref:issueType:#3}",
         params: { substituteIssueTypeId: { $ref: { kind: "issueType", name: "調査" } } },
       },
     });
+  });
+
+  it("適用後は名前で照合されるので、同じマニフェストを当てても何も起きない", () => {
+    const desired: IssueType[] = [
+      { name: "調査", color: "#2779ca" },
+      { name: "バグ", color: "#990000" },
+    ];
+    const applied: ExistingIssueType[] = [
+      { id: 101, name: "調査", color: "#2779ca" },
+      { id: 102, name: "バグ", color: "#990000" },
+    ];
+
+    expect(plan(desired, applied).every(({ op }) => op === "noop")).toBe(true);
   });
 });
 
@@ -194,7 +280,7 @@ describe("環境変数から展開した値", () => {
   it("課題テンプレートが ${ENV} 由来なら計画に実値が現れない", () => {
     const actions = issueTypesReconciler.plan(
       [{ name: "バグ", color: "#990000", templateDescription: "社外秘の手順" }],
-      [],
+      { source: "project", issueTypes: [] },
       fixedPlanContext({ isSecret: secretPaths("issueTypes/0/templateDescription") }),
     );
 

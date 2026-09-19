@@ -1,7 +1,7 @@
 import { type Action, type ProvidedRef } from "./action";
 import { type ExecuteContext, type ExecutionEvent } from "./execution";
 import { resolveRequest } from "./ref";
-import { type ResolutionKey } from "./resolution";
+import { defaultSlotName, type ResolutionKey } from "./resolution";
 import { type ResourceKind } from "./resource";
 
 /**
@@ -26,9 +26,26 @@ const RATE_LIMIT_RETRY_LIMIT = 3;
  * 再取得の実体はここに置く。
  */
 const REFRESHED = [
-  { kind: "issueType", path: (projectKey: string) => `/api/v2/projects/${projectKey}/issueTypes` },
-  { kind: "status", path: (projectKey: string) => `/api/v2/projects/${projectKey}/statuses` },
-] as const satisfies readonly { kind: ResourceKind; path: (projectKey: string) => string }[];
+  /**
+   * 課題種別だけ位置キーも登録する。新規プロジェクトの計画は既定の表示名を知らず、
+   * 枠の位置でしか既定4件を指せない（§4.1）。ステータスは ID が 1〜4 の固定値なので
+   * 位置で指す必要がない。
+   */
+  {
+    kind: "issueType",
+    path: (projectKey: string) => `/api/v2/projects/${projectKey}/issueTypes`,
+    positional: true,
+  },
+  {
+    kind: "status",
+    path: (projectKey: string) => `/api/v2/projects/${projectKey}/statuses`,
+    positional: false,
+  },
+] as const satisfies readonly {
+  kind: ResourceKind;
+  path: (projectKey: string) => string;
+  positional: boolean;
+}[];
 
 type Failure = { status?: number; errors: { message: string }[] };
 
@@ -161,14 +178,18 @@ export const execute = async function* (
     const responses: unknown[] = [];
     const resolved: { ref: ProvidedRef; id: number }[] = [];
 
-    for (const { kind, path } of REFRESHED) {
+    for (const { kind, path, positional } of REFRESHED) {
       const response = await ctx.get(path(ctx.projectKey));
 
       responses.push(response);
 
-      for (const { id, name } of toNamedResources(response)) {
-        ctx.resolutions.set(`${kind}:${name}`, id);
-        resolved.push({ ref: { kind, name }, id });
+      for (const [slot, { id, name }] of toNamedResources(response).entries()) {
+        const names = positional ? [name, defaultSlotName(slot)] : [name];
+
+        for (const registered of names) {
+          ctx.resolutions.set(`${kind}:${registered}`, id);
+          resolved.push({ ref: { kind, name: registered }, id });
+        }
       }
     }
 
