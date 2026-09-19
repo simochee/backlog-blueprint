@@ -6,8 +6,8 @@
   "scripts": {
     "dev": "vite --configLoader runner",
     "build": "vite build --configLoader runner",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests --configLoader runner"
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json",
+    "test": "vitest run --configLoader runner"
   },
   "dependencies": {
     "@backlog-blueprint/backlog-client": "workspace:*",

@@ -28,7 +28,16 @@ const schemaArtifact = (): Plugin => ({
   },
 });
 
+/** GitHub Pages のサブパス配信（要件定義 §7.1 / WU-2） */
+const BASE = "/backlog-blueprint/";
+
+/**
+ * `@vitejs/plugin-react` を読み込まない。導入済みの 6.1.1 は peer に vite ^8 を要求し、
+ * `vite/internal` を import するため vite 7 では設定の読み込み自体が落ちる（実測）。
+ * JSX は vite の esbuild が tsconfig の `jsx: react-jsx` を見て変換するので、
+ * 変換だけなら plugin は要らない。plugin が戻せるのは開発時の Fast Refresh である。
+ */
 export default defineConfig({
-  base: "./",
+  base: BASE,
   plugins: [schemaArtifact()],
 });
