@@ -280,6 +280,16 @@ describe("環境変数から展開した値", () => {
 });
 
 describe("冪等性（NFR-4）", () => {
+  it("${ENV} 由来の説明が現状と同じなら2回目は noop になる", () => {
+    const actions = milestonesReconciler.plan(
+      [{ name: "v1.0", description: "社外秘の説明" }],
+      [{ id: 21, name: "v1.0", description: "社外秘の説明" }],
+      fixedPlanContext({ isSecret: secretPaths("milestones/0/description") }),
+    );
+
+    expect(actions.map(({ op }) => op)).toEqual(["noop"]);
+  });
+
   it("適用後の現状に同じマニフェストを当てると全部 noop になる", () => {
     const desired: Milestone[] = [
       { name: "v1.0", description: "最初のリリース", startDate: "2026-10-01" },

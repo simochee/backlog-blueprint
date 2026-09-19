@@ -175,6 +175,16 @@ describe("環境変数から展開した値", () => {
 });
 
 describe("冪等性（NFR-4）", () => {
+  it("${ENV} 由来のカテゴリー名が現状と同じなら2回目は noop になる", () => {
+    const actions = categoriesReconciler.plan(
+      [{ name: "社外秘カテゴリー" }],
+      [{ id: 11, name: "社外秘カテゴリー" }],
+      fixedPlanContext({ isSecret: secretPaths("categories/0/name") }),
+    );
+
+    expect(actions.map(({ op }) => op)).toEqual(["noop"]);
+  });
+
   it("適用後の現状に同じマニフェストを当てると全部 noop になる", () => {
     const desired: Category[] = [
       { name: "インフラ" },

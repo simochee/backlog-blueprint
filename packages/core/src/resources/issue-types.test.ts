@@ -348,6 +348,21 @@ describe("環境変数から展開した値", () => {
 });
 
 describe("冪等性（NFR-4）", () => {
+  it("${ENV} 由来の課題テンプレートが現状と同じなら2回目は noop になる", () => {
+    const actions = issueTypesReconciler.plan(
+      [{ name: "バグ", color: "#990000", templateDescription: "社外秘の手順" }],
+      {
+        source: "project",
+        issueTypes: [
+          { id: 101, name: "バグ", color: "#990000", templateDescription: "社外秘の手順" },
+        ],
+      },
+      fixedPlanContext({ isSecret: secretPaths("issueTypes/0/templateDescription") }),
+    );
+
+    expect(actions.map(({ op }) => op)).toEqual(["noop"]);
+  });
+
   it("適用後の現状に同じマニフェストを当てると全部 noop になる", () => {
     const desired: IssueType[] = [
       { name: "タスク", color: "#7ea800" },

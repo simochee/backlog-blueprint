@@ -457,6 +457,19 @@ describe("環境変数から展開した値", () => {
     });
     expect(actions[0]?.id).toBe("customFields/create/社外秘の属性");
   });
+
+  it("${ENV} 由来の単位が現状と同じなら2回目は noop になる", () => {
+    const actions = customFieldsReconciler.plan(
+      [{ name: "予算", type: "number", unit: "億円" }],
+      {
+        customFields: [{ id: 31, name: "予算", typeId: 3, unit: "億円", applicableIssueTypes: [] }],
+        issueTypes: [],
+      },
+      fixedPlanContext({ isSecret: secretPaths("customFields/0/unit") }),
+    );
+
+    expect(actions.map(({ op }) => op)).toEqual(["noop"]);
+  });
 });
 
 describe("カスタム属性の型の変更", () => {
