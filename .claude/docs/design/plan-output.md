@@ -225,6 +225,22 @@ PO-3 は「実装の詳細を晒す」という見方もできるが、本ツー
 [D-2](manifest-versioning.md#3-本プロジェクトの決定) とは事情が違い、
 JSON 出力は「壊れない限りバージョンを上げない」ほうが消費側が楽になる。
 
+## 2.3 `validate --output json`
+
+`validate` は計画を持たないので、plan の構造から計画に関わる項目を落とした形にする。
+
+```json
+{
+  "formatVersion": 1,
+  "tool": { "name": "@simochee/backlog-blueprint", "version": "0.1.0" },
+  "manifest": { "path": "projects/PROJ_A.yaml" },
+  "diagnostics": []
+}
+```
+
+`space` と `project` は無い。`validate` は Backlog に一切アクセスせず（CL-1）、
+プロジェクトが存在するかも知らないため。
+
 ## 3. apply の出力
 
 `apply` は plan と同じ描画を出したうえで、確認プロンプトと進捗を重ねる。
