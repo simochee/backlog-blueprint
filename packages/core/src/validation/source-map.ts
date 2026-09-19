@@ -18,9 +18,16 @@ export const parentPath = (path: string): string => {
   return separator === -1 ? ROOT_PATH : path.slice(0, separator);
 };
 
-export const pathFromInstancePath = (instancePath: string): string =>
+/**
+ * Ajv の `instancePath` は JSON Pointer で、`Diagnostic.path` は DG-4 の
+ * スラッシュ区切りである。似ているので各所で `split("/")` を書きたくなるが、
+ * `~0` / `~1` の復号を1つでも落とすと、その path だけ位置も値も引けなくなる。
+ */
+export const instancePathTokens = (instancePath: string): string[] =>
   instancePath
     .split("/")
     .filter((segment) => segment.length > 0)
-    .map((segment) => segment.replaceAll("~1", "/").replaceAll("~0", "~"))
-    .join("/");
+    .map((segment) => segment.replaceAll("~1", "/").replaceAll("~0", "~"));
+
+export const pathFromInstancePath = (instancePath: string): string =>
+  instancePathTokens(instancePath).join("/");

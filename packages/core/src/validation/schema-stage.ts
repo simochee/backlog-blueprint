@@ -2,7 +2,7 @@ import { Ajv2020, type ErrorObject } from "ajv/dist/2020.js";
 
 import { type Diagnostic } from "../diagnostic";
 import { DATE_PATTERN, ManifestSchema } from "../manifest";
-import { pathFromInstancePath, type SourceMap } from "./source-map";
+import { instancePathTokens, pathFromInstancePath, type SourceMap } from "./source-map";
 
 export type SchemaStageOptions = {
   source?: SourceMap;
@@ -26,13 +26,8 @@ const CUSTOM_FIELD_INDEX = /^\/customFields\/(\d+)/;
 const isRedundant = (error: ErrorObject): boolean =>
   error.keyword === "if" || UNION_BRANCH.test(error.schemaPath);
 
-const unescapeToken = (token: string): string => token.replaceAll("~1", "/").replaceAll("~0", "~");
-
-const tokensOf = (pointer: string): string[] =>
-  pointer === "" ? [] : pointer.slice(1).split("/").map(unescapeToken);
-
 const valueAt = (data: unknown, pointer: string): unknown =>
-  tokensOf(pointer).reduce<unknown>(
+  instancePathTokens(pointer).reduce<unknown>(
     (value, token) =>
       typeof value === "object" && value !== null
         ? (value as Record<string, unknown>)[token]
@@ -40,7 +35,7 @@ const valueAt = (data: unknown, pointer: string): unknown =>
     data,
   );
 
-const lastToken = (pointer: string): string => tokensOf(pointer).at(-1) ?? "";
+const lastToken = (pointer: string): string => instancePathTokens(pointer).at(-1) ?? "";
 
 const typeName = (value: unknown): string => (value === null ? "null" : typeof value);
 
