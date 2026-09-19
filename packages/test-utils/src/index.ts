@@ -167,3 +167,23 @@ export const secretPaths = (...paths: string[]): PlanContext["isSecret"] => {
 
   return (path) => expanded.has(path);
 };
+
+export { mockBacklog, withoutWritePacing } from "./mock-backlog";
+export type {
+  MockBacklog,
+  MockBacklogOptions,
+  MockCategory,
+  MockCustomField,
+  MockFailure,
+  MockFetch,
+  MockIssueType,
+  MockMethod,
+  MockMilestone,
+  MockProject,
+  MockProjectInput,
+  MockRequest,
+  MockStatus,
+  MockTeam,
+  MockUser,
+  MockWebhook,
+} from "./mock-backlog";
