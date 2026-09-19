@@ -1,3 +1,13 @@
+/**
+ * `import` に置き換えられない。`fetch.d.ts` は export を持たないグローバル宣言の
+ * ファイルで、import すると module 扱いになって宣言がグローバルでなくなる。
+ * 参照が要るのは、core を読む側（test-utils / cli / web）の program に
+ * `fetch.d.ts` が入らず、`setTimeout` が下流でだけ見つからなくなるため。
+ * consumer の `types` に足す案は、NFR-5 のガードを緩めるので採らない。
+ */
+// oxlint-disable-next-line typescript/triple-slash-reference
+/// <reference path="./fetch.d.ts" />
+
 import { type Action, type ProvidedRef } from "./action";
 import { asArrayOf, asRecord, requiredNumber, requiredString } from "./api-response";
 import { type ExecuteContext, type ExecutionEvent } from "./execution";

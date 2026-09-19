@@ -12,11 +12,11 @@
   },
   "dependencies": {
     "@sinclair/typebox": "catalog:",
+    "ajv": "catalog:",
     "yaml": "catalog:"
   },
   "devDependencies": {
     "@backlog-blueprint/tsconfigs": "workspace:*",
-    "ajv": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }
