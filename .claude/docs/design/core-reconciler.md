@@ -385,6 +385,8 @@ type PlanContext = {
 }
 ```
 
+`ReadContext.get` と `ExecuteContext.send` が失敗したときに投げるものは [§7.0](#70-送信層が投げる失敗の形) で定める。
+
 `PlanContext` が持つのは、他フェーズの結果ではなく**マニフェスト全体と空間スナップショット**。
 リソース間の参照（カスタム属性 → 課題種別）は `Ref` を作るだけなので、
 他 reconciler の `Action[]` を見る必要がない。reconciler どうしは互いを知らない。
@@ -515,6 +517,27 @@ function execute(actions: Action[], ctx: ExecuteContext): AsyncIterable<Executio
 CLI は行を書き、Web UI は state を更新する。core にコールバックやロガーを渡す設計にすると、
 片方にしかない表現（TTY の書き換え、React の再描画）が core に漏れる。
 イベント列だけを公開すれば NFR-6（同一ロジック）が保たれる。
+
+### 7.0 送信層が投げる失敗の形
+
+`ReadContext.get` と `ExecuteContext.send` が失敗したときに投げるものを、core 側で定める。
+送信層（`packages/backlog-client`）はこの形に合わせる。
+
+```ts
+type HttpFailure = {
+  status?: number                  // HTTP まで到達しなかった失敗では無い（§7.2 / PO-7）
+  errors: { message: string }[]
+}
+```
+
+**404 はエラーではなく情報である。** `GET /projects/:key` の 404 は「プロジェクトが存在しない」を
+意味し、フェーズ0がそれを読んで `Snapshot.project.exists` を決める（§4.1）。
+`get` は 404 でも `HttpFailure` を投げ、**呼び出し側が `status === 404` を見て情報として扱う**。
+
+`get` に「404 なら `undefined` を返す」専用の経路を作る案は採らない。
+404 を情報として扱うのはフェーズ0の `GET /projects/:key` だけで、他のすべての GET では
+404 は本物の失敗である。送信層に「どの 404 が情報か」を判断させると、その知識が
+core と送信層の2箇所に分かれる。
 
 ### 7.1 レート制限の扱い
 
