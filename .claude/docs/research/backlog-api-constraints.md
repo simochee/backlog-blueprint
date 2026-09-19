@@ -39,6 +39,26 @@
 そのためブラウザからは `X-RateLimit-*` ヘッダを読めない。
 レート制限の残量をブラウザで観測する手段は、`GET /api/v2/rateLimit`（本文で返る）だけになる。
 
+## 既定リソースの表示名
+
+新規プロジェクトの既定ステータスと既定課題種別の表示名は、**スペースの言語設定で変わる**。
+言語は `GET /api/v2/space` の `lang` で取れる（[リファレンスの応答例](https://developer.nulab.com/docs/backlog/api/2/get-space/)に `lang` がある）。
+
+| 言語 | 既定ステータス（ID 1〜4） | 既定課題種別 |
+| --- | --- | --- |
+| `ja` | 未対応 / 処理中 / 処理済み / 完了（実測） | タスク / バグ / 要望 / その他（実測） |
+| `en` | `Open` / `In Progress` / `Resolved` / `Closed` | `Bug` / `Task` / `Request` / **4つ目は `要検証`** |
+
+英語のステータス名は [Get Status List of Project](https://developer.nulab.com/docs/backlog/api/2/get-status-list-of-project/)
+の応答例が id 1 = `Open` を示し、[Customize issue status](https://support.backlog.com/hc/en-us/articles/360035098894-Customize-issue-status)
+が4つを列挙している。英語の課題種別は [Issue Type](https://support.backlog.com/hc/en-us/articles/115015501328-Issue-Type)
+が Bug / Task / Request の3つしか挙げておらず、日本語の「その他」に対応する4つ目が確認できていない。
+
+**確認できるまで、`ja` 以外の言語では新規プロジェクトの計画を拒否する。**
+推測した名前で計画を組むと、適用の途中で未解決参照の中断が起きる
+（[core のデータモデル §4.1](../design/core-reconciler.md#41-フェーズと-read)）。
+既存プロジェクトは `GET` が実名を返すので、言語に関係なく動く。
+
 ## リクエストの形式
 
 出典は [backlog-js](https://github.com/nulab/backlog-js)（Nulab 公式クライアント・MIT）の
@@ -102,7 +122,7 @@ plan の段階で所要時間を見積もって提示し、apply 中は進捗を
 | 制約 | 内容 |
 | --- | --- |
 | 既定ステータス | 4つが最初から存在する。表示名はスペースの言語設定で変わる |
-| 既定ステータスの表示名 | 日本語: 未対応 / 処理中 / 処理済み / 完了。英語: `Open` / `In Progress` / `Resolved` / `Closed`（[Get Status List of Project](https://developer.nulab.com/docs/backlog/api/2/get-status-list-of-project/) の例が id 1 = `Open`、[Customize issue status](https://support.backlog.com/hc/en-us/articles/360035098894-Customize-issue-status) が4つの英語名を記載） |
+| 既定ステータスの表示名 | [既定リソースの表示名](#既定リソースの表示名)を参照 |
 | 既定ステータスの ID | **全プロジェクト共通で 1 / 2 / 3 / 4 の固定値**（実測）。プロジェクト固有の ID ではない |
 | 既定ステータスの削除 | **できない**（実測）。`Default status cannot be deleted. id: 1` が返る |
 | 既定ステータスのリネーム・色変更 | **できない**（実測）。`PATCH` は `No such status` を返す。プロジェクト固有のステータスしか更新対象にならない |
@@ -156,6 +176,7 @@ plan の段階で所要時間を見積もって提示し、apply 中は進捗を
 | --- | --- |
 | 種別 | 1:文字列 / 2:文章 / 3:数値 / 4:日付 / 5:単一リスト / 6:複数リスト / 7:チェックボックス / 8:ラジオ |
 | 共通パラメータ | `name`（必須）, `typeId`（必須）, `description`, `required`, `applicableIssueTypes[]`（空なら全種別） |
+| 更新できない項目 | **`typeId` は [Update Custom Field](https://developer.nulab.com/docs/backlog/api/2/update-custom-field/) のパラメータに無い**。型を変えるには削除して作り直すしかない |
 | 数値型 | `min` `max` `initialValue`（Number）/ `unit`（String） |
 | 日付型 | `min` `max` `initialDate` は **String（yyyy-MM-dd）**。`initialValueType`（Number。1:当日 2:当日+シフト 3:指定日）`initialShift`（Number） |
 
@@ -351,12 +372,12 @@ yyyy-MM-dd の String（[Add Custom Field](https://developer.nulab.com/docs/back
 | # | 確認すること | 現在の扱い |
 | --- | --- | --- |
 | 1 | `GET /projects/:key/versions` と `GET /projects/:key/customFields` が返す日付の形式 | 時刻付きで返る場合に毎回差分が出るのを避けるため、read で先頭10文字（`yyyy-MM-dd`）に切り詰めている。タイムゾーン次第で1日ずれる可能性が残る |
-| 2 | カテゴリー / マイルストーン / カスタム属性 / Webhook の更新・削除のパス | リファレンスに記録が無いので Backlog API の通常形（`PATCH` / `DELETE /api/v2/projects/:key/{categories\|versions\|customFields\|webhooks}/:id`）を使っている |
-| 3 | プロジェクトメンバー / チーム / 管理者の**削除**エンドポイント | 追加系しか記録が無い。同じパスへの `DELETE` と、追加時と同じパラメータ（`userId` / `teamId`）を使っている |
-| 4 | `PATCH` でカスタム属性の `typeId` を変更できるか | 型変更を差分として出す以上、更新リクエストに `typeId` を載せている |
+| 2 | カテゴリー / マイルストーン / カスタム属性 / Webhook の更新・削除のパス | 本文書に記録が無いので Backlog API の通常形（`PATCH` / `DELETE /api/v2/projects/:key/{categories\|versions\|customFields\|webhooks}/:id`）を使っている。リファレンスには該当エンドポイントが載っているはずなので、**記録を足せば未検証から外せる** |
+| 3 | プロジェクトメンバー / チーム / 管理者の**削除**エンドポイント | 本文書には追加系しか記録が無い。同じパスへの `DELETE` と、追加時と同じパラメータ（`userId` / `teamId`）を使っている。これも**リファレンスに載っているはず**なので記録を足せば外せる |
+| 4 | 既定課題種別の英語名の4つ目（日本語の「その他」に対応するもの） | 確認できるまで `ja` 以外の言語では新規プロジェクトの計画を拒否する（[既定リソースの表示名](#既定リソースの表示名)） |
 | 5 | `GET /rateLimit` の本文の構造 | `{ rateLimit: { read \| update: { limit, remaining, reset } } }` と仮定。読めなければ 429 の再試行を諦める（勝手な既定秒数で待たない） |
 
-1〜4 はいずれも**確認に書き込みを伴う**。5 は読み取りだけで確認できる。
+1 と 4 は読み取りだけで確認できる。2 と 3 はリファレンスの読み直しで済む見込み。5 も読み取りだけで確認できる。
 
 ## 残る未検証事項
 
