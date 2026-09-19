@@ -3,12 +3,11 @@ import { type Status } from "../manifest";
 import { type Reconciler } from "../reconciler";
 import { sealChanges, sealFields, sealer } from "../secret";
 import { type IdOrRef, type Ref, type Value } from "../value";
+import { asArrayOf, asRecord, requiredNumber, requiredString } from "../api-response";
 
 export type ExistingStatus = { id: number; name: string; color: string };
 
 export type StatusesSnapshot = ExistingStatus[];
-
-type StatusResponse = { id: number; name: string; color: string };
 
 /**
  * 既定ステータスは全プロジェクト共通で ID 1〜4 の固定値であり、作成前でも分かる（§4.1）。
@@ -90,9 +89,17 @@ export const statusesReconciler: Reconciler<Status[], StatusesSnapshot> = {
       return DEFAULT_STATUSES;
     }
 
-    const response = (await ctx.get(statusesPath(ctx.projectKey))) as StatusResponse[];
+    const response = await ctx.get(statusesPath(ctx.projectKey));
 
-    return response.map(({ id, name, color }) => ({ id, name, color }));
+    return asArrayOf(response, (item) => {
+      const status = asRecord(item);
+
+      return {
+        id: requiredNumber(status, "id"),
+        name: requiredString(status, "name"),
+        color: requiredString(status, "color"),
+      };
+    });
   },
 
   plan(desired, snapshot, ctx) {

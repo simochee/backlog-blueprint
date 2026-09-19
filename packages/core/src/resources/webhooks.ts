@@ -4,6 +4,15 @@ import { type Reconciler } from "../reconciler";
 import { Secret, sealChanges, sealer, type Seal } from "../secret";
 import { type Value } from "../value";
 import { WEBHOOK_EVENTS, type WebhookEvent } from "../webhook-events";
+import {
+  asArrayOf,
+  asRecord,
+  numbers,
+  optionalString,
+  requiredBoolean,
+  requiredNumber,
+  requiredString,
+} from "../api-response";
 
 export type ExistingWebhook = {
   id: number;
@@ -120,23 +129,18 @@ export const webhooksReconciler: Reconciler<Webhook[], WebhooksSnapshot> = {
       return [];
     }
 
-    const webhooks = (await get(collectionPath(projectKey))) as {
-      id: number;
-      name: string;
-      description?: string | null;
-      hookUrl: string;
-      allEvent: boolean;
-      activityTypeIds?: number[] | null;
-    }[];
+    return asArrayOf(await get(collectionPath(projectKey)), (item) => {
+      const webhook = asRecord(item);
 
-    return webhooks.map(({ id, name, description, hookUrl, allEvent, activityTypeIds }) => ({
-      id,
-      name,
-      description: description ?? undefined,
-      hookUrl: new Secret(hookUrl),
-      allEvent,
-      activityTypeIds: activityTypeIds ?? [],
-    }));
+      return {
+        id: requiredNumber(webhook, "id"),
+        name: requiredString(webhook, "name"),
+        description: optionalString(webhook, "description"),
+        hookUrl: new Secret(requiredString(webhook, "hookUrl")),
+        allEvent: requiredBoolean(webhook, "allEvent"),
+        activityTypeIds: numbers(webhook, "activityTypeIds"),
+      };
+    });
   },
 
   plan: (desired, snapshot, { manifest, isSecret }) => {

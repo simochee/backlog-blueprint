@@ -1,6 +1,7 @@
 import { type Action, type Change } from "../action";
 import { type Manifest, type Settings } from "../manifest";
 import { type Reconciler } from "../reconciler";
+import { asRecord, requiredNumber, requiredString } from "../api-response";
 import { sealer, type Seal } from "../secret";
 import { type Value } from "../value";
 
@@ -17,7 +18,17 @@ export type ProjectSnapshot =
   | { exists: false }
   | { exists: true; id: number; name: string; settings: ProjectSettingsSnapshot };
 
-type ProjectResponse = { id: number; name: string } & ProjectSettingsSnapshot;
+/**
+ * 基本設定は14個のキーを並べた定数から拾い直さない（上記）。代わりに、応答のうち
+ * スカラー値だけを持つ。マニフェストが書けるのは真偽値と文字列だけ（§5）なので、
+ * 入れ子の値を落としても比較できる情報は減らない。
+ */
+const settingsOf = (record: Record<string, unknown>): ProjectSettingsSnapshot =>
+  Object.fromEntries(
+    Object.entries(record).filter(
+      ([, value]) => typeof value === "boolean" || typeof value === "string",
+    ),
+  );
 
 const projectsPath = "/api/v2/projects";
 
@@ -67,9 +78,14 @@ export const projectReconciler: Reconciler<ProjectDesired, ProjectSnapshot> = {
       return { exists: false };
     }
 
-    const project = (await ctx.get(projectPath(ctx.projectKey))) as ProjectResponse;
+    const project = asRecord(await ctx.get(projectPath(ctx.projectKey)));
 
-    return { exists: true, id: project.id, name: project.name, settings: project };
+    return {
+      exists: true,
+      id: requiredNumber(project, "id"),
+      name: requiredString(project, "name"),
+      settings: settingsOf(project),
+    };
   },
 
   plan(desired, snapshot, ctx) {

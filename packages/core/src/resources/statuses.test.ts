@@ -257,3 +257,13 @@ describe("送るものと前後差分の対応（PO-11）", () => {
     );
   });
 });
+
+describe("応答の検査", () => {
+  it("ステータスの応答に色が無ければ取り込む時点で落ちる", async () => {
+    await expect(
+      statusesReconciler.read(
+        fixedReadContext({ "/api/v2/projects/PROJ_A/statuses": [{ id: 1, name: "未対応" }] }),
+      ),
+    ).rejects.toThrow("color");
+  });
+});

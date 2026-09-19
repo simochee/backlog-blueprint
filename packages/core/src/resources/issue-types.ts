@@ -5,6 +5,13 @@ import { embedRef } from "../ref";
 import { defaultSlotName } from "../resolution";
 import { sealChanges, sealFields, sealer, type Seal } from "../secret";
 import { type IdOrRef, type Ref, type Value } from "../value";
+import {
+  asArrayOf,
+  asRecord,
+  optionalString,
+  requiredNumber,
+  requiredString,
+} from "../api-response";
 
 export type ExistingIssueType = {
   id: number;
@@ -27,14 +34,6 @@ export type IssueTypesSnapshot =
 /** 既定の課題種別は4件（API 制約） */
 export const DEFAULT_ISSUE_TYPE_SLOTS = 4;
 
-type IssueTypeResponse = {
-  id: number;
-  name: string;
-  color: string;
-  templateSummary: string | null;
-  templateDescription: string | null;
-};
-
 const issueTypesPath = (key: string): string => `/api/v2/projects/${key}/issueTypes`;
 
 const issueTypeRef = (name: string): Ref => ({ $ref: { kind: "issueType", name } });
@@ -45,8 +44,6 @@ const basePath = (index: number): string => `issueTypes/${index}`;
 
 const memberPath = (key: string, target: IdOrRef): string =>
   `${issueTypesPath(key)}/${typeof target === "number" ? target : embedRef(target)}`;
-
-const optional = (value: string | null): string | undefined => value ?? undefined;
 
 /**
  * 書かれていないキーを「空にする」と解釈しない。`templateSummary` を消す意図と
@@ -254,17 +251,21 @@ export const issueTypesReconciler: Reconciler<IssueType[], IssueTypesSnapshot> =
       return { source: "defaults", slots: DEFAULT_ISSUE_TYPE_SLOTS };
     }
 
-    const response = (await ctx.get(issueTypesPath(ctx.projectKey))) as IssueTypeResponse[];
+    const response = await ctx.get(issueTypesPath(ctx.projectKey));
 
     return {
       source: "project",
-      issueTypes: response.map((issueType) => ({
-        id: issueType.id,
-        name: issueType.name,
-        color: issueType.color,
-        templateSummary: optional(issueType.templateSummary),
-        templateDescription: optional(issueType.templateDescription),
-      })),
+      issueTypes: asArrayOf(response, (item) => {
+        const issueType = asRecord(item);
+
+        return {
+          id: requiredNumber(issueType, "id"),
+          name: requiredString(issueType, "name"),
+          color: requiredString(issueType, "color"),
+          templateSummary: optionalString(issueType, "templateSummary"),
+          templateDescription: optionalString(issueType, "templateDescription"),
+        };
+      }),
     };
   },
 

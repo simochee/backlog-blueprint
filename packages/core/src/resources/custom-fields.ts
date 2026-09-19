@@ -2,6 +2,17 @@ import { type Action, type Change } from "../action";
 import { CUSTOM_FIELD_TYPE_IDS, INITIAL_VALUE_TYPE_IDS, type CustomField } from "../manifest";
 import { type Reconciler } from "../reconciler";
 import { sealChanges, sealer } from "../secret";
+import {
+  asArrayOf,
+  asRecord,
+  numberOrString,
+  numbers,
+  optionalBoolean,
+  optionalNumber,
+  optionalString,
+  requiredNumber,
+  requiredString,
+} from "../api-response";
 import { type Value } from "../value";
 
 type CustomFieldFields = {
@@ -80,7 +91,16 @@ const asRange = (value: number | string | null | undefined) =>
 
 const asDate = (value: string | null | undefined) => value?.slice(0, 10);
 
-const asText = (value: string | null | undefined) => value ?? undefined;
+/** リスト型の選択肢は `{ id, name }` の配列で返る（API 制約）。比較に要るのは名前だけ */
+const itemsOf = (record: Record<string, unknown>): string[] | undefined => {
+  const items = record["items"];
+
+  if (items === undefined || items === null) {
+    return undefined;
+  }
+
+  return asArrayOf(items, (item) => requiredString(asRecord(item), "name"));
+};
 
 const fieldsOf = (desired: CustomField): CustomFieldFields => ({
   name: desired.name,
@@ -175,45 +195,34 @@ export const customFieldsReconciler: Reconciler<CustomField[], CustomFieldsSnaps
       return { customFields: [], issueTypes: [] };
     }
 
-    const issueTypes = (await get(issueTypesPath(projectKey))) as { id: number; name: string }[];
+    const issueTypes = asArrayOf(await get(issueTypesPath(projectKey)), (item) => {
+      const issueType = asRecord(item);
 
-    const customFields = (await get(collectionPath(projectKey))) as {
-      id: number;
-      name: string;
-      typeId: number;
-      description?: string | null;
-      required?: boolean;
-      min?: number | string | null;
-      max?: number | string | null;
-      initialValue?: number | null;
-      unit?: string | null;
-      initialDate?: string | null;
-      initialValueType?: number | null;
-      initialShift?: number | null;
-      items?: { name: string }[] | null;
-      allowInput?: boolean;
-      allowAddItem?: boolean;
-      applicableIssueTypes?: number[] | null;
-    }[];
+      return { id: requiredNumber(issueType, "id"), name: requiredString(issueType, "name") };
+    });
 
-    const mapped = customFields.map((customField) => ({
-      id: customField.id,
-      name: customField.name,
-      typeId: customField.typeId,
-      description: asText(customField.description),
-      required: customField.required,
-      min: asRange(customField.min),
-      max: asRange(customField.max),
-      initialValue: customField.initialValue ?? undefined,
-      unit: asText(customField.unit),
-      initialDate: asDate(customField.initialDate),
-      initialValueType: customField.initialValueType ?? undefined,
-      initialShift: customField.initialShift ?? undefined,
-      items: customField.items?.map(({ name }) => name),
-      allowInput: customField.allowInput,
-      allowAddItem: customField.allowAddItem,
-      applicableIssueTypes: customField.applicableIssueTypes ?? [],
-    }));
+    const mapped = asArrayOf(await get(collectionPath(projectKey)), (item) => {
+      const customField = asRecord(item);
+
+      return {
+        id: requiredNumber(customField, "id"),
+        name: requiredString(customField, "name"),
+        typeId: requiredNumber(customField, "typeId"),
+        description: optionalString(customField, "description"),
+        required: optionalBoolean(customField, "required"),
+        min: asRange(numberOrString(customField, "min")),
+        max: asRange(numberOrString(customField, "max")),
+        initialValue: optionalNumber(customField, "initialValue"),
+        unit: optionalString(customField, "unit"),
+        initialDate: asDate(optionalString(customField, "initialDate")),
+        initialValueType: optionalNumber(customField, "initialValueType"),
+        initialShift: optionalNumber(customField, "initialShift"),
+        items: itemsOf(customField),
+        allowInput: optionalBoolean(customField, "allowInput"),
+        allowAddItem: optionalBoolean(customField, "allowAddItem"),
+        applicableIssueTypes: numbers(customField, "applicableIssueTypes"),
+      };
+    });
 
     return { customFields: mapped, issueTypes: issueTypes.map(({ id, name }) => ({ id, name })) };
   },

@@ -1,4 +1,5 @@
 import { type Action } from "../action";
+import { asArray, asRecord, requiredNumber, requiredString } from "../api-response";
 import { type Access } from "../manifest";
 import { type Reconciler } from "../reconciler";
 import { type Value } from "../value";
@@ -41,42 +42,18 @@ const personalMembersPath = (projectKey: string): string =>
 const administratorsPath = (projectKey: string): string =>
   `/api/v2/projects/${projectKey}/administrators`;
 
-const asArray = (value: unknown): unknown[] => {
-  if (!Array.isArray(value)) {
-    throw new TypeError("Unexpected Backlog API response: expected an array");
-  }
-
-  return value;
-};
-
-const asRecord = (value: unknown): Record<string, unknown> => {
-  if (typeof value !== "object" || value === null) {
-    throw new TypeError("Unexpected Backlog API response: expected an object");
-  }
-
-  return value as Record<string, unknown>;
-};
-
 const toUser = (value: unknown): AccessUser => {
-  const { id, userId } = asRecord(value);
+  const user = asRecord(value);
 
-  if (typeof id !== "number" || typeof userId !== "string") {
-    throw new TypeError("Unexpected Backlog API response: a user needs a numeric id and a userId");
-  }
-
-  return { id, userId };
+  return { id: requiredNumber(user, "id"), userId: requiredString(user, "userId") };
 };
 
 const toUsers = (value: unknown): AccessUser[] => asArray(value).map((item) => toUser(item));
 
 const toTeam = (value: unknown): AccessTeam => {
-  const { id, name } = asRecord(value);
+  const team = asRecord(value);
 
-  if (typeof id !== "number" || typeof name !== "string") {
-    throw new TypeError("Unexpected Backlog API response: a team needs a numeric id and a name");
-  }
-
-  return { id, name };
+  return { id: requiredNumber(team, "id"), name: requiredString(team, "name") };
 };
 
 const toTeams = (value: unknown): AccessTeam[] => asArray(value).map((item) => toTeam(item));
@@ -87,12 +64,18 @@ const toSpaceTeams = (value: unknown): SpaceTeam[] =>
     members: toUsers(asRecord(item).members ?? []),
   }));
 
-const matched = (kind: AccessKind, name: string): Action => ({
+/**
+ * 一致している Action にも既存の ID を載せる（§6.1）。`--output json` の消費側は
+ * `noop` から「このリソースは意図的に一致している」を読むので、どのリソースと
+ * 一致しているのかを指せないと、名前だけを頼りに引き直すことになる。
+ */
+const matched = (kind: AccessKind, name: string, target: number): Action => ({
   id: `${SECTIONS[kind]}/noop/${name}`,
   phase: PHASE,
   kind,
   op: "noop",
   name,
+  target,
   writeRequest: false,
 });
 
@@ -176,29 +159,37 @@ export const accessReconciler: Reconciler<Access, AccessSnapshot> = {
      */
     const desiredMembers = unique([...desired.members, ...desired.administrators]);
 
-    const joinedMembers = new Set(snapshot.members.map((user) => user.userId));
-    const joinedTeams = new Set(snapshot.teams.map((team) => team.name));
-    const grantedAdministrators = new Set(snapshot.administrators.map((user) => user.userId));
-
-    const teamsToAdd = desired.teams.map((name) =>
-      joinedTeams.has(name)
-        ? matched("projectTeam", name)
-        : added("projectTeam", name, teamsPath(projectKey), { teamId: teamId(name) }),
+    const joinedMembers = new Map(snapshot.members.map((user) => [user.userId, user.id]));
+    const joinedTeams = new Map(snapshot.teams.map((team) => [team.name, team.id]));
+    const grantedAdministrators = new Map(
+      snapshot.administrators.map((user) => [user.userId, user.id]),
     );
 
-    const membersToAdd = desiredMembers.map((login) =>
-      joinedMembers.has(login)
-        ? matched("projectMember", login)
-        : added("projectMember", login, usersPath(projectKey), { userId: userId(login) }),
-    );
+    const teamsToAdd = desired.teams.map((name) => {
+      const joined = joinedTeams.get(name);
 
-    const administratorsToGrant = desired.administrators.map((login) =>
-      grantedAdministrators.has(login)
-        ? matched("projectAdministrator", login)
-        : added("projectAdministrator", login, administratorsPath(projectKey), {
+      return joined === undefined
+        ? added("projectTeam", name, teamsPath(projectKey), { teamId: teamId(name) })
+        : matched("projectTeam", name, joined);
+    });
+
+    const membersToAdd = desiredMembers.map((login) => {
+      const joined = joinedMembers.get(login);
+
+      return joined === undefined
+        ? added("projectMember", login, usersPath(projectKey), { userId: userId(login) })
+        : matched("projectMember", login, joined);
+    });
+
+    const administratorsToGrant = desired.administrators.map((login) => {
+      const granted = grantedAdministrators.get(login);
+
+      return granted === undefined
+        ? added("projectAdministrator", login, administratorsPath(projectKey), {
             userId: userId(login),
-          }),
-    );
+          })
+        : matched("projectAdministrator", login, granted);
+    });
 
     const administratorsToRevoke = snapshot.administrators
       .filter((user) => !desired.administrators.includes(user.userId))

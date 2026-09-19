@@ -2,6 +2,13 @@ import { type Action, type Change } from "../action";
 import { type Milestone } from "../manifest";
 import { type Reconciler } from "../reconciler";
 import { sealChanges, sealer } from "../secret";
+import {
+  asArrayOf,
+  asRecord,
+  optionalString,
+  requiredNumber,
+  requiredString,
+} from "../api-response";
 
 type MilestoneFields = {
   name: string;
@@ -30,8 +37,6 @@ const basePath = (index: number) => `milestones/${index}`;
  */
 const asDate = (value: string | null | undefined) => value?.slice(0, 10);
 
-const asText = (value: string | null | undefined) => value ?? undefined;
-
 const findExisting = (snapshot: MilestonesSnapshot, { name, oldname }: Milestone) =>
   snapshot.find((milestone) => milestone.name === name) ??
   snapshot.find((milestone) => milestone.name === oldname);
@@ -59,21 +64,17 @@ export const milestonesReconciler: Reconciler<Milestone[], MilestonesSnapshot> =
       return [];
     }
 
-    const versions = (await get(collectionPath(projectKey))) as {
-      id: number;
-      name: string;
-      description?: string | null;
-      startDate?: string | null;
-      releaseDueDate?: string | null;
-    }[];
+    return asArrayOf(await get(collectionPath(projectKey)), (item) => {
+      const version = asRecord(item);
 
-    return versions.map(({ id, name, description, startDate, releaseDueDate }) => ({
-      id,
-      name,
-      description: asText(description),
-      startDate: asDate(startDate),
-      releaseDueDate: asDate(releaseDueDate),
-    }));
+      return {
+        id: requiredNumber(version, "id"),
+        name: requiredString(version, "name"),
+        description: optionalString(version, "description"),
+        startDate: asDate(optionalString(version, "startDate")),
+        releaseDueDate: asDate(optionalString(version, "releaseDueDate")),
+      };
+    });
   },
 
   plan: (desired, snapshot, { manifest, isSecret }) => {

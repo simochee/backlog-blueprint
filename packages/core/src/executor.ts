@@ -1,4 +1,5 @@
 import { type Action, type ProvidedRef } from "./action";
+import { asArrayOf, asRecord, requiredNumber, requiredString } from "./api-response";
 import { type ExecuteContext, type ExecutionEvent } from "./execution";
 import { resolveRequest } from "./ref";
 import { defaultSlotName, type ResolutionKey } from "./resolution";
@@ -58,23 +59,28 @@ const delay = (milliseconds: number): Promise<void> =>
     setTimeout(() => resolve(), milliseconds);
   });
 
-const asRecord = (value: unknown): Record<string, unknown> | undefined =>
+/**
+ * 応答の形を確かめる `asRecord` と違い、こちらは失敗しても投げない。ここで見るのは
+ * エラー本文とレート制限の本文で、形が違えば「読めなかった」として扱う道が要る。
+ * 投げると、API の失敗を報告する経路自体が別の例外で置き換わる。
+ */
+const optionalRecord = (value: unknown): Record<string, unknown> | undefined =>
   typeof value === "object" && value !== null ? (value as Record<string, unknown>) : undefined;
 
 const numericId = (value: unknown): number | undefined => {
-  const id = asRecord(value)?.["id"];
+  const id = optionalRecord(value)?.["id"];
 
   return typeof id === "number" ? id : undefined;
 };
 
 const messagesOf = (value: unknown): { message: string }[] | undefined => {
-  const errors = asRecord(value)?.["errors"];
+  const errors = optionalRecord(value)?.["errors"];
 
   if (!Array.isArray(errors)) {
     return undefined;
   }
 
-  const messages = errors.map((error) => asRecord(error)?.["message"]);
+  const messages = errors.map((error) => optionalRecord(error)?.["message"]);
 
   return messages.every((message) => typeof message === "string")
     ? messages.map((message) => ({ message }))
@@ -88,34 +94,28 @@ const messagesOf = (value: unknown): { message: string }[] | undefined => {
  * 区別できなくなる（plan の出力仕様 §3.3）。
  */
 const toFailure = (error: unknown): Failure => {
-  const status = asRecord(error)?.["status"];
-  const errors = messagesOf(error) ?? [{ message: String(asRecord(error)?.["message"] ?? error) }];
+  const status = optionalRecord(error)?.["status"];
+  const errors = messagesOf(error) ?? [
+    { message: String(optionalRecord(error)?.["message"] ?? error) },
+  ];
 
   return typeof status === "number" ? { status, errors } : { errors };
 };
 
 const rateLimitReset = (body: unknown, section: "read" | "update"): number | undefined => {
-  const reset = asRecord(asRecord(asRecord(body)?.["rateLimit"])?.[section])?.["reset"];
+  const reset = optionalRecord(optionalRecord(optionalRecord(body)?.["rateLimit"])?.[section])?.[
+    "reset"
+  ];
 
   return typeof reset === "number" ? reset : undefined;
 };
 
-const toNamedResources = (value: unknown): { id: number; name: string }[] => {
-  if (!Array.isArray(value)) {
-    throw new TypeError("Unexpected Backlog API response: expected an array");
-  }
+const toNamedResources = (value: unknown): { id: number; name: string }[] =>
+  asArrayOf(value, (item) => {
+    const resource = asRecord(item);
 
-  return value.map((item) => {
-    const id = numericId(item);
-    const name = asRecord(item)?.["name"];
-
-    if (id === undefined || typeof name !== "string") {
-      throw new TypeError("Unexpected Backlog API response: a resource needs an id and a name");
-    }
-
-    return { id, name };
+    return { id: requiredNumber(resource, "id"), name: requiredString(resource, "name") };
   });
-};
 
 export const execute = async function* (
   actions: Action[],

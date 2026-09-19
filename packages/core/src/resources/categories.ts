@@ -2,6 +2,7 @@ import { type Action, type Change } from "../action";
 import { type Category } from "../manifest";
 import { type Reconciler } from "../reconciler";
 import { sealChanges, sealFields, sealer } from "../secret";
+import { asArrayOf, asRecord, requiredNumber, requiredString } from "../api-response";
 
 export type ExistingCategory = {
   id: number;
@@ -33,9 +34,11 @@ export const categoriesReconciler: Reconciler<Category[], CategoriesSnapshot> = 
       return [];
     }
 
-    const categories = (await get(collectionPath(projectKey))) as ExistingCategory[];
+    return asArrayOf(await get(collectionPath(projectKey)), (item) => {
+      const category = asRecord(item);
 
-    return categories.map(({ id, name }) => ({ id, name }));
+      return { id: requiredNumber(category, "id"), name: requiredString(category, "name") };
+    });
   },
 
   plan: (desired, snapshot, { manifest, isSecret }) => {

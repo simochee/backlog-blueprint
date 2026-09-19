@@ -203,3 +203,39 @@ describe("チーム", () => {
     expect(paramsOf(actions, "projectTeams/delete/QA")).toEqual({ teamId: qa.id });
   });
 });
+
+describe("一致している参加の表し方", () => {
+  it("一致しているチーム・個人・管理者には既存の ID が載る", () => {
+    const actions = planOf(
+      { teams: ["開発チーム"], members: ["suzuki"], administrators: ["yamada"] },
+      {
+        teams: [joined(developers)],
+        members: [suzuki, yamada],
+        administrators: [yamada],
+      },
+    );
+
+    expect(
+      actions.filter(({ op }) => op === "noop").map(({ name, target }) => [name, target]),
+    ).toEqual([
+      ["開発チーム", developers.id],
+      ["suzuki", suzuki.id],
+      ["yamada", yamada.id],
+      ["yamada", yamada.id],
+    ]);
+  });
+});
+
+describe("応答の検査", () => {
+  it("形の違う応答は取り込む時点で落ちる", async () => {
+    await expect(
+      accessReconciler.read(fixedReadContext({ ...SPACE_RESPONSES, "/api/v2/users": {} })),
+    ).rejects.toThrow(TypeError);
+  });
+
+  it("ユーザーに userId が無い応答も落ちる", async () => {
+    await expect(
+      accessReconciler.read(fixedReadContext({ ...SPACE_RESPONSES, "/api/v2/users": [{ id: 1 }] })),
+    ).rejects.toThrow("userId");
+  });
+});
