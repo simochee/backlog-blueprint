@@ -1,3 +1,5 @@
 import type { ResourceKind } from './resource'
 
-export type ResolutionTable = Map<`${ResourceKind}:${string}`, number>
+export type ResolutionKey = `${ResourceKind}:${string}`
+
+export type ResolutionTable = Map<ResolutionKey, number>

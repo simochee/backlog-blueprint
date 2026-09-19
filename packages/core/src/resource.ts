@@ -1,14 +1,17 @@
-export type ResourceKind =
-  | 'project'
-  | 'issueType'
-  | 'status'
-  | 'category'
-  | 'milestone'
-  | 'customField'
-  | 'projectTeam'
-  | 'projectMember'
-  | 'projectAdministrator'
-  | 'webhook'
+export const RESOURCE_KINDS = [
+  'project',
+  'issueType',
+  'status',
+  'category',
+  'milestone',
+  'customField',
+  'projectTeam',
+  'projectMember',
+  'projectAdministrator',
+  'webhook',
+] as const
+
+export type ResourceKind = (typeof RESOURCE_KINDS)[number]
 
 export type Op = 'create' | 'update' | 'delete' | 'reorder' | 'refresh' | 'noop'
 
