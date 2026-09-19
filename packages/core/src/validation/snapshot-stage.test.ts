@@ -5,8 +5,9 @@ import {
   fixedResourceSnapshots,
   fixedSnapshot,
 } from "../../../test-utils/src/index";
-import { type ManifestInput, type Settings, type Status } from "../manifest";
+import { type CustomField, type ManifestInput, type Settings } from "../manifest";
 import { type ResourceSnapshots } from "../plan";
+import { type ExistingCustomField } from "../resources/custom-fields";
 import { type ProjectSettingsSnapshot, type ProjectSnapshot } from "../resources/project";
 import { DEFAULT_STATUSES_EN, DEFAULT_STATUSES_JA } from "../resources/statuses";
 import { type Snapshot } from "../snapshot";
@@ -15,13 +16,6 @@ import { validateAgainstSnapshot } from "./snapshot-stage";
 const defaultStatuses = DEFAULT_STATUSES_JA.map(({ name }) => ({ name }));
 
 const englishStatuses = DEFAULT_STATUSES_EN.map(({ name }) => ({ name }));
-
-/**
- * S3 の `enum` がパレット外の色を弾くので、型の上ではこの値を書けない。
- * V-A8 が S6 で何を見ているかを記すために、検証を通っていない形をここで作る。
- */
-const unvalidatedColor = (name: string, color: string): Status =>
-  ({ name, color }) as unknown as Status;
 
 const validate = (
   manifest: Partial<ManifestInput>,
@@ -171,40 +165,6 @@ describe("既定ステータス（V-A6 / V-A6a）", () => {
   });
 });
 
-describe("カスタムステータスの色（V-A8）", () => {
-  it("10色パレットの外の色は V-A8 で中断する", () => {
-    expect(
-      idsOf({
-        statuses: [
-          ...defaultStatuses.slice(0, 3),
-          unvalidatedColor("レビュー中", "#000000"),
-          ...defaultStatuses.slice(3),
-        ],
-      }),
-    ).toEqual(["V-A8"]);
-  });
-
-  it("パレット内の色は通す", () => {
-    expect(
-      idsOf({
-        statuses: [
-          ...defaultStatuses.slice(0, 3),
-          { name: "レビュー中", color: "#3b9dbd" },
-          ...defaultStatuses.slice(3),
-        ],
-      }),
-    ).toEqual([]);
-  });
-
-  it("既定ステータスの色は判定の対象にしない", () => {
-    const defaultColors = DEFAULT_STATUSES_JA.map(({ name, color }) =>
-      unvalidatedColor(name, color),
-    );
-
-    expect(idsOf({ statuses: defaultColors })).not.toContain("V-A8");
-  });
-});
-
 describe("ステータスの並び（V-A14）", () => {
   it("未対応が先頭でないと中断する", () => {
     expect(
@@ -306,5 +266,63 @@ describe("孫課題の設定（V-A12）", () => {
     );
 
     expect(diagnostic).not.toHaveProperty("line");
+  });
+});
+
+const limited: ExistingCustomField = {
+  id: 10,
+  name: "影響範囲",
+  typeId: 5,
+  applicableIssueTypes: [1],
+};
+
+const withCustomFields = (customFields: ExistingCustomField[]) => ({
+  snapshots: { customFields: { customFields, issueTypes: [{ id: 1, name: "タスク" }] } },
+});
+
+const declared = (overrides: Partial<CustomField> = {}) => ({
+  customFields: [{ name: "影響範囲", type: "singleList" as const, items: ["大"], ...overrides }],
+});
+
+describe("絞りの解除（V-B10）", () => {
+  it("絞られているカスタム属性から applicableIssueTypes を落とすと中断する", () => {
+    expect(idsOf(declared(), withCustomFields([limited]))).toEqual(["V-B10"]);
+  });
+
+  it("空の配列を書いた場合も同じく中断する", () => {
+    expect(idsOf(declared({ applicableIssueTypes: [] }), withCustomFields([limited]))).toEqual([
+      "V-B10",
+    ]);
+  });
+
+  it("別の課題種別に絞り直す宣言は通す", () => {
+    expect(
+      idsOf(declared({ applicableIssueTypes: ["タスク"] }), withCustomFields([limited])),
+    ).toEqual([]);
+  });
+
+  it("もともと絞られていないカスタム属性は対象にしない", () => {
+    expect(idsOf(declared(), withCustomFields([{ ...limited, applicableIssueTypes: [] }]))).toEqual(
+      [],
+    );
+  });
+
+  it("型が変わる宣言は作り直しになるので止めない", () => {
+    expect(
+      idsOf(declared({ type: "text", items: undefined }), withCustomFields([limited])),
+    ).toEqual([]);
+  });
+
+  it("oldname で同定されるカスタム属性も対象にする", () => {
+    expect(
+      idsOf(declared({ name: "影響", oldname: "影響範囲" }), withCustomFields([limited])),
+    ).toEqual(["V-B10"]);
+  });
+
+  it("作り直す道を案内する", () => {
+    const [diagnostic] = validate(declared(), withCustomFields([limited]));
+
+    expect(diagnostic?.hint).toContain("create it again");
+    expect(diagnostic?.hint).toContain("oldname");
   });
 });

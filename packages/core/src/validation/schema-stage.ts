@@ -1,7 +1,7 @@
 import { Ajv2020, type ErrorObject } from "ajv/dist/2020.js";
 
 import { type Diagnostic } from "../diagnostic";
-import { DATE_PATTERN, ManifestSchema } from "../manifest";
+import { DATE_PATTERN, ManifestSchema, STATUS_COLORS } from "../manifest";
 import { type SchemaStage } from "./pipeline";
 import { instancePathTokens, pathFromInstancePath, type SourceMap } from "./source-map";
 
@@ -16,6 +16,8 @@ const CUSTOM_FIELD_CONDITIONS = "#/properties/customFields/items/allOf/";
 const UNION_BRANCH = /\/(?:anyOf|oneOf)\/\d+\//;
 
 const CUSTOM_FIELD_INDEX = /^\/customFields\/(\d+)/;
+
+const STATUS_COLOR_PATH = /^\/statuses\/\d+\/color$/;
 
 /**
  * `if` の指摘と、`anyOf` / `oneOf` の枝の指摘は落とす。どちらも同じ誤りが二重に出るが、
@@ -65,6 +67,9 @@ const isUnquotedColor = (
 const identify = (error: ErrorObject, data: unknown, source: SourceMap | undefined): string => {
   if (isUnquotedColor(error, data, source)) {
     return "V-A18";
+  }
+  if (error.keyword === "enum" && STATUS_COLOR_PATH.test(error.instancePath)) {
+    return "V-A8";
   }
   if (error.keyword === "additionalProperties") {
     return "V-A1";
@@ -271,6 +276,12 @@ const wordingFor = (id: string, error: ErrorObject, data: unknown): Wording => {
       return {
         ...byKeyword(error, data),
         hint: "write the project key with uppercase letters, digits and underscores only",
+      };
+    }
+    case "V-A8": {
+      return {
+        message: `${JSON.stringify(valueAt(data, error.instancePath))} is not one of the ten colors Backlog accepts for a status`,
+        hint: `use one of: ${STATUS_COLORS.join(", ")}`,
       };
     }
     case "V-A9": {

@@ -122,7 +122,14 @@ const fieldsOf = (desired: CustomField): CustomFieldFields => ({
   allowAddItem: desired.allowAddItem,
 });
 
-const findExisting = (snapshot: ExistingCustomField[], { name, oldname }: CustomField) =>
+/**
+ * 同定の規則を V-B10（S6）と1つにするために公開する。名前で引けなければ `oldname`、
+ * という順序が検証と計画でずれると、検証が見ていない要素を計画が更新することになる。
+ */
+export const findExistingCustomField = (
+  snapshot: ExistingCustomField[],
+  { name, oldname }: CustomField,
+): ExistingCustomField | undefined =>
   snapshot.find((customField) => customField.name === name) ??
   snapshot.find((customField) => customField.name === oldname);
 
@@ -241,7 +248,7 @@ export const customFieldsReconciler: Reconciler<CustomField[], CustomFieldsSnaps
 
     for (const [index, customField] of desired.entries()) {
       const fields = fieldsOf(customField);
-      const found = findExisting(snapshot, customField);
+      const found = findExistingCustomField(snapshot, customField);
       /**
        * 型が変わったら作り直す（§6.3a）。同名のまま `PATCH` すると、型は変わらないのに
        * 成功が返り、マニフェストと現実が食い違ったまま apply が完了する。
@@ -267,6 +274,10 @@ export const customFieldsReconciler: Reconciler<CustomField[], CustomFieldsSnaps
        * 絞りを解除するときだけ、空の配列を差分にも送信にも載せる（§9）。新しく作る
        * カスタム属性には解除する絞りが無いので、書かれていないキーは送らない（K-3）。
        * 課題種別の名前は同定名なので包まない（E-7）。
+       *
+       * 解除の側（`applicable` が空で `current` が空でない）にはここへ来る経路が無い。
+       * S6 の V-B10 が先に止めるためで、畳んで `current` の判定を落とすと、V-B10 を
+       * 外したときに解除が差分にすら現れなくなる。
        */
       const filters = applicable.length > 0 || (current !== undefined && current.length > 0);
       const changes = [

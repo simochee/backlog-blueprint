@@ -113,6 +113,29 @@ describe("要件定義の ID への割り当て", () => {
     });
   });
 
+  it("ステータスの色がパレットの外にあると V-A8 として報告される", () => {
+    expect(
+      only({ ...minimal, statuses: [{ name: "レビュー中", color: "#000000" }] }),
+    ).toMatchObject({ id: "V-A8", path: "statuses/0/color" });
+  });
+
+  it("パレット内のステータスの色は何も指摘されない", () => {
+    expect(idsOf({ ...minimal, statuses: [{ name: "レビュー中", color: "#3b9dbd" }] })).toEqual([]);
+  });
+
+  it("既定ステータスに既定の色を書いた場合も V-A8 になる", () => {
+    expect(idsOf({ ...minimal, statuses: [{ name: "未対応", color: "#ed8077" }] })).toEqual([
+      "V-A8",
+    ]);
+  });
+
+  it("課題種別の色は個別の ID を持たないので V-A21 のままになる", () => {
+    expect(only({ ...minimal, issueTypes: [{ name: "バグ", color: "#000000" }] })).toMatchObject({
+      id: "V-A21",
+      path: "issueTypes/0/color",
+    });
+  });
+
   it("個別の ID を持たない型・制約の違反は V-A21 として報告される", () => {
     expect(only({ ...minimal, settings: { textFormattingRule: "html" } })).toMatchObject({
       id: "V-A21",

@@ -1,7 +1,8 @@
 import { type Diagnostic } from "../diagnostic";
-import { type Manifest, type Status, STATUS_COLORS } from "../manifest";
+import { CUSTOM_FIELD_TYPE_IDS, type Manifest, type Status } from "../manifest";
 import { type ResourceSnapshots } from "../plan";
 import { type AccessSnapshot } from "../resources/access";
+import { findExistingCustomField, type CustomFieldsSnapshot } from "../resources/custom-fields";
 import { type ProjectSnapshot } from "../resources/project";
 import {
   DEFAULT_STATUSES_EN,
@@ -98,24 +99,6 @@ const defaultStatusFields = (declared: Status, index: number): Diagnostic[] => [
       ]),
 ];
 
-/**
- * S3 が `color` を10色の `enum` で縛っているので、この判定は現状のスキーマでは
- * 成立しない。それでも消さないのは、V-A8 の置き場所が S6 と決まっているため
- * （既定ステータスを対象から外せるのは、どれが既定かを ID で知れるここだけである）。
- * スキーマ側を緩めたときに、パレット外の色が V-A21 として素通りするのを防ぐ。
- */
-const customStatusColor = (declared: Status, index: number): Diagnostic[] =>
-  declared.color === undefined || STATUS_COLORS.includes(declared.color)
-    ? []
-    : [
-        snapshotDiagnostic(
-          "V-A8",
-          `statuses/${index}/color`,
-          `${JSON.stringify(declared.color)} is not one of the ten colors Backlog accepts for a status`,
-          `use one of: ${STATUS_COLORS.join(", ")}`,
-        ),
-      ];
-
 type DeclaredDefault = { name: string; position: number };
 
 const declaredDefaults = (
@@ -187,7 +170,7 @@ const statusDiagnostics = (manifest: Manifest, snapshot: StatusesSnapshot): Diag
 
   /**
    * どれが既定か決まらないときは V-A6 だけを出す。既定と自作の区別が付かないまま
-   * V-A6a / V-A8 / V-A14 を走らせると、既定を指すべき指摘が利用者の自作ステータスに
+   * V-A6a / V-A14 を走らせると、既定を指すべき指摘が利用者の自作ステータスに
    * 付き、直しようのないエラーになる。
    */
   if (defaults === undefined) {
@@ -200,9 +183,7 @@ const statusDiagnostics = (manifest: Manifest, snapshot: StatusesSnapshot): Diag
   return [
     ...missing,
     ...manifest.statuses.flatMap((declared, index) =>
-      defaultNames.has(declared.name)
-        ? defaultStatusFields(declared, index)
-        : customStatusColor(declared, index),
+      defaultNames.has(declared.name) ? defaultStatusFields(declared, index) : [],
     ),
     ...(missing.length > 0
       ? []
@@ -234,6 +215,41 @@ export const unconfirmedIssueCount = (projectKey: string, detail: string): Diagn
     `the issue count of ${projectKey} could not be confirmed: ${detail}`,
     "only projects whose issue count is confirmed to be zero can be targeted",
   );
+
+/**
+ * 絞りの解除を計画させない（V-B10）。空配列は form-urlencoded の段で `qs` がキーごと
+ * 落とす（API 制約「リクエストの形式」）ので、解除は本文に現れないまま apply が成功し、
+ * 次の plan でも同じ差分が出続けて NFR-4 と AC-8 が満たされなくなる。
+ */
+const applicableIssueTypes = (
+  manifest: Manifest,
+  { customFields }: CustomFieldsSnapshot,
+): Diagnostic[] =>
+  manifest.customFields.flatMap((declared, index) => {
+    const existing = findExistingCustomField(customFields, declared);
+
+    /**
+     * 型が変わる宣言は対象外。作り直しになる（§6.3a）ので、絞りは解除されるのではなく
+     * 新しいカスタム属性に最初から無い。ここで止めると直しようのないエラーになる。
+     */
+    if (
+      existing === undefined ||
+      existing.typeId !== CUSTOM_FIELD_TYPE_IDS[declared.type] ||
+      existing.applicableIssueTypes.length === 0 ||
+      (declared.applicableIssueTypes ?? []).length > 0
+    ) {
+      return [];
+    }
+
+    return [
+      snapshotDiagnostic(
+        "V-B10",
+        `customFields/${index}/applicableIssueTypes`,
+        `the custom field "${declared.name}" is limited to specific issue types, and that limit cannot be lifted: an empty list never reaches Backlog, so the limit would stay while the plan claims it is gone`,
+        `delete the custom field and create it again instead. oldname moves the current one to a different name`,
+      ),
+    ];
+  });
 
 const spaceMembers = (manifest: Manifest, access: AccessSnapshot): Diagnostic[] => {
   const userIds = new Set(access.spaceUsers.map(({ userId }) => userId));
@@ -329,5 +345,6 @@ export const validateAgainstSnapshot = ({
   ...issueCount(manifest, snapshot),
   ...spaceMembers(manifest, snapshots.access),
   ...statusDiagnostics(manifest, snapshots.statuses),
+  ...applicableIssueTypes(manifest, snapshots.customFields),
   ...grandchildIssues(manifest, snapshots.project),
 ];
