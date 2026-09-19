@@ -5,9 +5,9 @@ import {
   fixedResourceSnapshots,
   fixedSnapshot,
 } from "../../../test-utils/src/index";
-import { type CustomField, type ManifestInput, type Settings } from "../manifest";
-import { type ResourceSnapshots } from "../plan";
+import { type ManifestInput, type Settings } from "../manifest";
 import { type ExistingCustomField } from "../resources/custom-fields";
+import { type ResourceSnapshots } from "../plan";
 import { type ProjectSettingsSnapshot, type ProjectSnapshot } from "../resources/project";
 import { DEFAULT_STATUSES_EN, DEFAULT_STATUSES_JA } from "../resources/statuses";
 import { type Snapshot } from "../snapshot";
@@ -269,61 +269,24 @@ describe("孫課題の設定（V-A12）", () => {
   });
 });
 
-const limited: ExistingCustomField = {
-  id: 10,
-  name: "影響範囲",
-  typeId: 5,
-  applicableIssueTypes: [1],
-};
+describe("適用課題種別の絞り", () => {
+  const limited: ExistingCustomField = {
+    id: 10,
+    name: "影響範囲",
+    typeId: 5,
+    applicableIssueTypes: [1],
+  };
 
-const withCustomFields = (customFields: ExistingCustomField[]) => ({
-  snapshots: { customFields: { customFields, issueTypes: [{ id: 1, name: "タスク" }] } },
-});
-
-const declared = (overrides: Partial<CustomField> = {}) => ({
-  customFields: [{ name: "影響範囲", type: "singleList" as const, items: ["大"], ...overrides }],
-});
-
-describe("絞りの解除（V-B10）", () => {
-  it("絞られているカスタム属性から applicableIssueTypes を落とすと中断する", () => {
-    expect(idsOf(declared(), withCustomFields([limited]))).toEqual(["V-B10"]);
-  });
-
-  it("空の配列を書いた場合も同じく中断する", () => {
-    expect(idsOf(declared({ applicableIssueTypes: [] }), withCustomFields([limited]))).toEqual([
-      "V-B10",
-    ]);
-  });
-
-  it("別の課題種別に絞り直す宣言は通す", () => {
+  it("絞りの解除は止めない", () => {
     expect(
-      idsOf(declared({ applicableIssueTypes: ["タスク"] }), withCustomFields([limited])),
+      idsOf(
+        { customFields: [{ name: "影響範囲", type: "singleList", items: ["大"] }] },
+        {
+          snapshots: {
+            customFields: { customFields: [limited], issueTypes: [{ id: 1, name: "タスク" }] },
+          },
+        },
+      ),
     ).toEqual([]);
-  });
-
-  it("もともと絞られていないカスタム属性は対象にしない", () => {
-    expect(idsOf(declared(), withCustomFields([{ ...limited, applicableIssueTypes: [] }]))).toEqual(
-      [],
-    );
-  });
-
-  it("型が変わる宣言は作り直しになるので止めない", () => {
-    expect(
-      idsOf(declared({ type: "text", items: undefined }), withCustomFields([limited])),
-    ).toEqual([]);
-  });
-
-  it("oldname で同定されるカスタム属性も対象にする", () => {
-    expect(
-      idsOf(declared({ name: "影響", oldname: "影響範囲" }), withCustomFields([limited])),
-    ).toEqual(["V-B10"]);
-  });
-
-  it("1回の apply では組めない手順を案内しない", () => {
-    const [diagnostic] = validate(declared(), withCustomFields([limited]));
-
-    expect(diagnostic?.hint).toContain("apply again");
-    expect(diagnostic?.hint).toContain("under a different name");
-    expect(diagnostic?.hint).not.toContain("oldname");
   });
 });

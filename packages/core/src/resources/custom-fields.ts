@@ -122,11 +122,7 @@ const fieldsOf = (desired: CustomField): CustomFieldFields => ({
   allowAddItem: desired.allowAddItem,
 });
 
-/**
- * 同定の規則を V-B10（S6）と1つにするために公開する。名前で引けなければ `oldname`、
- * という順序が検証と計画でずれると、検証が見ていない要素を計画が更新することになる。
- */
-export const findExistingCustomField = (
+const findExistingCustomField = (
   snapshot: ExistingCustomField[],
   { name, oldname }: CustomField,
 ): ExistingCustomField | undefined =>
@@ -275,9 +271,9 @@ export const customFieldsReconciler: Reconciler<CustomField[], CustomFieldsSnaps
        * カスタム属性には解除する絞りが無いので、書かれていないキーは送らない（K-3）。
        * 課題種別の名前は同定名なので包まない（E-7）。
        *
-       * 解除の側（`applicable` が空で `current` が空でない）にはここへ来る経路が無い。
-       * S6 の V-B10 が先に止めるためで、畳んで `current` の判定を落とすと、V-B10 を
-       * 外したときに解除が差分にすら現れなくなる。
+       * `current` の判定を畳むと、解除（`applicable` が空で `current` が空でない）が
+       * 差分にも本文にも現れなくなる。空配列を `applicableIssueTypes[]=` にするのは
+       * 送信層の仕事である（API 制約「空配列を送る方法」）。
        */
       const filters = applicable.length > 0 || (current !== undefined && current.length > 0);
       const changes = [

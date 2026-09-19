@@ -104,6 +104,14 @@ describe("送信", () => {
     expect(calls[0]?.body).toBe("activityTypeIds%5B%5D=1&activityTypeIds%5B%5D=2");
   });
 
+  it("空の配列は key[]= として本文に現れる", async () => {
+    const { calls, client } = clientWith();
+
+    await client.send(aRequest({ params: { applicableIssueTypes: [] } }));
+
+    expect(calls[0]?.body).toBe("applicableIssueTypes%5B%5D=");
+  });
+
   it("計画が選んだメソッドとパスをそのまま使う", async () => {
     const { calls, client } = clientWith();
 

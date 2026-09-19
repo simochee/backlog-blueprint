@@ -1,8 +1,7 @@
 import { type Diagnostic } from "../diagnostic";
-import { CUSTOM_FIELD_TYPE_IDS, type Manifest, type Status } from "../manifest";
+import { type Manifest, type Status } from "../manifest";
 import { type ResourceSnapshots } from "../plan";
 import { type AccessSnapshot } from "../resources/access";
-import { findExistingCustomField, type CustomFieldsSnapshot } from "../resources/custom-fields";
 import { type ProjectSnapshot } from "../resources/project";
 import {
   DEFAULT_STATUSES_EN,
@@ -216,41 +215,6 @@ export const unconfirmedIssueCount = (projectKey: string, detail: string): Diagn
     "only projects whose issue count is confirmed to be zero can be targeted",
   );
 
-/**
- * 絞りの解除を計画させない（V-B10）。空配列は form-urlencoded の段で `qs` がキーごと
- * 落とす（API 制約「リクエストの形式」）ので、解除は本文に現れないまま apply が成功し、
- * 次の plan でも同じ差分が出続けて NFR-4 と AC-8 が満たされなくなる。
- */
-const applicableIssueTypes = (
-  manifest: Manifest,
-  { customFields }: CustomFieldsSnapshot,
-): Diagnostic[] =>
-  manifest.customFields.flatMap((declared, index) => {
-    const existing = findExistingCustomField(customFields, declared);
-
-    /**
-     * 型が変わる宣言は対象外。作り直しになる（§6.3a）ので、絞りは解除されるのではなく
-     * 新しいカスタム属性に最初から無い。ここで止めると直しようのないエラーになる。
-     */
-    if (
-      existing === undefined ||
-      existing.typeId !== CUSTOM_FIELD_TYPE_IDS[declared.type] ||
-      existing.applicableIssueTypes.length === 0 ||
-      (declared.applicableIssueTypes ?? []).length > 0
-    ) {
-      return [];
-    }
-
-    return [
-      snapshotDiagnostic(
-        "V-B10",
-        `customFields/${index}/applicableIssueTypes`,
-        `the custom field "${declared.name}" is limited to specific issue types, and that limit cannot be lifted: an empty list never reaches Backlog, so the limit would stay while the plan claims it is gone`,
-        `remove this custom field from the manifest and apply, then add it back and apply again, or declare it under a different name so the current one is deleted and the new one is created without the limit`,
-      ),
-    ];
-  });
-
 const spaceMembers = (manifest: Manifest, access: AccessSnapshot): Diagnostic[] => {
   const userIds = new Set(access.spaceUsers.map(({ userId }) => userId));
   const teamNames = new Set(access.spaceTeams.map(({ name }) => name));
@@ -345,6 +309,5 @@ export const validateAgainstSnapshot = ({
   ...issueCount(manifest, snapshot),
   ...spaceMembers(manifest, snapshots.access),
   ...statusDiagnostics(manifest, snapshots.statuses),
-  ...applicableIssueTypes(manifest, snapshots.customFields),
   ...grandchildIssues(manifest, snapshots.project),
 ];
