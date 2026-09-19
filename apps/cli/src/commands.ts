@@ -5,7 +5,10 @@ import {
   hasError,
   orderDiagnostics,
   schemaStage,
+  summarize,
   validateManifest,
+  type Action,
+  type ApplyOutcome,
   type Diagnostic,
   type ExecuteContext,
   type Manifest,
@@ -17,7 +20,6 @@ import { EXIT_CHANGES, EXIT_ERROR, EXIT_SUCCESS } from "./exit-code";
 import { type Io } from "./io";
 import { readManifest } from "./manifest-source";
 import {
-  type ApplyOutcome,
   type BuildPlan,
   type Output,
   type OutputContext,
@@ -25,7 +27,6 @@ import {
   type RenderOptions,
   type ToolContext,
 } from "./ports";
-import { errorReport, writeRequestCount } from "./report";
 import { TOOL } from "./version";
 
 export type CommonOptions = {
@@ -46,7 +47,13 @@ export type Deps = {
   createClient: (credentials: Credentials) => BacklogClient;
 };
 
-type StaticValidation = { path: string; diagnostics: Diagnostic[]; manifest?: Manifest };
+type StaticValidation = {
+  path: string;
+  diagnostics: Diagnostic[];
+  /** S2 が返す展開経路。そのまま `isSecret` になる（E-6 / FR-3.6） */
+  expandedPaths: Set<string>;
+  manifest?: Manifest;
+};
 
 type Prepared =
   | { ok: false; code: number }
@@ -64,14 +71,19 @@ const validateStatically = async (
   unresolvedEnvSeverity: Diagnostic["severity"],
 ): Promise<StaticValidation> => {
   const source = await readManifest(options.file, deps.io);
-  const { diagnostics, manifest } = validateManifest({
+  const { diagnostics, expandedPaths, manifest } = validateManifest({
     text: source.text,
     schemaStage,
     env: deps.io.env,
     unresolvedEnvSeverity,
   });
 
-  return { path: source.path, diagnostics, ...(manifest === undefined ? {} : { manifest }) };
+  return {
+    path: source.path,
+    diagnostics,
+    expandedPaths,
+    ...(manifest === undefined ? {} : { manifest }),
+  };
 };
 
 /**
@@ -121,21 +133,28 @@ const prepare = async (options: CommonOptions, deps: Deps): Promise<Prepared> =>
   };
 
   try {
-    const built = await deps.buildPlan({ manifest: statically.manifest, get: client.get });
-    const plan: PlanResult = {
-      ...built,
-      diagnostics: orderDiagnostics([...statically.diagnostics, ...built.diagnostics]),
-    };
+    const built = await deps.buildPlan({
+      manifest: statically.manifest,
+      get: client.get,
+      isSecret: (path) => statically.expandedPaths.has(path),
+    });
+    const diagnostics = orderDiagnostics([...statically.diagnostics, ...built.diagnostics]);
 
-    if (hasError(plan.diagnostics)) {
-      io.err(output.diagnostics(plan.diagnostics, render));
+    if (built.plan === undefined || hasError(diagnostics)) {
+      io.err(output.diagnostics(diagnostics, render));
 
       return { ok: false, code: EXIT_ERROR };
     }
 
-    return { ok: true, plan, context, client, manifest: statically.manifest };
+    return {
+      ok: true,
+      plan: { ...built.plan, diagnostics },
+      context,
+      client,
+      manifest: statically.manifest,
+    };
   } catch (error) {
-    io.err(errorReport(error));
+    io.err(output.failure(error, render));
 
     return { ok: false, code: EXIT_ERROR };
   }
@@ -172,7 +191,7 @@ export const runPlan = async (options: PlanOptions, deps: Deps): Promise<number>
         ),
   );
 
-  return writeRequestCount(plan.actions) > 0 ? EXIT_CHANGES : EXIT_SUCCESS;
+  return summarize(plan.actions).hasChanges ? EXIT_CHANGES : EXIT_SUCCESS;
 };
 
 const runExecution = async (
@@ -189,14 +208,20 @@ const runExecution = async (
     send: client.send,
   };
 
+  const applied: Action[] = [];
+
   let failure: { status?: number; errors: { message: string }[] } = { errors: [] };
-  let outcome: ApplyOutcome = { result: "succeeded" };
+  let outcome: ApplyOutcome = { result: "succeeded", applied };
 
   for await (const event of execute(plan.actions, context)) {
     const line = deps.output.progress(event, render);
 
     if (line !== undefined) {
       deps.io.err(line);
+    }
+
+    if (event.type === "actionSucceeded") {
+      applied.push(event.action);
     }
 
     if (event.type === "actionFailed") {
@@ -210,9 +235,8 @@ const runExecution = async (
       outcome = {
         result: "aborted",
         applied: event.applied,
-        failed: event.failed,
+        failed: { action: event.failed, ...failure },
         pending: event.pending,
-        ...failure,
       };
     }
   }

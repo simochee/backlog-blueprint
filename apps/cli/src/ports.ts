@@ -1,10 +1,13 @@
 import {
   type Action,
+  type ApplyOutcome,
   type Diagnostic,
   type ExecutionEvent,
   type Manifest,
+  type PlanContext,
   type ReadContext,
   type ResolutionTable,
+  type ResultingOrder,
 } from "@backlog-blueprint/core";
 
 export type ToolContext = {
@@ -23,29 +26,25 @@ export type RenderOptions = { color: boolean };
  * `resultingOrder` は JSON 出力が持つ項目（plan の出力仕様 §2.1）。
  */
 export type PlanResult = {
-  project: { key: string; name?: string; exists: boolean };
+  project: { key: string; name: string; exists: boolean };
   diagnostics: Diagnostic[];
   actions: Action[];
   resolutions: ResolutionTable;
-  resultingOrder: Record<string, string[]>;
+  resultingOrder: ResultingOrder;
 };
+
+/**
+ * `plan` が空なのは、どこかのステージがエラーを出して先へ進まなかったこと（VG-2）。
+ * `PlanResult` を必ず返す形にすると、エラーで止まった計画を空の `Action[]` として
+ * 描けてしまい、「差分なし」と区別が付かなくなる。
+ */
+export type PlanOutcome = { diagnostics: Diagnostic[]; plan?: PlanResult };
 
 export type BuildPlan = (input: {
   manifest: Manifest;
   get: ReadContext["get"];
-}) => Promise<PlanResult>;
-
-export type ApplyOutcome =
-  | { result: "succeeded" }
-  | { result: "rejected" }
-  | {
-      result: "aborted";
-      applied: Action[];
-      failed: Action;
-      pending: Action[];
-      status?: number;
-      errors: { message: string }[];
-    };
+  isSecret: PlanContext["isSecret"];
+}) => Promise<PlanOutcome>;
 
 /**
  * 描画は文字列を返すだけにする（C-4 / NFR-6）。ストリームもロガーも渡さない。
@@ -54,6 +53,7 @@ export type ApplyOutcome =
  */
 export type Output = {
   diagnostics: (diagnostics: Diagnostic[], options: RenderOptions) => string;
+  failure: (error: unknown, options: RenderOptions) => string;
   validateJson: (input: { context: ToolContext; diagnostics: Diagnostic[] }) => string;
   plan: (
     input: { context: OutputContext; plan: PlanResult },

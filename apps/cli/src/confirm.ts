@@ -1,7 +1,6 @@
-import { type Io } from "./io";
+import { APPLY_CONFIRMATION } from "@backlog-blueprint/core";
 
-const PROMPT =
-  'Do you want to apply these changes?\n  Only "yes" will be accepted to confirm.\n\n  Enter a value: ';
+import { type Io } from "./io";
 
 export const NOT_A_TERMINAL =
   "ERROR  apply requires confirmation, but stdin is not a terminal.\n  → pass --auto-approve to skip the confirmation\n";
@@ -20,7 +19,7 @@ export const confirmApply = async (io: Io): Promise<Confirmation> => {
     return { error: NOT_A_TERMINAL };
   }
 
-  io.err(PROMPT);
+  io.err(APPLY_CONFIRMATION);
 
   const answer = await io.readLine();
 

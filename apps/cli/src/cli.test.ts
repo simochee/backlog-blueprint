@@ -58,6 +58,7 @@ const anAction = (overrides: Partial<Action> = {}): Action => ({
 const fakeOutput: Output = {
   diagnostics: (diagnostics, { color }) =>
     `diagnostics(color=${color}) ${diagnostics.map(({ id, severity }) => `${id}:${severity}`).join(",")}\n`,
+  failure: (error) => `failure:${JSON.stringify(error)}\n`,
   validateJson: ({ diagnostics }) => `${JSON.stringify({ diagnostics: diagnostics.length })}\n`,
   plan: (_input, { color, showUnchanged }) =>
     `plan-body(color=${color},showUnchanged=${showUnchanged})\n`,
@@ -72,7 +73,13 @@ const fakePlan = (overrides: Partial<PlanResult> = {}): PlanResult => ({
   diagnostics: [],
   actions: [],
   resolutions: new Map(),
-  resultingOrder: {},
+  resultingOrder: {
+    issueTypes: [],
+    statuses: [],
+    categories: [],
+    milestones: [],
+    customFields: [],
+  },
   ...overrides,
 });
 
@@ -82,7 +89,13 @@ const deps = (
 ): Deps => ({
   io,
   output: fakeOutput,
-  buildPlan: overrides.buildPlan ?? (() => Promise.resolve(overrides.plan ?? fakePlan())),
+  buildPlan:
+    overrides.buildPlan ??
+    (() => {
+      const plan = overrides.plan ?? fakePlan();
+
+      return Promise.resolve({ diagnostics: plan.diagnostics, plan });
+    }),
   createClient:
     overrides.createClient ??
     ((): BacklogClient => ({
