@@ -71,7 +71,10 @@ export const validateManifest = ({
   }
 
   const manifest = normalizeManifest(expand.parsed.value as ManifestInput);
-  const diagnostics = [...validated, ...validateStaticSemantics(manifest, expand.parsed.source)];
+  const diagnostics = [
+    ...validated,
+    ...validateStaticSemantics(manifest, expand.parsed.source, expandedPaths),
+  ];
   const applicable = !hasError(diagnostics) && unresolvedPaths.size === 0;
 
   return {

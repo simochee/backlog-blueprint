@@ -24,6 +24,7 @@ const validate = (text: string, env: Record<string, string> = {}) => {
   return validateStaticSemantics(
     normalizeManifest(expanded.parsed.value as ManifestInput),
     expanded.parsed.source,
+    expanded.expandedPaths,
   );
 };
 
@@ -288,5 +289,92 @@ describe("Webhook のイベント", () => {
     const [diagnostic] = validate(webhook("[9999]"));
 
     expect(diagnostic?.hint).toContain("sent as written");
+  });
+});
+
+describe("同定名に書かれた環境変数（V-A25）", () => {
+  it("課題種別の名前が ${ENV} 由来なら警告する", () => {
+    const [diagnostic] = validate(
+      `key: PROJ_A
+name: プロジェクトA
+issueTypes:
+  - name: \${ISSUE_TYPE}
+    color: "#7ea800"
+`,
+      { ISSUE_TYPE: "タスク" },
+    );
+
+    expect(diagnostic).toMatchObject({
+      id: "V-A25",
+      severity: "warning",
+      stage: "semantic",
+      path: "issueTypes/0/name",
+      line: 4,
+    });
+  });
+
+  it("マスクできない理由が hint に書かれている", () => {
+    const [diagnostic] = validate(
+      `${HEAD}categories:
+  - name: \${CATEGORY}
+`,
+      { CATEGORY: "共通" },
+    );
+
+    expect(diagnostic?.hint).toContain("keys of the reference table");
+    expect(diagnostic?.hint).toContain("action id");
+  });
+
+  it("oldname・access の各要素・applicableIssueTypes も同定名として警告する", () => {
+    const diagnostics = validate(
+      `${HEAD}categories:
+  - name: 共通
+    oldname: \${OLD}
+customFields:
+  - name: 見積
+    type: number
+    applicableIssueTypes:
+      - \${ISSUE_TYPE}
+access:
+  members:
+    - \${MEMBER}
+`,
+      { OLD: "きょうつう", ISSUE_TYPE: "タスク", MEMBER: "suzuki" },
+    );
+
+    expect(diagnostics.map(({ id, path }) => [id, path])).toEqual([
+      ["V-A25", "categories/0/oldname"],
+      ["V-A25", "access/members/0"],
+      ["V-A25", "customFields/0/applicableIssueTypes/0"],
+    ]);
+  });
+
+  it("警告なので適用は止まらない", () => {
+    const diagnostics = validate(
+      `${HEAD}categories:
+  - name: \${CATEGORY}
+`,
+      { CATEGORY: "共通" },
+    );
+
+    expect(diagnostics.every(({ severity }) => severity === "warning")).toBe(true);
+  });
+
+  it("プロジェクト名は同定キーではないので警告しない", () => {
+    expect(
+      idsOf(
+        `key: PROJ_A
+name: \${PROJECT_NAME}
+issueTypes:
+  - name: タスク
+    color: "#7ea800"
+`,
+        { PROJECT_NAME: "プロジェクトA" },
+      ),
+    ).toEqual([]);
+  });
+
+  it("Yaml に直接書かれた名前は警告しない", () => {
+    expect(idsOf(`${HEAD}categories:\n  - name: 共通\n`)).toEqual([]);
   });
 });
