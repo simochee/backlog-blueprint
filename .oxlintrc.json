@@ -77,14 +77,16 @@
   },
   "overrides": [
     {
-      "files": [
-        "apps/cli/src/main.ts",
-        "apps/web/src/main.ts",
-        "packages/backlog-client/src/index.ts"
-      ],
+      "files": ["apps/web/src/main.ts"],
       "rules": {
         "unicorn/no-empty-file": "off",
         "unicorn/require-module-specifiers": "off"
+      }
+    },
+    {
+      "files": ["apps/cli/src/**"],
+      "rules": {
+        "import/no-nodejs-modules": "off"
       }
     },
     {

@@ -168,3 +168,5 @@ backlog-js とその型定義を `packages/core` に入れない。
   実装が入るまでの `export {}` を許すため。**実装を入れたら `.oxlintrc.json` から
   そのパスを消す。**
 - `no-template-curly-in-string` — 仕様上 `${ENV}` を含む文字列を書く場面が多いため（E-1）。
+- `import/no-nodejs-modules`（`apps/cli/src/` のみ）— CLI は Node のアプリで、
+  ファイル読み込みと標準入力に `node:*` が要るため。`packages/` では有効のままにする（NFR-5）。
