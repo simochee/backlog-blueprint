@@ -1,6 +1,6 @@
 # plan の出力仕様
 
-最終更新: 2026-09-19
+最終更新: 2026-09-20
 前提: [要件定義 FR-3](../requirements/requirements-definition.md#fr-3-計画dry-run) / [core のデータモデル](core-reconciler.md)
 
 人間向け（`--output text`）と機械向け（`--output json`）の両方を定義する。

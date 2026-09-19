@@ -1,6 +1,6 @@
 # backlog-blueprint 要件定義
 
-最終更新: 2026-09-19
+最終更新: 2026-09-20
 前提となる要求: [requirement-design.md](requirement-design.md)
 前提となる API 仕様: [../research/backlog-api-constraints.md](../research/backlog-api-constraints.md)
 参考にした先行事例: [../design/syntax-reference-github.md](../design/syntax-reference-github.md)
@@ -381,7 +381,6 @@ FR-2 の具体。**すべて適用開始前に判定する。**
 | V-B6 | **実行者自身がプロジェクト管理者から外れる定義になっていない** | エラー |
 | V-B7 | 削除対象リソースに対して、**削除対象自身ではない**振替先が計画上決定できる | エラー |
 | V-B8 | 更新系のレート制限残量が計画の操作数以上ある | 警告 |
-| V-B10 | 既に `applicableIssueTypes` で絞られているカスタム属性から、その絞りを解除する計画になっていない | エラー |
 
 V-A14 は API の制約をそのまま検証に落としたもの。適用の最後で表示順更新だけが失敗するのを防ぐ。
 
