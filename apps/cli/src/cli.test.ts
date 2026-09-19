@@ -297,6 +297,15 @@ describe("§1.5 終了コード", () => {
     expect(io.stderr).toContain("401");
   });
 
+  it("確認プロンプトを拒否すると 1 で終わる", async () => {
+    const io = fakeIo({ answers: ["no"] });
+
+    await expect(
+      runCli(["apply", "-f", "-"], deps(io, { plan: fakePlan({ actions: [anAction()] }) })),
+    ).resolves.toBe(1);
+    expect(io.stdout).toContain("apply-result:rejected");
+  });
+
   it("apply は成功すると 0 で終わる", async () => {
     const io = fakeIo();
 
@@ -431,6 +440,40 @@ describe("§1.3 標準出力と標準エラー出力", () => {
     );
 
     expect(JSON.parse(io.stdout)).toStrictEqual({ result: "succeeded" });
+  });
+
+  it("--output text では警告を標準エラー出力に写さない", async () => {
+    const io = fakeIo();
+    const warning: Diagnostic = {
+      id: "V-A15",
+      severity: "warning",
+      stage: "plan",
+      path: "categories",
+      message: "resulting order differs",
+    };
+
+    await runCli(
+      ["plan", "-f", "-"],
+      deps(io, { plan: fakePlan({ actions: [anAction()], diagnostics: [warning] }) }),
+    );
+
+    expect(io.stderr).not.toContain("V-A15");
+  });
+
+  it("validate の --output json は標準出力に JSON だけを書く", async () => {
+    const io = fakeIo();
+
+    await runCli(["validate", "-f", "-", "--output", "json"], deps(io));
+
+    expect(() => JSON.parse(io.stdout) as unknown).not.toThrow();
+  });
+
+  it("validate は --output text では標準出力に何も書かない", async () => {
+    const io = fakeIo();
+
+    await runCli(["validate", "-f", "-"], deps(io));
+
+    expect(io.stdout).toBe("");
   });
 
   it("進捗は標準エラー出力に書く", async () => {
