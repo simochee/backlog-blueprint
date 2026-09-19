@@ -267,6 +267,16 @@ Do you want to apply these changes?
 Apply complete. 5 added, 3 changed, 1 destroyed.
 ```
 
+レート制限による待機（`ExecutionEvent` の `waiting`。X-4）は、進捗の行の後に1行足す。
+
+```
+[ 5/10] + status         "レビュー中" ... rate limited, waiting 42s
+```
+
+X-1 の1秒間隔では何も出さない。`waiting` が流れるのは 429 を受けたときだけで
+（[core §7.1](core-reconciler.md#71-レート制限の扱い)）、毎回 1 秒の待機を報告しても
+利用者の判断材料にならない。
+
 ### 3.2 中断時（FR-4.4）
 
 ```
@@ -303,6 +313,14 @@ The project must still have zero issues at that point.
 **そのプロジェクトは二度とツールで触れなくなる**
 （[適用対象の限定 §7.3](validation-pipeline.md#73-中断後の再開は保証されない)）。
 「続きから進む」とだけ書いて、その条件を書かないのは嘘になる。
+
+確認プロンプトで拒否したときは1行で終える。
+
+```
+Apply cancelled. Nothing has been applied.
+```
+
+何も書かずに終了コード 1 を返すと、拒否と失敗が区別できない。
 
 ### 3.3 JSON
 
