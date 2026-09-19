@@ -250,20 +250,20 @@ V-A6 / V-A6a / V-A8 / V-A14 はスナップショット取得後のステージ�
 
 `categories[]`
 
-| キー | 型 | 必須 |
-| --- | --- | --- |
-| `name` | string | **必須** |
-| `oldname` | string | — |
+| キー | 型 | 必須 | 制約 |
+| --- | --- | --- | --- |
+| `name` | string | **必須** | `minLength: 1` |
+| `oldname` | string | — | `minLength: 1` |
 
 `milestones[]`
 
 | キー | 型 | 必須 | 制約 |
 | --- | --- | --- | --- |
-| `name` | string | **必須** | |
+| `name` | string | **必須** | `minLength: 1` |
 | `description` | string | — | |
 | `startDate` | string | — | `^\d{4}-\d{2}-\d{2}$` |
 | `releaseDueDate` | string | — | 同上 |
-| `oldname` | string | — | |
+| `oldname` | string | — | `minLength: 1` |
 
 ## 9. `customFields[]`
 
@@ -271,12 +271,12 @@ V-A6 / V-A6a / V-A8 / V-A14 はスナップショット取得後のステージ�
 
 | キー | 型 | 必須 | 制約 |
 | --- | --- | --- | --- |
-| `name` | string | **必須** | |
+| `name` | string | **必須** | `minLength: 1` |
 | `type` | string | **必須** | 下表の enum |
 | `description` | string | — | |
 | `required` | boolean | — | 既定 `false` |
 | `applicableIssueTypes` | string[] | — | `uniqueItems: true`。空／省略で全種別 |
-| `oldname` | string | — | |
+| `oldname` | string | — | `minLength: 1` |
 
 型の enum と `typeId` の対応。
 
@@ -284,12 +284,16 @@ V-A6 / V-A6a / V-A8 / V-A14 はスナップショット取得後のステージ�
 | --- | --- | --- |
 | `text` | 1 | — |
 | `textArea` | 2 | — |
-| `number` | 3 | `min` `max` `initialValue`（number）/ `unit`（string） |
-| `date` | 4 | `min` `max` `initialDate`（date 文字列）/ `initialValueType` / `initialShift`（integer） |
+| `number` | 3 | `min` `max` `initialValue`（いずれも **number**）/ `unit`（string） |
+| `date` | 4 | `min` `max` `initialDate`（いずれも `^\d{4}-\d{2}-\d{2}$` の**文字列**）/ `initialValueType` / `initialShift`（integer） |
 | `singleList` | 5 | `items`（string[]・**必須**）/ `allowInput` / `allowAddItem`（boolean） |
 | `multipleList` | 6 | 同上 |
 | `checkBox` | 7 | 同上 |
 | `radio` | 8 | 同上 |
+
+**`min` / `max` は型によって値の型が変わる。** number 型では数値、date 型では `yyyy-MM-dd` の文字列。
+キー名が共有されているため取り違えやすい（[API 制約](../research/backlog-api-constraints.md#カスタム属性カスタムフィールド)）。
+条件付きの表でこれも分岐させる。
 
 `initialValueType` の enum。
 
@@ -306,6 +310,8 @@ V-A6 / V-A6a / V-A8 / V-A14 はスナップショット取得後のステージ�
 | `type` がリスト型4種 | `items`（`minItems: 1`） | `min` `max` `unit` `initialValue` `initialDate` `initialValueType` `initialShift` |
 | `type: number` | — | `items` `allowInput` `allowAddItem` `initialDate` `initialValueType` `initialShift` |
 | `type: date` | — | `items` `allowInput` `allowAddItem` `unit` `initialValue` |
+| `type: number` の `min` / `max` | number であること | — |
+| `type: date` の `min` / `max` | `^\d{4}-\d{2}-\d{2}$` の文字列であること | — |
 | `initialValueType: specifiedDate` | `initialDate` | `initialShift` |
 | `initialValueType: todayPlusShift` | `initialShift` | `initialDate` |
 | `initialValueType: today` | — | `initialDate` `initialShift` |
@@ -331,13 +337,18 @@ W-1 が数値を許す理由は「Backlog が新イベントを追加しても C
 `teams` はチーム名、`members` / `administrators` はユーザー ID（ログイン ID）。
 V-A13 は `uniqueItems` で JSON Schema が直接表現できる数少ない検証のひとつ。
 
+**3キーはいずれも任意で、省略したキーは空配列として扱う。** `access` 全体を省略した場合
+（[K-1](#k-1-配列キーの省略は空配列であって管理対象外ではない)）と同じ規則を、キー単位にも一貫させる。
+`access: { teams: [開発チーム] }` と書けば `members` と `administrators` は空配列になり、
+実行者が管理者から外れるので V-B6 でエラーになる。
+
 ## 11. `webhooks[]`
 
 | キー | 型 | 必須 |
 | --- | --- | --- |
-| `name` | string | **必須** |
+| `name` | string | **必須**。`minLength: 1` |
 | `description` | string | — |
-| `hookUrl` | string | **必須** |
+| `hookUrl` | string | **必須**。`minLength: 1` |
 | `events` | `"all"` \| array | **必須** |
 
 `events` の型（W-1 / W-2 / W-4）。

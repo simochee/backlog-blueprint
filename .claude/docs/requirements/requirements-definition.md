@@ -442,14 +442,21 @@ ERROR [V-B3] key: project already has issues
 ## 7. アーキテクチャ
 
 ```
+apps/
+  cli/             npx backlog-blueprint（環境変数・ファイル IO・終了コード）
+  web/             Vite SPA。static hosting に配置
 packages/
   core/            パース・検証・plan 算出・apply 実行
                    プラットフォーム固有 API を使わない。fetch は ambient 宣言で型だけ持つ
   backlog-client/  backlog-js を包み、core に get / send を注入する送信層
-  cli/             npx backlog-blueprint（環境変数・ファイル IO・終了コード）
-  web/             Vite SPA。static hosting に配置
   schema/          JSON Schema の生成物
+  test-utils/      テストの共有ヘルパ。実 API を叩かずに固定値で組み立てる
+  tsconfigs/       共有 TypeScript 設定。core は types を上書きする
 ```
+
+`apps/` と `packages/` の分け方、ツールチェーン、`test-utils` / `tsconfigs` の切り出しは
+[先行事例 bee](../design/reference-bee.md) から借りた（B-1〜B-8）。
+bee は CLI 専用ツールなので、**ブラウザでも動く必要がある部分だけは借りていない**（同 §3）。
 
 ### 7.0 送信層を core から切り離す
 
