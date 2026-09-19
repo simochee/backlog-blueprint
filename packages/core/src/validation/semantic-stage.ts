@@ -30,6 +30,7 @@ const pathOf = (...segments: (string | number)[]): string => segments.join("/");
  * `changes` にしか載らないので包める（V-A22 が同じ理由で対象外にしている）。
  */
 const identifyingNames = (manifest: Manifest, resources: NamedResource[]): string[] => [
+  "key",
   ...resources.flatMap(({ key, items }) =>
     items.flatMap((item, index) => [
       pathOf(key, index, "name"),

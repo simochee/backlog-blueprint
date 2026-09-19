@@ -360,6 +360,26 @@ access:
     expect(diagnostics.every(({ severity }) => severity === "warning")).toBe(true);
   });
 
+  it("プロジェクトキーが ${ENV} 由来なら警告する", () => {
+    const [diagnostic] = validate(
+      `key: \${PROJECT_KEY}
+name: プロジェクトA
+issueTypes:
+  - name: タスク
+    color: "#7ea800"
+`,
+      { PROJECT_KEY: "PROJ_B" },
+    );
+
+    expect(diagnostic).toMatchObject({
+      id: "V-A25",
+      severity: "warning",
+      stage: "semantic",
+      path: "key",
+      line: 1,
+    });
+  });
+
   it("プロジェクト名は同定キーではないので警告しない", () => {
     expect(
       idsOf(
