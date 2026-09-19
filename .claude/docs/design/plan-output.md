@@ -88,6 +88,7 @@ Write requests: 9 (estimated 9s)
 | `noop` の表示 | 既定では**表示しない**。件数のみ集計に出す。`--show-unchanged` で展開する |
 | 変更点の展開 | `~` の行の下に `field: before -> after` をインデントして並べる。`(none)` は未設定。**`before` と `after` が同じ項目は描かない**（§2.2） |
 | リソース名 | 利用者が Backlog 上で付けた名前はそのまま出す（翻訳しない。要件定義 §5.3） |
+| 余った既定の枠 | 新規プロジェクトで余った既定課題種別の削除は `- issueType  (unused default)` と描く。`Action.name` は位置を表す数字だが、それを利用者に見せる意味が無い（[core §4.1](core-reconciler.md#41-フェーズと-read)） |
 | ツールのメッセージ | 英語のみ（NFR-9） |
 | マスク | `Secret`（`${ENV}` 由来）は `***`。Yaml に直接書かれた値は出す（E-4 / E-5） |
 | 色 | TTY のときのみ。`--no-color` と環境変数 `NO_COLOR` を尊重する |

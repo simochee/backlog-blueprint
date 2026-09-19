@@ -83,6 +83,7 @@ type Phase = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8   // 要件定義 §6 の適用順序
 ```
 
 `issueTypeSlot` は他と性質が違う。**解決表のキーを分けるためだけに存在し、`Action.kind` には現れない。**
+ただし `provides[].kind` と `target.$ref.kind` には現れるので、`--output json` の消費側からは見える。
 新規プロジェクトで余った既定課題種別の枠を削除するとき、その枠には対応する名前が無いので位置で指す必要があり、
 利用者の付けた名前と同じ名前空間に置くと衝突する（§4.1）。
 
@@ -261,7 +262,7 @@ V-C1 のメッセージはもともと利用者に直せるものではなくバ
 | --- | --- | --- |
 | 先頭から `min(N, 4)` 件 | 枠を引き継ぐ。`op: 'create'`、`request.method: 'PATCH'`、`target` は**その要素自身の名前の `Ref`** | `refresh` が i 番目の既定を `issueType:<マニフェストの i 番目の名前>` で登録する |
 | N > 4 の残り | 通常の `create`（`POST`） | Action の `provides` |
-| N < 4 で余った枠 | `delete`。`target` は `Ref{kind:'issueTypeSlot', name:'<位置>'}` | `refresh` が余りを `issueTypeSlot:<位置>` で登録する |
+| N < 4 で余った枠 | `delete`。`target` は `Ref{kind:'issueTypeSlot', name:'<位置>'}`。位置は**0 始まりの10進文字列**。Action は `id: "issueTypes/delete/slot/<位置>"` / `name: '<位置>'` | `refresh` が余りを `issueTypeSlot:<位置>` で登録する |
 
 **枠そのものに中間の識別子を与えない。** 計画の時点で決まっていないのは Backlog 上の ID だけで、
 **名前はマニフェストに書かれている**。解決表は「名前 → ID」なので、引き継ぐ枠は最初から
