@@ -1,7 +1,12 @@
 import { type Diagnostic } from "../diagnostic";
 import { type Manifest } from "../manifest";
+import { WEBHOOK_EVENTS } from "../webhook-events";
 import { hasEnvSentinel } from "./expand-stage";
 import { type SourceMap } from "./source-map";
+
+const KNOWN_EVENT_IDS = new Set<number>(WEBHOOK_EVENTS.map(({ id }) => id));
+
+const LAST_KNOWN_EVENT_ID = Math.max(...WEBHOOK_EVENTS.map(({ id }) => id));
 
 type NamedItem = { name: string; oldname?: string };
 
@@ -33,17 +38,27 @@ const exceeds = (min: number | string, max: number | string): boolean => {
 export const validateStaticSemantics = (manifest: Manifest, source: SourceMap): Diagnostic[] => {
   const diagnostics: Diagnostic[] = [];
 
-  const report = (id: string, path: string, message: string, hint: string): void => {
-    diagnostics.push({
-      id,
-      severity: "error",
-      stage: "semantic",
-      path,
-      ...source.positionAt(path),
-      message,
-      hint,
-    });
-  };
+  const push =
+    (severity: Diagnostic["severity"]) =>
+    (id: string, path: string, message: string, hint: string): void => {
+      diagnostics.push({
+        id,
+        severity,
+        stage: "semantic",
+        path,
+        ...source.positionAt(path),
+        message,
+        hint,
+      });
+    };
+
+  const report = push("error");
+
+  /**
+   * 警告を出す口を分けて持つ。V-A24 は W-1（Backlog がイベントを増やしても CLI を
+   * 更新せず使える）を残すための警告で、エラーに寄せると前方互換が消える。
+   */
+  const warn = push("warning");
 
   const resources = namedResources(manifest);
 
@@ -99,18 +114,6 @@ export const validateStaticSemantics = (manifest: Manifest, source: SourceMap): 
         );
       }
     }
-  }
-
-  if (
-    manifest.settings.grandchildIssueEnabled === true &&
-    manifest.settings.subtaskingEnabled !== true
-  ) {
-    report(
-      "V-A12",
-      "settings/grandchildIssueEnabled",
-      "grandchildIssueEnabled requires subtaskingEnabled to be true",
-      "set settings.subtaskingEnabled to true, or set settings.grandchildIssueEnabled to false",
-    );
   }
 
   for (const { key, items } of resources) {
@@ -191,12 +194,29 @@ export const validateStaticSemantics = (manifest: Manifest, source: SourceMap): 
     );
   };
 
-  checkBrace("name", "name", manifest.name);
-
   for (const { key, items } of resources) {
     for (const [index, item] of items.entries()) {
       checkBrace(pathOf(key, index, "name"), "name", item.name);
       checkBrace(pathOf(key, index, "oldname"), "oldname", item.oldname);
+    }
+  }
+
+  for (const [index, webhook] of manifest.webhooks.entries()) {
+    if (webhook.events === "all") {
+      continue;
+    }
+
+    for (const [position, event] of webhook.events.entries()) {
+      if (typeof event !== "number" || KNOWN_EVENT_IDS.has(event)) {
+        continue;
+      }
+
+      warn(
+        "V-A24",
+        pathOf("webhooks", index, "events", position),
+        `unknown webhook event id: ${event}`,
+        `this version of the CLI knows activityTypeId 1 to ${LAST_KNOWN_EVENT_ID}. the id is sent as written, so leave it if Backlog added the event after this release; otherwise use an event name`,
+      );
     }
   }
 

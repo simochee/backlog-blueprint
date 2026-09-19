@@ -114,24 +114,11 @@ describe("カスタム属性が指す課題種別", () => {
 });
 
 describe("孫課題の設定", () => {
-  it("孫課題を有効にして子課題を有効にしなければエラーになる", () => {
+  it("現状を見ないと決まらないので、この段では判定しない", () => {
     expect(
       idsOf(`${HEAD}settings:
   grandchildIssueEnabled: true
   subtaskingEnabled: false
-`),
-    ).toEqual(["V-A12"]);
-  });
-
-  it("子課題の設定を書かずに孫課題だけ有効にするのもエラーになる", () => {
-    expect(idsOf(`${HEAD}settings:\n  grandchildIssueEnabled: true\n`)).toEqual(["V-A12"]);
-  });
-
-  it("どちらも有効ならエラーにならない", () => {
-    expect(
-      idsOf(`${HEAD}settings:
-  grandchildIssueEnabled: true
-  subtaskingEnabled: true
 `),
     ).toEqual([]);
   });
@@ -237,10 +224,8 @@ describe("名前に使えない文字", () => {
     expect(idsOf(`${HEAD}categories:\n  - name: 緊急\n    oldname: 旧}対応\n`)).toEqual(["V-A22"]);
   });
 
-  it("プロジェクト名に } を含むとエラーになる", () => {
-    expect(idsOf("key: PROJ_A\nname: プロジェクト}A\nissueTypes:\n  - name: タスク\n")).toEqual([
-      "V-A22",
-    ]);
+  it("プロジェクト名の } は対象にならない", () => {
+    expect(idsOf("key: PROJ_A\nname: プロジェクト}A\nissueTypes:\n  - name: タスク\n")).toEqual([]);
   });
 
   it("ツールの都合による制約であることが hint に書かれている", () => {
@@ -269,5 +254,39 @@ describe("未解決の環境変数が入った値", () => {
     releaseDueDate: 2026-10-01
 `),
     ).toEqual([]);
+  });
+});
+
+describe("Webhook のイベント", () => {
+  const webhook = (events: string) =>
+    `${HEAD}webhooks:\n  - name: 通知\n    hookUrl: https://example.test\n    events: ${events}\n`;
+
+  it("CLI が知らない数値のイベントは警告にとどまる", () => {
+    const [diagnostic] = validate(webhook("[9999]"));
+
+    expect(diagnostic).toMatchObject({
+      id: "V-A24",
+      severity: "warning",
+      path: "webhooks/0/events/0",
+    });
+    expect(diagnostic?.message).toContain("9999");
+  });
+
+  it("知っている数値のイベントは何も言わない", () => {
+    expect(idsOf(webhook("[1, 2]"))).toEqual([]);
+  });
+
+  it("イベント名は数値ではないので対象にならない", () => {
+    expect(idsOf(webhook("[issueCreated]"))).toEqual([]);
+  });
+
+  it("events: all も対象にならない", () => {
+    expect(idsOf(webhook("all"))).toEqual([]);
+  });
+
+  it("Backlog が後から増やしたイベントでも使えることが hint に書かれている", () => {
+    const [diagnostic] = validate(webhook("[9999]"));
+
+    expect(diagnostic?.hint).toContain("sent as written");
   });
 });

@@ -4,8 +4,22 @@ import { describe, expect, it } from "vitest";
 import { type Diagnostic } from "../diagnostic";
 import { ManifestSchema } from "../manifest";
 import { validateSchema } from "./schema-stage";
+import { type SourceMap } from "./source-map";
 
 const minimal = { key: "PROJ_A", name: "プロジェクトA" };
+
+/**
+ * 位置と「ソースに値が書かれていないか」は S1 が読み取る（DG-5 / Y-3）。
+ * S3 のテストは S1 を走らせずに、その読み取り結果を固定値で差し替える。
+ */
+const sourceMap = (overrides: Partial<SourceMap> = {}): SourceMap => ({
+  positionAt: () => ({ line: 1, column: 1 }),
+  isEmptySource: () => false,
+  ...overrides,
+});
+
+const unquoted = (...paths: string[]): SourceMap =>
+  sourceMap({ isEmptySource: (path) => paths.includes(path) });
 
 const idsOf = (manifest: unknown): string[] => validateSchema(manifest).map(({ id }) => id);
 
@@ -112,18 +126,49 @@ describe("要件定義の ID への割り当て", () => {
 
 describe("メッセージ", () => {
   it("色の引用符を忘れた場合は、型の説明ではなく引用符を促す（V-A18）", () => {
-    const diagnostic = only({ ...minimal, statuses: [{ name: "完了", color: null }] });
+    const [diagnostic] = validateSchema(
+      { ...minimal, statuses: [{ name: "完了", color: null }] },
+      { source: unquoted("statuses/0/color") },
+    );
 
     expect(diagnostic).toMatchObject({ id: "V-A18", path: "statuses/0/color" });
-    expect(diagnostic.message).not.toContain("string");
-    expect(diagnostic.hint).toContain("quote");
+    expect(diagnostic?.message).not.toContain("string");
+    expect(diagnostic?.hint).toContain("quote");
   });
 
   it("課題種別の色でも同じ指摘になる", () => {
-    expect(only({ ...minimal, issueTypes: [{ name: "バグ", color: null }] })).toMatchObject({
-      id: "V-A18",
-      path: "issueTypes/0/color",
+    expect(
+      validateSchema(
+        { ...minimal, issueTypes: [{ name: "バグ", color: null }] },
+        { source: unquoted("issueTypes/0/color") },
+      ),
+    ).toMatchObject([{ id: "V-A18", path: "issueTypes/0/color" }]);
+  });
+
+  it("color: null と明示的に書いた場合は引用符の話をしない", () => {
+    const [diagnostic] = validateSchema(
+      { ...minimal, statuses: [{ name: "完了", color: null }] },
+      { source: sourceMap() },
+    );
+
+    expect(diagnostic?.id).toBe("V-A21");
+    expect(diagnostic?.hint).not.toContain("quote");
+  });
+
+  it("日付のパターン違反は正規表現ではなく書き方で説明する", () => {
+    expect(only({ ...minimal, milestones: [{ name: "v1", startDate: "2026/10/01" }] }).hint).toBe(
+      "use the yyyy-MM-dd format",
+    );
+  });
+
+  it("イベント名の打ち間違いには、書ける3つの形を示す", () => {
+    const diagnostic = only({
+      ...minimal,
+      webhooks: [{ name: "通知", hookUrl: "https://example.test", events: ["issueCreatd"] }],
     });
+
+    expect(diagnostic.hint).toContain("issueCreated");
+    expect(diagnostic.hint).toContain("all");
   });
 
   it("利用者が付けた名前はそのまま埋め込まれる", () => {
@@ -163,13 +208,12 @@ describe("列挙と位置", () => {
     ).toMatchObject({ path: "statuses/2/color" });
   });
 
-  it("行と列は path を引く関数から受け取る", () => {
-    const positions: Record<string, { line: number; column: number }> = {
-      key: { line: 2, column: 6 },
-    };
-
+  it("行と列は S1 が読み取った位置から受け取る", () => {
     expect(
-      validateSchema({ ...minimal, key: "proj_a" }, { positionAt: (path) => positions[path] }),
+      validateSchema(
+        { ...minimal, key: "proj_a" },
+        { source: sourceMap({ positionAt: () => ({ line: 2, column: 6 }) }) },
+      ),
     ).toMatchObject([{ path: "key", line: 2, column: 6 }]);
   });
 

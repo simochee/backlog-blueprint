@@ -20,7 +20,7 @@ const StrictObject = <Properties extends TProperties>(
   options: SchemaOptions = {},
 ) => Type.Object(properties, { ...options, additionalProperties: false });
 
-const DATE_PATTERN = String.raw`^\d{4}-\d{2}-\d{2}$`;
+export const DATE_PATTERN = String.raw`^\d{4}-\d{2}-\d{2}$`;
 
 export const ISSUE_TYPE_COLORS = [
   "#e30000",

@@ -88,8 +88,14 @@ describe("パースの失敗", () => {
 
     expect(result.parsed).toBeUndefined();
     expect(result.diagnostics).toEqual([
-      expect.objectContaining({ severity: "error", stage: "syntax", line: 3 }),
+      expect.objectContaining({ id: "V-A23", severity: "error", stage: "syntax", line: 3 }),
     ]);
+  });
+
+  it("どう直すかを hint に書く", () => {
+    const [diagnostic] = parseManifestSyntax("key: PROJ_A\nstatuses: [1, 2\n").diagnostics;
+
+    expect(diagnostic?.hint).toContain("indentation");
   });
 });
 

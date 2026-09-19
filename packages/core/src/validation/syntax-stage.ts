@@ -10,7 +10,7 @@ import {
   type SourcePosition,
 } from "./source-map";
 
-export const SYNTAX_ID = "S1";
+export const SYNTAX_ID = "V-A23";
 
 export const MULTIPLE_DOCUMENTS_ID = "Y-5";
 
@@ -126,6 +126,11 @@ export const parseManifestSyntax = (text: string): SyntaxStageResult => {
     path: ROOT_PATH,
     ...positionOf(error.pos[0]),
     message: error.message,
+    /**
+     * パーサの診断そのものは何が起きたかしか言わない。DG-2 が hint に求めるのは
+     * どう直すかなので、YAML で最も多い2つの原因を名指しする。
+     */
+    hint: 'fix the YAML at this position: check the indentation, and quote values that contain ":" or start with "#"',
   }));
 
   if (second) {

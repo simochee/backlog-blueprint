@@ -1,18 +1,11 @@
 import { Ajv2020, type ErrorObject } from "ajv/dist/2020.js";
 
 import { type Diagnostic } from "../diagnostic";
-import { ManifestSchema } from "../manifest";
-
-export type SourcePosition = { line: number; column: number };
-
-/**
- * S1 が読み取った位置を S3 に渡すための口（DG-5）。引くキーは `Diagnostic.path` と
- * 同じスラッシュ区切り（DG-4）にしてある。
- */
-export type PositionLookup = (path: string) => SourcePosition | undefined;
+import { DATE_PATTERN, ManifestSchema } from "../manifest";
+import { pathFromInstancePath, type SourceMap } from "./source-map";
 
 export type SchemaStageOptions = {
-  positionAt?: PositionLookup;
+  source?: SourceMap;
 };
 
 const validateManifest = new Ajv2020({ allErrors: true, strict: true }).compile(ManifestSchema);
@@ -38,8 +31,6 @@ const unescapeToken = (token: string): string => token.replaceAll("~1", "/").rep
 const tokensOf = (pointer: string): string[] =>
   pointer === "" ? [] : pointer.slice(1).split("/").map(unescapeToken);
 
-const toPath = (pointer: string): string => tokensOf(pointer).join("/");
-
 const valueAt = (data: unknown, pointer: string): unknown =>
   tokensOf(pointer).reduce<unknown>(
     (value, token) =>
@@ -62,11 +53,21 @@ const lengthAt = (data: unknown, pointer: string): number => {
   return Array.isArray(value) ? value.length : 0;
 };
 
-const isUnquotedColor = (error: ErrorObject, data: unknown): boolean =>
-  lastToken(error.instancePath) === "color" && valueAt(data, error.instancePath) === null;
+/**
+ * ソース上に値が書かれていないことまで確かめる（Y-3）。`color: null` と明示的に
+ * 書いた場合まで「YAML がコメントとして読んだ」と言うと、原因の説明が嘘になる。
+ */
+const isUnquotedColor = (
+  error: ErrorObject,
+  data: unknown,
+  source: SourceMap | undefined,
+): boolean =>
+  lastToken(error.instancePath) === "color" &&
+  valueAt(data, error.instancePath) === null &&
+  (source?.isEmptySource(pathFromInstancePath(error.instancePath)) ?? false);
 
-const identify = (error: ErrorObject, data: unknown): string => {
-  if (isUnquotedColor(error, data)) {
+const identify = (error: ErrorObject, data: unknown, source: SourceMap | undefined): string => {
+  if (isUnquotedColor(error, data, source)) {
     return "V-A18";
   }
   if (error.keyword === "additionalProperties") {
@@ -106,7 +107,7 @@ const offendingKey = (error: ErrorObject): string | undefined => {
 };
 
 const pathOf = (error: ErrorObject): string => {
-  const base = toPath(error.instancePath);
+  const base = pathFromInstancePath(error.instancePath);
   const key = offendingKey(error);
 
   if (key === undefined) {
@@ -117,6 +118,17 @@ const pathOf = (error: ErrorObject): string => {
 };
 
 type Wording = { message: string; hint?: string };
+
+const WEBHOOK_EVENTS_PATH = /^\/webhooks\/\d+\/events/;
+
+/**
+ * `events` には専用の hint を出す（W-4 前半）。「どの形にも一致しない」だけでは、
+ * イベント名を打ち間違えた利用者が、名前が拒まれたのか数値が拒まれたのかを読み取れない。
+ */
+const acceptedFormHint = (error: ErrorObject): string | undefined =>
+  WEBHOOK_EVENTS_PATH.test(error.instancePath)
+    ? 'write a known event name (such as "issueCreated"), a positive activityTypeId, or "all" for every event. event names are matched exactly'
+    : undefined;
 
 const byKeyword = (error: ErrorObject, data: unknown): Wording => {
   const params = error.params as Record<string, unknown>;
@@ -163,7 +175,10 @@ const byKeyword = (error: ErrorObject, data: unknown): Wording => {
 
       return {
         message: `${JSON.stringify(valueAt(data, error.instancePath))} does not match ${pattern}`,
-        hint: `write a value that matches ${pattern}`,
+        hint:
+          pattern === DATE_PATTERN
+            ? "use the yyyy-MM-dd format"
+            : `write a value that matches ${pattern}`,
       };
     }
     case "minLength": {
@@ -201,10 +216,16 @@ const byKeyword = (error: ErrorObject, data: unknown): Wording => {
     }
     case "oneOf":
     case "anyOf": {
-      return { message: "the value does not match any accepted form" };
+      return {
+        message: "the value does not match any accepted form",
+        hint: acceptedFormHint(error),
+      };
     }
     default: {
-      return { message: error.message ?? error.keyword };
+      return {
+        message: error.message ?? error.keyword,
+        hint: "adjust the value so that it satisfies the schema",
+      };
     }
   }
 };
@@ -277,9 +298,9 @@ const wordingFor = (id: string, error: ErrorObject, data: unknown): Wording => {
 const toDiagnostic = (
   error: ErrorObject,
   data: unknown,
-  positionAt: PositionLookup | undefined,
+  source: SourceMap | undefined,
 ): Diagnostic => {
-  const id = identify(error, data);
+  const id = identify(error, data, source);
   const path = pathOf(error);
 
   return {
@@ -287,7 +308,7 @@ const toDiagnostic = (
     severity: "error",
     stage: "schema",
     path,
-    ...positionAt?.(path),
+    ...source?.positionAt(path),
     ...wordingFor(id, error, data),
   };
 };
@@ -297,7 +318,7 @@ const signature = (diagnostic: Diagnostic): string =>
 
 export const validateSchema = (
   value: unknown,
-  { positionAt }: SchemaStageOptions = {},
+  { source }: SchemaStageOptions = {},
 ): Diagnostic[] => {
   if (validateManifest(value)) {
     return [];
@@ -307,7 +328,7 @@ export const validateSchema = (
 
   return (validateManifest.errors ?? [])
     .filter((error) => !isRedundant(error))
-    .map((error) => toDiagnostic(error, value, positionAt))
+    .map((error) => toDiagnostic(error, value, source))
     .filter((diagnostic) => {
       const key = signature(diagnostic);
       const isFirst = !seen.has(key);
