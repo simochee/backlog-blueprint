@@ -29,11 +29,19 @@ import {
 } from "./ports";
 import { TOOL } from "./version";
 
+/**
+ * 本文は stdout、診断・進捗・警告は stderr に出る（CLI 仕様 §1.3）ので、色は
+ * 書き出す先ごとに持つ（plan の出力仕様 §1.2）。1つの真偽値にまとめると、
+ * パイプしたときに本文から色が消えないか、端末の stderr から色が消えるかの
+ * どちらかになる。
+ */
+export type ColorOptions = { stdout: boolean; stderr: boolean };
+
 export type CommonOptions = {
   file: string;
   space?: string;
   output: "text" | "json";
-  color: boolean;
+  color: ColorOptions;
 };
 
 export type PlanOptions = CommonOptions & { showUnchanged: boolean };
@@ -64,6 +72,10 @@ type Prepared =
       client: BacklogClient;
       manifest: Manifest;
     };
+
+const bodyRender = ({ color }: CommonOptions): RenderOptions => ({ color: color.stdout });
+
+const noticeRender = ({ color }: CommonOptions): RenderOptions => ({ color: color.stderr });
 
 const validateStatically = async (
   options: CommonOptions,
@@ -96,7 +108,7 @@ export const runValidate = async (options: CommonOptions, deps: Deps): Promise<n
   const context: ToolContext = { tool: TOOL, manifest: { path } };
 
   if (diagnostics.length > 0) {
-    io.err(output.diagnostics(diagnostics, { color: options.color }));
+    io.err(output.diagnostics(diagnostics, noticeRender(options)));
   }
 
   if (options.output === "json") {
@@ -108,7 +120,7 @@ export const runValidate = async (options: CommonOptions, deps: Deps): Promise<n
 
 const prepare = async (options: CommonOptions, deps: Deps): Promise<Prepared> => {
   const { io, output } = deps;
-  const render: RenderOptions = { color: options.color };
+  const render = noticeRender(options);
   const statically = await validateStatically(options, deps, "error");
 
   if (statically.manifest === undefined) {
@@ -166,7 +178,7 @@ const prepare = async (options: CommonOptions, deps: Deps): Promise<Prepared> =>
  */
 const echoWarnings = (plan: PlanResult, options: CommonOptions, deps: Deps): void => {
   if (options.output === "json" && plan.diagnostics.length > 0) {
-    deps.io.err(deps.output.diagnostics(plan.diagnostics, { color: options.color }));
+    deps.io.err(deps.output.diagnostics(plan.diagnostics, noticeRender(options)));
   }
 };
 
@@ -187,7 +199,7 @@ export const runPlan = async (options: PlanOptions, deps: Deps): Promise<number>
       ? output.planJson({ context, plan })
       : output.plan(
           { context, plan },
-          { color: options.color, showUnchanged: options.showUnchanged },
+          { ...bodyRender(options), showUnchanged: options.showUnchanged },
         ),
   );
 
@@ -253,7 +265,7 @@ export const runApply = async (options: ApplyOptions, deps: Deps): Promise<numbe
 
   const { io, output } = deps;
   const { plan, context, client, manifest } = prepared;
-  const render: RenderOptions = { color: options.color };
+  const progressRender = noticeRender(options);
 
   echoWarnings(plan, options, deps);
 
@@ -262,7 +274,7 @@ export const runApply = async (options: ApplyOptions, deps: Deps): Promise<numbe
    * JSON 1つだけで（PO-7）、本文を先に書くと `| jq` が素通しで動かなくなる。
    */
   if (options.output === "text") {
-    io.out(output.plan({ context, plan }, { color: options.color, showUnchanged: false }));
+    io.out(output.plan({ context, plan }, { ...bodyRender(options), showUnchanged: false }));
   }
 
   const approval = options.autoApprove ? { confirmed: true } : await confirmApply(io);
@@ -274,13 +286,13 @@ export const runApply = async (options: ApplyOptions, deps: Deps): Promise<numbe
   }
 
   const outcome = approval.confirmed
-    ? await runExecution(plan, manifest, client, deps, render)
+    ? await runExecution(plan, manifest, client, deps, progressRender)
     : ({ result: "rejected" } as const);
 
   io.out(
     options.output === "json"
       ? output.applyJson({ context, plan, outcome })
-      : output.applyResult({ context, plan, outcome }, render),
+      : output.applyResult({ context, plan, outcome }, bodyRender(options)),
   );
 
   return outcome.result === "succeeded" ? EXIT_SUCCESS : EXIT_ERROR;

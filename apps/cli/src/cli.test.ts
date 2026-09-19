@@ -22,9 +22,16 @@ type Capture = { stdout: string; stderr: string };
 
 type FakeIo = Io & Capture;
 
-const fakeIo = (
-  overrides: { stdin?: string; answers?: string[]; isStdinTty?: boolean; env?: Io["env"] } = {},
-): FakeIo => {
+type IoOverrides = {
+  stdin?: string;
+  answers?: string[];
+  isStdinTty?: boolean;
+  isStdoutTty?: boolean;
+  isStderrTty?: boolean;
+  env?: Io["env"];
+};
+
+const fakeIo = (overrides: IoOverrides = {}): FakeIo => {
   const answers = [...(overrides.answers ?? [])];
   const io: FakeIo = {
     stdout: "",
@@ -38,6 +45,8 @@ const fakeIo = (
     readStdin: () => Promise.resolve(overrides.stdin ?? MANIFEST),
     readLine: () => Promise.resolve(answers.shift() ?? ""),
     isStdinTty: overrides.isStdinTty ?? true,
+    isStdoutTty: overrides.isStdoutTty ?? true,
+    isStderrTty: overrides.isStderrTty ?? true,
     env: overrides.env ?? { BACKLOG_API_KEY: API_KEY, BACKLOG_SPACE: "example.backlog.com" },
   };
 
@@ -53,6 +62,14 @@ const anAction = (overrides: Partial<Action> = {}): Action => ({
   request: { method: "POST", path: "/api/v2/projects/PROJ_A/versions", params: { name: "v1" } },
   writeRequest: true,
   ...overrides,
+});
+
+const aWarning = (): Diagnostic => ({
+  id: "V-A15",
+  severity: "warning",
+  stage: "plan",
+  path: "categories",
+  message: "resulting order differs",
 });
 
 const fakeOutput: Output = {
@@ -527,6 +544,14 @@ describe("表示の切り替え", () => {
     expect(io.stdout).toContain("showUnchanged=true");
   });
 
+  it("端末に出すときは色を付ける", async () => {
+    const io = fakeIo();
+
+    await runCli(["plan", "-f", "-"], deps(io));
+
+    expect(io.stdout).toContain("color=true");
+  });
+
   it("--no-color は色を落とす", async () => {
     const io = fakeIo();
 
@@ -545,7 +570,7 @@ describe("表示の切り替え", () => {
     expect(io.stdout).toContain("color=false");
   });
 
-  it("NO_COLOR が空なら色を落とさない", async () => {
+  it("NO_COLOR が空なら端末の判定だけで決まる", async () => {
     const io = fakeIo({
       env: { BACKLOG_API_KEY: API_KEY, BACKLOG_SPACE: "example.backlog.com", NO_COLOR: "" },
     });
@@ -553,6 +578,36 @@ describe("表示の切り替え", () => {
     await runCli(["plan", "-f", "-"], deps(io));
 
     expect(io.stdout).toContain("color=true");
+  });
+
+  it("標準出力をパイプすると本文から色が消える", async () => {
+    const io = fakeIo({ isStdoutTty: false });
+
+    await runCli(["plan", "-f", "-"], deps(io));
+
+    expect(io.stdout).toContain("color=false");
+  });
+
+  it("標準出力をパイプしても端末に出る診断は色付きのまま", async () => {
+    const io = fakeIo({ isStdoutTty: false });
+
+    await runCli(
+      ["plan", "-f", "-", "--output", "json"],
+      deps(io, { plan: fakePlan({ diagnostics: [aWarning()] }) }),
+    );
+
+    expect(io.stderr).toContain("diagnostics(color=true)");
+  });
+
+  it("標準エラー出力をパイプすると診断から色が消える", async () => {
+    const io = fakeIo({ isStderrTty: false });
+
+    await runCli(
+      ["plan", "-f", "-", "--output", "json"],
+      deps(io, { plan: fakePlan({ diagnostics: [aWarning()] }) }),
+    );
+
+    expect(io.stderr).toContain("diagnostics(color=false)");
   });
 });
 

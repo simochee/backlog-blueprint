@@ -52,18 +52,24 @@ const withCommonOptions = (command: Command): Command =>
     .option("--no-color", "Disable colored output");
 
 /**
- * 色の既定は `--no-color` と `NO_COLOR` のどちらでも落ちる。`NO_COLOR` は
- * 空でない値が設定されていることを合図とする取り決めなので、空文字は無視する。
+ * 色は `--no-color` と `NO_COLOR` のどちらでも落ちる。`NO_COLOR` は空でない値が
+ * 設定されていることを合図とする取り決めなので、空文字は無視する。
  */
+const colorAllowed = (options: RawOptions, io: Io): boolean => {
+  const noColor = io.env["NO_COLOR"];
+
+  return options["color"] !== false && (noColor === undefined || noColor === "");
+};
+
 const commonOptions = (options: RawOptions, io: Io): CommonOptions => {
   const { space } = options;
-  const noColor = io.env["NO_COLOR"];
+  const allowed = colorAllowed(options, io);
 
   return {
     file: options["file"] as string,
     ...(typeof space === "string" ? { space } : {}),
     output: options["output"] as CommonOptions["output"],
-    color: options["color"] !== false && (noColor === undefined || noColor === ""),
+    color: { stdout: allowed && io.isStdoutTty, stderr: allowed && io.isStderrTty },
   };
 };
 

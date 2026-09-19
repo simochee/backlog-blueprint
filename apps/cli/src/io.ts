@@ -11,6 +11,8 @@ export type Io = {
   readStdin: () => Promise<string>;
   readLine: () => Promise<string>;
   isStdinTty: boolean;
+  isStdoutTty: boolean;
+  isStderrTty: boolean;
   env: Record<string, string | undefined>;
 };
 
@@ -48,5 +50,7 @@ export const processIo = (): Io => ({
     }
   },
   isStdinTty: process.stdin.isTTY === true,
+  isStdoutTty: process.stdout.isTTY === true,
+  isStderrTty: process.stderr.isTTY === true,
   env: process.env,
 });

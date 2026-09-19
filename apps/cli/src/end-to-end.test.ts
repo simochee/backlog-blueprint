@@ -40,6 +40,8 @@ const capturingIo = (text: string): Capture => {
     readStdin: () => Promise.resolve(text),
     readLine: () => Promise.resolve(""),
     isStdinTty: false,
+    isStdoutTty: false,
+    isStderrTty: false,
     env: { BACKLOG_API_KEY: API_KEY, BACKLOG_SPACE: "example.backlog.com" },
   };
 
@@ -132,6 +134,14 @@ describe("plan を端から端まで", () => {
     expect(io.stdout).toContain("Blueprint: PROJ_A (example.backlog.com)");
     expect(io.stdout).toContain('+ status         "レビュー中"');
     expect(io.stdout).toContain("Write requests:");
+  });
+
+  it("端末でない標準出力には色を混ぜない", async () => {
+    const { io, run } = cliWith(MANIFEST);
+
+    await expect(run(["plan", "-f", "-"])).resolves.toBe(2);
+    expect(io.stdout).toContain('+ status         "レビュー中"');
+    expect(io.stdout).not.toContain(String.fromCharCode(27));
   });
 
   it("--output json は標準出力に JSON だけを書く", async () => {
