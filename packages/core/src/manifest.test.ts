@@ -159,7 +159,26 @@ describe('ステータス', () => {
   })
 })
 
+describe('カテゴリー', () => {
+  it('空の名前を持つカテゴリーは受理されない', () => {
+    expect(accepts({ ...minimal, categories: [{ name: '設計' }] })).toBe(true)
+    expect(accepts({ ...minimal, categories: [{ name: '' }] })).toBe(false)
+  })
+
+  it('空の oldname を持つカテゴリーは受理されない', () => {
+    expect(accepts({ ...minimal, categories: [{ name: '設計', oldname: '' }] })).toBe(false)
+  })
+})
+
 describe('マイルストーン', () => {
+  it('空の名前を持つマイルストーンは受理されない', () => {
+    expect(accepts({ ...minimal, milestones: [{ name: '' }] })).toBe(false)
+  })
+
+  it('空の oldname を持つマイルストーンは受理されない', () => {
+    expect(accepts({ ...minimal, milestones: [{ name: 'v1.0', oldname: '' }] })).toBe(false)
+  })
+
   it('日付は yyyy-MM-dd の文字列でなければ受理されない', () => {
     expect(accepts({ ...minimal, milestones: [{ name: 'v1.0', startDate: '2026-10-01' }] })).toBe(
       true,
@@ -201,6 +220,42 @@ describe('カスタム属性', () => {
 
   it('リスト型の items を空配列にはできない', () => {
     expect(accepts(withCustomField({ type: 'singleList', items: [] }))).toBe(false)
+  })
+
+  it('空の名前を持つカスタム属性は受理されない', () => {
+    expect(accepts({ ...minimal, customFields: [{ name: '', type: 'text' }] })).toBe(false)
+  })
+
+  it('空の oldname を持つカスタム属性は受理されない', () => {
+    expect(accepts(withCustomField({ type: 'text', oldname: '' }))).toBe(false)
+  })
+
+  it('数値型のカスタム属性の範囲は数値で書く', () => {
+    expect(accepts(withCustomField({ type: 'number', min: 1, max: 9 }))).toBe(true)
+    expect(rejectedPaths(withCustomField({ type: 'number', min: '2026-01-01' }))).toContain(
+      '/customFields/0/min',
+    )
+    expect(rejectedPaths(withCustomField({ type: 'number', max: '2026-12-31' }))).toContain(
+      '/customFields/0/max',
+    )
+  })
+
+  it('日付型のカスタム属性の範囲は日付文字列で書く', () => {
+    expect(accepts(withCustomField({ type: 'date', min: '2026-01-01', max: '2026-12-31' }))).toBe(
+      true,
+    )
+    expect(rejectedPaths(withCustomField({ type: 'date', min: 1 }))).toContain(
+      '/customFields/0/min',
+    )
+    expect(rejectedPaths(withCustomField({ type: 'date', max: 9 }))).toContain(
+      '/customFields/0/max',
+    )
+  })
+
+  it('日付型のカスタム属性の範囲は yyyy-MM-dd 以外の文字列では書けない', () => {
+    expect(rejectedPaths(withCustomField({ type: 'date', min: '2026/01/01' }))).toContain(
+      '/customFields/0/min',
+    )
   })
 
   it('リスト型には min / max を書けない', () => {
@@ -307,6 +362,18 @@ describe('Webhook', () => {
   it('イベントの空配列と重複は受理されない', () => {
     expect(accepts(withWebhookEvents([]))).toBe(false)
     expect(accepts(withWebhookEvents(['issueCreated', 'issueCreated']))).toBe(false)
+  })
+
+  it('空の名前を持つ Webhook は受理されない', () => {
+    expect(accepts({ ...minimal, webhooks: [{ name: '', hookUrl: 'https://x.test', events: 'all' }] })).toBe(
+      false,
+    )
+  })
+
+  it('空の hookUrl を持つ Webhook は受理されない', () => {
+    expect(
+      accepts({ ...minimal, webhooks: [{ name: 'Slack 通知', hookUrl: '', events: 'all' }] }),
+    ).toBe(false)
   })
 
   it('events を省いた Webhook は受理されない', () => {

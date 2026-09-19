@@ -98,11 +98,22 @@ const TYPE_SPECIFIC_CUSTOM_FIELD_KEYS = [
 const forbid = (...keys: readonly string[]): Record<string, false> =>
   Object.fromEntries(keys.map((key) => [key, false]))
 
+const rangeOf = (schema: Record<string, unknown>) => ({ min: schema, max: schema })
+
+const NUMBER_RANGE = rangeOf({ type: 'number' })
+
+const DATE_RANGE = rangeOf({ type: 'string', pattern: DATE_PATTERN })
+
 /**
  * 8種の型を判別共用体にして `oneOf` を出す形は採らない。どの分岐にも一致しない入力に
  * 対してエディタが出せるのは「どの分岐にも一致しない」だけで、V-A11 が指したい
  * 「この型にはこのキーが要る」にならない。§9 が `allOf` + `if`/`then` を指定しているのは
  * この違いによる。
+ *
+ * 各 `if` の `required` は省略できない。判別キー（`type` / `initialValueType`）が
+ * 書かれていないとき `properties` だけの `if` は真になるため、`required` を外すと
+ * すべての分岐の `then` が同時に成立し、型固有キーが一律に禁止された結果として
+ * 「どのキーも書けない」というエラーが並ぶ。
  */
 const CUSTOM_FIELD_CONDITIONS = [
   {
@@ -110,6 +121,7 @@ const CUSTOM_FIELD_CONDITIONS = [
     then: {
       required: ['items'],
       properties: {
+        // `type` は `minItems` と併記する。Ajv の strict モードが単独の `minItems` を拒む。
         items: { type: 'array', minItems: 1 },
         ...forbid(
           'min',
@@ -126,19 +138,27 @@ const CUSTOM_FIELD_CONDITIONS = [
   {
     if: { properties: { type: { const: 'number' } }, required: ['type'] },
     then: {
-      properties: forbid(
-        'items',
-        'allowInput',
-        'allowAddItem',
-        'initialDate',
-        'initialValueType',
-        'initialShift',
-      ),
+      properties: {
+        ...NUMBER_RANGE,
+        ...forbid(
+          'items',
+          'allowInput',
+          'allowAddItem',
+          'initialDate',
+          'initialValueType',
+          'initialShift',
+        ),
+      },
     },
   },
   {
     if: { properties: { type: { const: 'date' } }, required: ['type'] },
-    then: { properties: forbid('items', 'allowInput', 'allowAddItem', 'unit', 'initialValue') },
+    then: {
+      properties: {
+        ...DATE_RANGE,
+        ...forbid('items', 'allowInput', 'allowAddItem', 'unit', 'initialValue'),
+      },
+    },
   },
   {
     if: {
@@ -196,28 +216,30 @@ const StatusSchema = StrictObject({
 })
 
 const CategorySchema = StrictObject({
-  name: Type.String(),
-  oldname: Type.Optional(Type.String()),
+  name: Type.String({ minLength: 1 }),
+  oldname: Type.Optional(Type.String({ minLength: 1 })),
 })
 
 const MilestoneSchema = StrictObject({
-  name: Type.String(),
+  name: Type.String({ minLength: 1 }),
   description: Type.Optional(Type.String()),
   startDate: Type.Optional(Type.String({ pattern: DATE_PATTERN })),
   releaseDueDate: Type.Optional(Type.String({ pattern: DATE_PATTERN })),
-  oldname: Type.Optional(Type.String()),
+  oldname: Type.Optional(Type.String({ minLength: 1 })),
 })
+
+const CustomFieldRange = Type.Union([Type.Number(), Type.String({ pattern: DATE_PATTERN })])
 
 const CustomFieldSchema = StrictObject(
   {
-    name: Type.String(),
+    name: Type.String({ minLength: 1 }),
     type: StringEnum(CUSTOM_FIELD_TYPES),
     description: Type.Optional(Type.String()),
     required: Type.Optional(Type.Boolean({ default: false })),
     applicableIssueTypes: Type.Optional(Type.Array(Type.String(), { uniqueItems: true })),
-    oldname: Type.Optional(Type.String()),
-    min: Type.Optional(Type.Number()),
-    max: Type.Optional(Type.Number()),
+    oldname: Type.Optional(Type.String({ minLength: 1 })),
+    min: Type.Optional(CustomFieldRange),
+    max: Type.Optional(CustomFieldRange),
     initialValue: Type.Optional(Type.Number()),
     unit: Type.Optional(Type.String()),
     initialDate: Type.Optional(Type.String({ pattern: DATE_PATTERN })),
@@ -254,9 +276,9 @@ const WebhookEventsSchema = Type.Unsafe<'all' | WebhookEvent[]>({
 })
 
 const WebhookSchema = StrictObject({
-  name: Type.String(),
+  name: Type.String({ minLength: 1 }),
   description: Type.Optional(Type.String()),
-  hookUrl: Type.String(),
+  hookUrl: Type.String({ minLength: 1 }),
   events: WebhookEventsSchema,
 })
 
