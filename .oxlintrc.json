@@ -113,6 +113,12 @@
       }
     },
     {
+      "files": ["apps/web/src/test-setup.ts"],
+      "rules": {
+        "import/no-unassigned-import": "off"
+      }
+    },
+    {
       "files": ["**/vite.config.*", "**/vitest.config.*"],
       "rules": {
         "import/no-default-export": "off",
