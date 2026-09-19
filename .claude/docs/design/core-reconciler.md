@@ -99,7 +99,7 @@ type Action = {
   request?: HttpRequest            // op が noop / refresh のときは無い
   provides?: ProvidedRef[]         // 成功時に解決表へ登録するもの
   changes?: Change[]               // 表示用の前後差分
-  notes?: Note[]                   // "rename of X" / "issues move to Y"
+  notes?: Note[]                   // 現状は "renamed from X" のみ（FR-3.3）
   writeRequest: boolean            // 所要時間の見積もりに数えるか
 }
 
@@ -408,7 +408,7 @@ function execute(actions: Action[], ctx: ExecuteContext): AsyncIterable<Executio
 | `started` | 総数 M |
 | `actionStarted` | N/M と Action |
 | `actionSucceeded` | レスポンス、解決表への登録結果 |
-| `actionFailed` | API エラー。直後に `aborted` |
+| `actionFailed` | API エラー、または HTTP まで到達しなかった失敗。直後に `aborted` |
 | `waiting` | レート制限による待機（残り秒数） |
 | `finished` | 全件成功 |
 | `aborted` | 適用済み / 失敗 / 未適用 の3分割（FR-4.4） |

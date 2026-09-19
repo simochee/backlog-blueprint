@@ -1,6 +1,6 @@
 # plan の出力仕様
 
-最終更新: 2026-09-18
+最終更新: 2026-09-19
 前提: [要件定義 FR-3](../requirements/requirements-definition.md#fr-3-計画dry-run) / [core のデータモデル](core-reconciler.md)
 
 人間向け（`--output text`）と機械向け（`--output json`）の両方を定義する。
@@ -26,7 +26,7 @@ Project does not exist and will be created.
   ~ issueType      "バグ"
       templateSummary: (none) -> "【不具合】"
   ~ issueType      "調査"         renamed from "その他"
-  - issueType      "要望"         issues move to "タスク"
+  - issueType      "要望"
   + status         "レビュー中"    color "#3b9dbd"
   ~ statusOrder    未対応, 処理中, レビュー中, 処理済み, 完了
   + projectTeam    "開発チーム"
@@ -51,6 +51,9 @@ Write requests: 9 (estimated 9s)
 | `=` | `noop` | 一致しているので何もしない |
 | `↻` | `refresh` | 作成直後の既定リソースを読み直す（GET のみ） |
 | `!` | — | 警告 |
+
+削除行に振替先を添えない理由は要件定義 FR-3.3 の通り。対象が課題0件のプロジェクトに
+限られる以上、振替先に移る課題は常に0件になる。
 
 ### PO-1: `oldname` によるリネームは `+` ではなく `~` で表す
 
@@ -302,6 +305,14 @@ plan の構造に `result` と実行結果を足したもの。
 
 `result` は `succeeded` / `aborted` / `rejected`（確認プロンプトで拒否）。
 `applied` / `pending` は `Action.id` の配列。`id` が安定している（[Action の定義](core-reconciler.md#22-action)）ことがここで効く。
+
+`failed.status` は**任意**である。タイムアウト・名前解決の失敗・ブラウザの CORS 失敗のように
+HTTP のやり取りが成立しなかった場合、ステータスは存在しない。そのときは `status` を省き、
+`errors[]` にだけ内容を入れる。消費側は `status` の有無で「Backlog が拒否した」と
+「Backlog に届かなかった」を判別できる。
+
+存在しないステータスを `0` などで埋める案は採らない。未解決の `Ref` を偽の ID で
+埋めないこと（PO-5）と同じ理由で、無い値は無いまま表す。
 
 進捗を逐次 JSON で流す（JSON Lines）案は採らない。
 `--output json` の消費者は CI のスクリプトであり、
