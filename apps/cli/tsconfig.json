@@ -1,4 +1,4 @@
 {
   "extends": "@backlog-blueprint/tsconfigs/node.json",
-  "include": ["src"]
+  "include": ["src", "vite.config.ts"]
 }
