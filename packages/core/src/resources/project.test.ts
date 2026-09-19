@@ -216,6 +216,26 @@ describe("送るものと前後差分の対応（PO-11）", () => {
 });
 
 describe("冪等性（NFR-4）", () => {
+  it("${ENV} 由来のプロジェクト名が現状と同じなら2回目は何も起きない", () => {
+    const actions = projectReconciler.plan(
+      desired({ name: "極秘プロジェクト" }),
+      existing({ name: "極秘プロジェクト" }),
+      fixedPlanContext({ isSecret: secretPaths("name") }),
+    );
+
+    expect(actions.map(({ op }) => op)).toEqual(["noop"]);
+  });
+
+  it("${ENV} 由来の基本設定が現状と同じなら2回目は何も起きない", () => {
+    const actions = projectReconciler.plan(
+      desired({ settings: { textFormattingRule: "markdown" } }),
+      existing({ settings: { textFormattingRule: "markdown" } }),
+      fixedPlanContext({ isSecret: secretPaths("settings/textFormattingRule") }),
+    );
+
+    expect(actions.map(({ op }) => op)).toEqual(["noop"]);
+  });
+
   it("適用後の現状に同じマニフェストを当てると何も起きない", () => {
     const settings = {
       textFormattingRule: "markdown" as const,

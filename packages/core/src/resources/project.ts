@@ -37,19 +37,32 @@ const projectPath = (key: string): string => `${projectsPath}/${key}`;
 const settingsKeys = (settings: Settings): (keyof Settings)[] =>
   Object.keys(settings) as (keyof Settings)[];
 
-const settingsParams = (settings: Settings, seal: Seal): Record<string, Value> => {
-  const params: Record<string, Value> = {};
+const settingsValues = (settings: Settings): Record<string, Value> => {
+  const values: Record<string, Value> = {};
 
   for (const key of settingsKeys(settings)) {
     const value = settings[key];
 
     if (value !== undefined) {
-      params[key] = seal(`settings/${key}`, value);
+      values[key] = value;
     }
   }
 
-  return params;
+  return values;
 };
+
+const declaredValues = (desired: ProjectDesired): Record<string, Value> => ({
+  name: desired.name,
+  ...settingsValues(desired.settings),
+});
+
+/**
+ * リクエストのキー名からマニフェストの path を引き直す。`settings` の項目は
+ * リクエストでは平らに並ぶので（L-3）、`sealFields` のように
+ * 「フィールド名 = path の末尾」を前提にした包み方ができない。
+ */
+const manifestPath = (field: string): string =>
+  field === "key" || field === "name" ? field : `settings/${field}`;
 
 /**
  * 値が変わらない項目も落とさず、`field` はリクエストのキー名のまま置く（PO-11）。
@@ -57,10 +70,10 @@ const settingsParams = (settings: Settings, seal: Seal): Record<string, Value> =
  * 突き合わせられなくなる。突き合わせられることが PO-11 の理由そのものである。
  */
 const changesOf = (
-  params: Record<string, Value>,
+  values: Record<string, Value>,
   current: ProjectSettingsSnapshot & { name?: Value },
 ): Change[] =>
-  Object.entries(params).map(([field, after]) => ({
+  Object.entries(values).map(([field, after]) => ({
     field,
     before: current[field as keyof Settings] ?? null,
     after,
@@ -68,6 +81,12 @@ const changesOf = (
 
 const differs = (changes: Change[]): boolean =>
   changes.some(({ before, after }) => before !== after);
+
+const sealAfter = (changes: Change[], seal: Seal): Change[] =>
+  changes.map((change) => ({ ...change, after: seal(manifestPath(change.field), change.after) }));
+
+const paramsOf = (changes: Change[]): Record<string, Value> =>
+  Object.fromEntries(changes.map(({ field, after }) => [field, after]));
 
 export const projectReconciler: Reconciler<ProjectDesired, ProjectSnapshot> = {
   kind: "project",
@@ -92,13 +111,17 @@ export const projectReconciler: Reconciler<ProjectDesired, ProjectSnapshot> = {
     const seal = sealer(ctx.isSecret);
 
     if (snapshot.exists) {
-      const params = {
-        name: seal("name", desired.name),
-        ...settingsParams(desired.settings, seal),
-      };
-      const changes = changesOf(params, { ...snapshot.settings, name: snapshot.name });
+      /**
+       * 一致の判定は包む前の値で行う。`Secret` は `===` で一致しないので、包んだ値を
+       * 比べると `${ENV}` を書いたプロジェクト名や基本設定が毎回 update になり
+       * NFR-4 / AC-8 が崩れる。
+       */
+      const declared = changesOf(declaredValues(desired), {
+        ...snapshot.settings,
+        name: snapshot.name,
+      });
 
-      if (!differs(changes)) {
+      if (!differs(declared)) {
         return [
           {
             id: `project/noop/${desired.key}`,
@@ -112,6 +135,8 @@ export const projectReconciler: Reconciler<ProjectDesired, ProjectSnapshot> = {
         ];
       }
 
+      const changes = sealAfter(declared, seal);
+
       return [
         {
           id: `project/update/${desired.key}`,
@@ -120,18 +145,17 @@ export const projectReconciler: Reconciler<ProjectDesired, ProjectSnapshot> = {
           op: "update",
           name: desired.key,
           target: snapshot.id,
-          request: { method: "PATCH", path: projectPath(desired.key), params },
+          request: { method: "PATCH", path: projectPath(desired.key), params: paramsOf(changes) },
           changes,
           writeRequest: true,
         },
       ];
     }
 
-    const params = {
-      key: seal("key", desired.key),
-      name: seal("name", desired.name),
-      ...settingsParams(desired.settings, seal),
-    };
+    const changes = sealAfter(
+      changesOf({ key: desired.key, ...declaredValues(desired) }, {}),
+      seal,
+    );
 
     const create: Action = {
       id: `project/create/${desired.key}`,
@@ -139,9 +163,9 @@ export const projectReconciler: Reconciler<ProjectDesired, ProjectSnapshot> = {
       kind: "project",
       op: "create",
       name: desired.key,
-      request: { method: "POST", path: projectsPath, params },
+      request: { method: "POST", path: projectsPath, params: paramsOf(changes) },
       provides: [{ kind: "project", name: desired.key }],
-      changes: changesOf(params, {}),
+      changes,
       writeRequest: true,
     };
 
