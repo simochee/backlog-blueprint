@@ -142,6 +142,17 @@ export type Plan = {
   order: ResourceOrder;
 };
 
+export type BuildPlanOptions = {
+  manifest: Manifest;
+  get: ReadContext["get"];
+  /**
+   * 既定値を持たせない（E-6 / FR-3.6）。「渡し忘れたら何も包まない」を許すと、
+   * 秘匿値が計画にそのまま載る経路が黙って開く。S2 が返す `expandedPaths` を
+   * そのまま述語にして渡す。
+   */
+  isSecret: PlanContext["isSecret"];
+};
+
 export type CreatePlanOptions = {
   text: string;
   schemaStage: SchemaStage;
@@ -155,26 +166,22 @@ export type CreatePlanOptions = {
  */
 export type CreatePlanResult = { diagnostics: Diagnostic[]; plan?: Plan };
 
-export const createPlan = async ({
-  text,
-  schemaStage,
+/**
+ * S5 から S7 まで（検証パイプライン §4 の `plan` / `apply`）。S1〜S4 を通った
+ * マニフェストを受け取る。
+ */
+export const buildPlan = async ({
+  manifest,
   get,
-  env,
-}: CreatePlanOptions): Promise<CreatePlanResult> => {
-  const validation = validateManifest({ text, schemaStage, env });
-  const diagnostics = [...validation.diagnostics];
-  const { manifest } = validation;
-
-  if (manifest === undefined) {
-    return { diagnostics: orderDiagnostics(diagnostics) };
-  }
-
+  isSecret,
+}: BuildPlanOptions): Promise<CreatePlanResult> => {
+  const diagnostics: Diagnostic[] = [];
   const auth = await authenticateExecutor(get);
 
   diagnostics.push(...auth.diagnostics);
 
   if (auth.executor === undefined || blocksNextStage(auth.diagnostics)) {
-    return { diagnostics: orderDiagnostics(diagnostics) };
+    return { diagnostics };
   }
 
   const projectKey = manifest.key;
@@ -184,7 +191,7 @@ export const createPlan = async ({
   diagnostics.push(...space.diagnostics);
 
   if (snapshot === undefined) {
-    return { diagnostics: orderDiagnostics(diagnostics) };
+    return { diagnostics };
   }
 
   const snapshots = await readResourceSnapshots({ projectKey, snapshot, get });
@@ -192,7 +199,7 @@ export const createPlan = async ({
   diagnostics.push(...validateAgainstSnapshot({ manifest, snapshot, snapshots }));
 
   if (blocksNextStage(diagnostics)) {
-    return { diagnostics: orderDiagnostics(diagnostics) };
+    return { diagnostics };
   }
 
   /**
@@ -201,22 +208,43 @@ export const createPlan = async ({
    * にも現れないので、ここで登録しないと適用の実行時に未解決参照で中断する。
    */
   const resolutions = seedResolutions(snapshots);
-  const actions = planActions(manifest, snapshots, {
-    manifest,
-    snapshot,
-    isSecret: (path) => validation.expandedPaths.has(path),
-  });
-
+  const actions = planActions(manifest, snapshots, { manifest, snapshot, isSecret });
   const order = resultingOrder(manifest, snapshots, actions);
 
   diagnostics.push(...validatePlan({ manifest, snapshot, snapshots, actions, order }));
 
   if (blocksNextStage(diagnostics)) {
-    return { diagnostics: orderDiagnostics(diagnostics) };
+    return { diagnostics };
   }
 
+  return { diagnostics, plan: { manifest, snapshot, snapshots, actions, resolutions, order } };
+};
+
+/**
+ * S1 から S7 まで（検証パイプライン §4）。`validate` は S1〜S4 だけなので、
+ * そちらは `validateManifest` を直に呼ぶ。
+ */
+export const createPlan = async ({
+  text,
+  schemaStage,
+  get,
+  env,
+}: CreatePlanOptions): Promise<CreatePlanResult> => {
+  const validation = validateManifest({ text, schemaStage, env });
+  const { manifest } = validation;
+
+  if (manifest === undefined) {
+    return { diagnostics: orderDiagnostics(validation.diagnostics) };
+  }
+
+  const built = await buildPlan({
+    manifest,
+    get,
+    isSecret: (path) => validation.expandedPaths.has(path),
+  });
+
   return {
-    diagnostics: orderDiagnostics(diagnostics),
-    plan: { manifest, snapshot, snapshots, actions, resolutions, order },
+    ...built,
+    diagnostics: orderDiagnostics([...validation.diagnostics, ...built.diagnostics]),
   };
 };

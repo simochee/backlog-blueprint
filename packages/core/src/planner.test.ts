@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { fixedSpaceResponses, httpFailure, recordingGet } from "../../test-utils/src/index";
-import { createPlan } from "./planner";
+import {
+  fixedGet,
+  fixedManifest,
+  fixedSpaceResponses,
+  httpFailure,
+  recordingGet,
+  secretPaths,
+} from "../../test-utils/src/index";
+import { buildPlan, createPlan } from "./planner";
 import { schemaStage } from "./validation/schema-stage";
 
 const manifestText = (
@@ -149,5 +156,39 @@ describe("計画の組み立て", () => {
 
     expect(requested).toEqual([]);
     expect(created).toBeUndefined();
+  });
+});
+
+describe("検証済みのマニフェストからの組み立て", () => {
+  const declared = {
+    issueTypes: [{ name: "タスク", color: "#7ea800" as const }],
+    statuses: [{ name: "未対応" }, { name: "処理中" }, { name: "処理済み" }, { name: "完了" }],
+  };
+
+  const webhook = {
+    name: "Slack 通知",
+    hookUrl: "https://hooks.example/T0/B0",
+    events: ["issueCreated" as const],
+  };
+
+  it("S1〜S4 を済ませた呼び出し側は、マニフェストを渡して S5 から始められる", async () => {
+    const { plan: created } = await buildPlan({
+      manifest: fixedManifest(declared),
+      get: fixedGet(fixedSpaceResponses()),
+      isSecret: secretPaths(),
+    });
+
+    expect(created?.actions.map(({ id }) => id)).toContain("issueTypes/create/タスク");
+  });
+
+  it("${ENV} 由来の値は計画に平文で載らない", async () => {
+    const { plan: created } = await buildPlan({
+      manifest: fixedManifest({ ...declared, webhooks: [webhook] }),
+      get: fixedGet(fixedSpaceResponses()),
+      isSecret: secretPaths("webhooks/0/hookUrl"),
+    });
+    const hook = created?.actions.find(({ kind }) => kind === "webhook");
+
+    expect(JSON.stringify(hook?.request?.params)).not.toContain("hooks.example");
   });
 });
