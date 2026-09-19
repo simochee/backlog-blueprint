@@ -1,4 +1,3 @@
-import { createBacklogClient, type BacklogClient } from "@backlog-blueprint/backlog-client";
 import { execute, type Diagnostic } from "@backlog-blueprint/core";
 import { useEffect, useState, useSyncExternalStore } from "react";
 
@@ -17,17 +16,12 @@ import {
 } from "./freshness";
 import { PASTED, preparePlan, type PlanAttempt } from "./plan";
 import { foldExecutionEvent, idleProgress, rejectedProgress } from "./progress";
-import {
-  environmentValue,
-  hasApiKey,
-  revealApiKey,
-  secretRevisions,
-  subscribeSecrets,
-} from "./secrets";
+import { environmentValue, hasApiKey, secretRevisions, subscribeSecrets } from "./secrets";
 import { ApplyStep, type ApplyRun } from "./steps/apply";
 import { ConnectStep } from "./steps/connect";
 import { ManifestStep } from "./steps/manifest";
 import { PlanStep } from "./steps/plan";
+import { openTransport, transport } from "./transport";
 import { validateInBrowser, type ManifestValidation } from "./validation";
 
 const VALIDATION_DELAY_MS = 300;
@@ -40,8 +34,6 @@ const EMPTY_VALIDATION: ManifestValidation = {
 
 type ConnectAttempt = { diagnostics: Diagnostic[]; failure?: unknown; connection?: Connection };
 
-type ActiveConnection = Connection & { client: BacklogClient };
-
 export const App = () => {
   const revisions = useSyncExternalStore(subscribeSecrets, secretRevisions);
   const [space, setSpace] = useState("");
@@ -49,7 +41,6 @@ export const App = () => {
   const [manifestSource, setManifestSource] = useState(PASTED);
   const [showUnchanged, setShowUnchanged] = useState(false);
   const [connectAttempt, setConnectAttempt] = useState<Derived<ConnectAttempt>>();
-  const [client, setClient] = useState<Derived<BacklogClient>>();
   const [validated, setValidated] = useState<Derived<ManifestValidation>>();
   const [planAttempt, setPlanAttempt] = useState<Derived<PlanAttempt>>();
   const [connecting, setConnecting] = useState(false);
@@ -64,11 +55,7 @@ export const App = () => {
   const planKey = planStamp(inputs);
 
   const attempt = fresh(connectAttempt, connectionKey);
-  const activeClient = fresh(client, connectionKey);
-  const connection: ActiveConnection | undefined =
-    attempt?.connection === undefined || activeClient === undefined
-      ? undefined
-      : { ...attempt.connection, client: activeClient };
+  const connection = attempt?.connection;
   const validation = fresh(validated, manifestKey);
   const plan = marked(appliedPlan, planKey) ? undefined : fresh(planAttempt, planKey);
   const confirming = marked(confirmingPlan, planKey);
@@ -111,14 +98,13 @@ export const App = () => {
 
   const runConnect = async (): Promise<void> => {
     const stamp = connectionKey;
-    const backlog = createBacklogClient({ space, apiKey: revealApiKey() });
 
     setConnecting(true);
+    openTransport(space);
 
     try {
-      const result = await connect(backlog.get);
+      const result = await connect(transport.get);
 
-      setClient({ stamp, value: backlog });
       setConnectAttempt({ stamp, value: result });
     } catch (error) {
       setConnectAttempt({ stamp, value: { diagnostics: [], failure: error } });
@@ -139,7 +125,7 @@ export const App = () => {
     try {
       const attempted = await preparePlan({
         manifest,
-        get: connection.client.get,
+        get: transport.get,
         isSecret: (path) => validation.expandedPaths.has(path),
         space,
         source: manifestSource,
@@ -171,8 +157,8 @@ export const App = () => {
       for await (const event of execute(actions, {
         projectKey: manifest.key,
         resolutions,
-        get: connection.client.get,
-        send: connection.client.send,
+        get: transport.get,
+        send: transport.send,
       })) {
         progress = foldExecutionEvent(progress, event);
         setRun({ ...base, progress, running: true });
