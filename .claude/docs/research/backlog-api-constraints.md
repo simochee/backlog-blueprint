@@ -382,9 +382,9 @@ yyyy-MM-dd の String（[Add Custom Field](https://developer.nulab.com/docs/back
 | 1 | マイルストーンとカスタム属性の日付の形式 | **`yyyy-MM-ddT00:00:00Z`** で返る。時刻は常に `T00:00:00Z` なので、**先頭10文字の切り詰めでタイムゾーンのずれは起きない** |
 | 2 | カテゴリー / マイルストーン / カスタム属性 / Webhook の更新・削除 | 通常形。同じパスに `:id` を足して `PATCH` / `DELETE` |
 | 3 | プロジェクトメンバー / チーム / 管理者の削除 | 追加と同じパスへ `DELETE`。パラメータも追加時と同じ（`userId` / `teamId`） |
-| 5 | `GET /rateLimit` の本文 | `rateLimit.{read,update,search,icon}.{limit,remaining,reset}`。仮定どおり |
-| 6 | `applicableIssueTypes` の絞りの解除 | **`applicableIssueTypes[]=`（空の値を1つ）を送れば解除できる。** 省略した場合は現状維持（K-3 が成立） |
-| 7 | プロジェクト画面の URL | `https://<space>/projects/<KEY>` |
+| 4 | `GET /rateLimit` の本文 | `rateLimit.{read,update,search,icon}.{limit,remaining,reset}`。仮定どおり |
+| 5 | `applicableIssueTypes` の絞りの解除 | **`applicableIssueTypes[]=`（空の値を1つ）を送れば解除できる。** 省略した場合は現状維持（K-3 が成立） |
+| 6 | プロジェクト画面の URL | `https://<space>/projects/<KEY>` |
 
 残っているのは**英語スペースでの既定リソースの表示名**だけで、検証用スペースの言語が `ja` のため
 そこからは確認できない（[既定リソースの表示名](#既定リソースの表示名)）。
