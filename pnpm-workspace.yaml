@@ -14,7 +14,8 @@ catalog:
   consola: ^3.4.2
   oxfmt: ^0.68.0
   oxlint: ^1.83.0
-  turbo: ^2.10.13
+  turbo: ~2.10.13
   typescript: ^5.9.3
   vite: ^7.1.14
   vitest: ^3.2.4
+  yaml: ^2.9.1
