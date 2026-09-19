@@ -11,9 +11,12 @@ export {
 } from "./json";
 export { executedActions, summarize } from "./report";
 export {
+  APPLY_CANCELLED,
   APPLY_CONFIRMATION,
   renderApplyAbort,
   renderApplyComplete,
+  renderApplyResult,
+  renderHttpFailure,
   renderPlanText,
   renderProgress,
 } from "./text";

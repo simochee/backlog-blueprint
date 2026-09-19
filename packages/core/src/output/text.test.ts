@@ -8,6 +8,8 @@ import {
   APPLY_CONFIRMATION,
   renderApplyAbort,
   renderApplyComplete,
+  renderApplyResult,
+  renderHttpFailure,
   renderPlanText,
   renderProgress,
 } from "./text";
@@ -317,5 +319,53 @@ The project must still have zero issues at that point.
       `ERROR  POST /api/v2/projects/PROJ_A/webhooks
   network error`,
     );
+  });
+});
+
+describe("適用の結末", () => {
+  it("成功したら追加・変更・削除の件数を書く", () => {
+    expect(renderApplyResult({ result: "succeeded", applied: executed() })).toBe(
+      "Apply complete. 5 added, 3 changed, 1 destroyed.\n",
+    );
+  });
+
+  it("確認を拒否したら、何も適用していないことを書く", () => {
+    expect(renderApplyResult({ result: "rejected" })).toBe(
+      "Apply cancelled. Nothing has been applied.\n",
+    );
+  });
+
+  it("中断したら、適用済み・失敗・未適用の3つを書く", () => {
+    const text = renderApplyResult({
+      result: "aborted",
+      applied: [],
+      failed: {
+        action: actionOf("issueTypes/delete/要望"),
+        status: 400,
+        errors: [{ message: "bad" }],
+      },
+      pending: [],
+    });
+
+    expect(text).toContain("Apply aborted. Nothing has been rolled back.");
+    expect(text).toContain("Failed (1):");
+  });
+});
+
+describe("送信層が投げた失敗", () => {
+  it("ステータスと本文だけを書く", () => {
+    expect(renderHttpFailure({ status: 401, errors: [{ message: "Unauthorized." }] })).toBe(
+      "ERROR  401  Unauthorized.\n",
+    );
+  });
+
+  it("HTTP まで到達しなかった失敗にはステータスを添えない", () => {
+    expect(renderHttpFailure({ errors: [{ message: "network error" }] })).toBe(
+      "ERROR  network error\n",
+    );
+  });
+
+  it("HttpFailure ではないものを投げられても読めたところまでで書く", () => {
+    expect(renderHttpFailure(new TypeError("boom"))).toBe("ERROR  boom\n");
   });
 });

@@ -6,6 +6,7 @@ import { type ActionFailure, type ApplyOptions, type ApplyOutcome } from "./appl
 import { painter } from "./color";
 import { renderWarnings } from "./diagnostics";
 import { type PlanReport, summarize } from "./report";
+import { failureDetail, failureStatus } from "../validation/http-failure";
 
 const SECONDS_PER_MINUTE = 60;
 
@@ -144,4 +145,37 @@ export const renderApplyAbort = (
     ].join("\n"),
     RESUME_NOTICE,
   ]);
+};
+
+/**
+ * 確認プロンプトを拒否したときの1行。plan の出力仕様 §3 は text の文面を定めていないが、
+ * 何も書かずに 1 で終わると（§1.5）、拒否と失敗が利用者から区別できなくなる。
+ */
+export const APPLY_CANCELLED = "Apply cancelled. Nothing has been applied.";
+
+export const renderApplyResult = (
+  outcome: ApplyOutcome,
+  options: TextOptions & ApplyOptions = {},
+): string => {
+  if (outcome.result === "rejected") {
+    return `${APPLY_CANCELLED}\n`;
+  }
+
+  if (outcome.result === "succeeded") {
+    return `${renderApplyComplete(outcome.applied)}\n`;
+  }
+
+  return renderApplyAbort(outcome, options);
+};
+
+/**
+ * 失敗の中身だけを書き、リクエストの本文もヘッダも書かない。API キーはヘッダにしか
+ * 存在しないので、ここに要求の中身を足した瞬間に CI のログへ流れる経路ができる
+ * （NFR-3 / AC-10）。
+ */
+export const renderHttpFailure = (error: unknown, options: TextOptions = {}): string => {
+  const paint = painter(options.color === true);
+  const status = failureStatus(error);
+
+  return `${paint("error", `ERROR  ${status === undefined ? "" : `${status}  `}${failureDetail(error)}`)}\n`;
 };
