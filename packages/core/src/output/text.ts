@@ -162,10 +162,7 @@ export const renderApplyAbort = (
   ]);
 };
 
-/**
- * 確認プロンプトを拒否したときの1行。plan の出力仕様 §3 は text の文面を定めていないが、
- * 何も書かずに 1 で終わると（§1.5）、拒否と失敗が利用者から区別できなくなる。
- */
+/** 拒否したときの1行（§3.2） */
 export const APPLY_CANCELLED = "Apply cancelled. Nothing has been applied.";
 
 export const renderApplyResult = (
