@@ -1,6 +1,6 @@
 # CLI と Web UI の設計
 
-最終更新: 2026-09-19
+最終更新: 2026-09-20
 前提: [要件定義 FR-6 / FR-7](../requirements/requirements-definition.md#fr-6-cli) / [plan の出力仕様](plan-output.md) / [検証パイプライン](validation-pipeline.md)
 
 CLI と Web UI は「入出力の違い」だけを担う（要件定義 §7）。
@@ -242,8 +242,7 @@ CI で `--auto-approve` を付け忘れたとき、マニフェストの内容�
 **表示するユーザー名は `GET /users/myself` の `userId`**（ログイン ID）。`access` に書くのと同じ値なので、
 画面に出ている名前をそのままマニフェストに写せる。
 
-**作成されたプロジェクトへのリンクは `https://<space>/projects/<KEY>`。** `要検証`。
-リファレンスにも実測にも記載が無く、Backlog の画面 URL の通常形から書いている。
+**作成されたプロジェクトへのリンクは `https://<space>/projects/<KEY>`**（実測）。
 
 #### Step 4 Apply
 

@@ -77,7 +77,7 @@ V-A6 が正しいマニフェストを止めうる。適用を壊す向きでは
 | 更新系の本文 | `Content-Type: application/x-www-form-urlencoded` |
 | 配列パラメータ | `qs.stringify(params, { arrayFormat: 'brackets' })`。`statusId[]=1&statusId[]=2` の形 |
 | 低レベル API | `request({ method, path, params })` が公開されている。型付きのエンドポイント別メソッドを経由せずに任意のパスを叩ける |
-| 空配列 | **`qs` がキーごと落とす**（実測）。`{ applicableIssueTypes: [] }` は本文に現れない。「絞りを解除する」意図を空配列では送れない（V-B10） |
+| 空配列 | **`qs` がキーごと落とす**（実測）。`{ applicableIssueTypes: [] }` をそのまま渡すと本文に現れないので、送信層が `applicableIssueTypes[]=` に変換する（[空配列を送る方法](#空配列を送る方法)） |
 | 実行環境 | `globalThis.fetch` を使う。差し替えも可能。ブラウザ向けビルドがある |
 
 本文書が配列パラメータを一貫して `statusId[]` `applicableIssueTypes[]` `activityTypeIds[]` と
@@ -373,20 +373,42 @@ yyyy-MM-dd の String（[Add Custom Field](https://developer.nulab.com/docs/back
 | `issues/count` が数える範囲 | **完了済みを含む全件。** 全件数が、ステータス別に数えた件数の合計と一致することを確認した |
 | 課題種別の色 | **10色の固定パレット**（観測による。拒否挙動は未確認） |
 
-## 実装中に見つかった未検証事項
+## 実装中に見つかった事項（実測で確定）
 
-いずれも実装を進められる形（安全側の既定、または通常形の採用）にしてあるが、裏が取れていない。
+実装を進める過程で文書に記述が無かった点を、検証用スペースで実測して確定させた。
 
-| # | 確認すること | 現在の扱い |
+| # | 確認したこと | 結果 |
 | --- | --- | --- |
-| 1 | `GET /projects/:key/versions` と `GET /projects/:key/customFields` が返す日付の形式 | 時刻付きで返る場合に毎回差分が出るのを避けるため、read で先頭10文字（`yyyy-MM-dd`）に切り詰めている。タイムゾーン次第で1日ずれる可能性が残る |
-| 2 | カテゴリー / マイルストーン / カスタム属性 / Webhook の更新・削除のパス | 本文書に記録が無いので Backlog API の通常形（`PATCH` / `DELETE /api/v2/projects/:key/{categories\|versions\|customFields\|webhooks}/:id`）を使っている。リファレンスには該当エンドポイントが載っているはずなので、**記録を足せば未検証から外せる** |
-| 3 | プロジェクトメンバー / チーム / 管理者の**削除**エンドポイント | 本文書には追加系しか記録が無い。同じパスへの `DELETE` と、追加時と同じパラメータ（`userId` / `teamId`）を使っている。これも**リファレンスに載っているはず**なので記録を足せば外せる |
-| 4 | 既定**ステータス**の英語名（課題種別は枠で引き継ぐので不要になった） | `ja` 以外のスペースで新規プロジェクトを作るとき、V-A6 の名前照合が誤検出しうる。適用を壊す向きではなく、正しいマニフェストを止める向きの誤り |
-| 5 | `GET /rateLimit` の本文の構造 | `{ rateLimit: { read \| update: { limit, remaining, reset } } }` と仮定。読めなければ 429 の再試行を諦める（勝手な既定秒数で待たない） |
-| 6 | `applicableIssueTypes` の絞りを解除する書き方 | 空配列は form-urlencoded の段で消える。解除の計画は V-B10 で止め、削除して作り直す道を案内する |
+| 1 | マイルストーンとカスタム属性の日付の形式 | **`yyyy-MM-ddT00:00:00Z`** で返る。時刻は常に `T00:00:00Z` なので、**先頭10文字の切り詰めでタイムゾーンのずれは起きない** |
+| 2 | カテゴリー / マイルストーン / カスタム属性 / Webhook の更新・削除 | 通常形。同じパスに `:id` を足して `PATCH` / `DELETE` |
+| 3 | プロジェクトメンバー / チーム / 管理者の削除 | 追加と同じパスへ `DELETE`。パラメータも追加時と同じ（`userId` / `teamId`） |
+| 5 | `GET /rateLimit` の本文 | `rateLimit.{read,update,search,icon}.{limit,remaining,reset}`。仮定どおり |
+| 6 | `applicableIssueTypes` の絞りの解除 | **`applicableIssueTypes[]=`（空の値を1つ）を送れば解除できる。** 省略した場合は現状維持（K-3 が成立） |
+| 7 | プロジェクト画面の URL | `https://<space>/projects/<KEY>` |
 
-1 と 4 は読み取りだけで確認できる。2 と 3 はリファレンスの読み直しで済む見込み。5 も読み取りだけで確認できる。
+残っているのは**英語スペースでの既定リソースの表示名**だけで、検証用スペースの言語が `ja` のため
+そこからは確認できない（[既定リソースの表示名](#既定リソースの表示名)）。
+
+### 空配列を送る方法
+
+`qs` は空配列をキーごと落とす。**絞りを解除するには `applicableIssueTypes[]=` を明示的に送る**
+必要があり、値の配列をそのまま渡すだけでは本文に現れない。送信層がこの変換を持つ。
+
+### チーム経由のみの参加者には管理者を付与できない
+
+`POST /projects/:key/administrators` は `No such project member` を返す（実測）。
+[core のデータモデル §6.3](../design/core-reconciler.md#63-access-の差分算出) が安全側に倒して
+「個人参加していない管理者には必ず個人参加の Action を出す」としていたのは、
+**任意の最適化ではなく必須の制約**だった。A-3 と同じ扱いになる。
+
+`GET /projects/:key/users` は既定でチーム経由の参加者も返し、`excludeGroupMembers=true` で
+個人参加者だけになることも実測で確認した。
+
+### 既定課題種別の並び
+
+`GET /projects/:key/issueTypes` は**表示順**で返る。**ID の昇順ではない**（実測で、2番目に並ぶ
+リソースの ID が1番目より小さい例を確認）。新規プロジェクトの枠を「返ってきた順」で割り当てる
+（[§4.1](../design/core-reconciler.md#41-フェーズと-read)）のは、この並びに依存している。
 
 ## 残る未検証事項
 

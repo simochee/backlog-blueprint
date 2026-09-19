@@ -1,6 +1,6 @@
 # 先行事例: nulab/bee
 
-最終更新: 2026-09-19
+最終更新: 2026-09-20
 調査対象: [nulab/bee](https://github.com/nulab/bee)（Nulab 公式の Backlog CLI・TypeScript・MIT）
 
 Backlog を対象にした CLI の先行事例。[GitHub の設定 IaC](syntax-reference-github.md) が
