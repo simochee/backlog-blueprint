@@ -93,7 +93,7 @@ const asDate = (value: string | null | undefined) => value?.slice(0, 10);
 
 /** リスト型の選択肢は `{ id, name }` の配列で返る（API 制約）。比較に要るのは名前だけ */
 const itemsOf = (record: Record<string, unknown>): string[] | undefined => {
-  const items = record["items"];
+  const { items } = record;
 
   if (items === undefined || items === null) {
     return undefined;

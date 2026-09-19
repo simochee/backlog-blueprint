@@ -5,14 +5,6 @@ import { resolveRequest } from "./ref";
 import { defaultSlotName, type ResolutionKey } from "./resolution";
 import { type ResourceKind } from "./resource";
 
-/**
- * `lib` に `DOM` を足さず、ここで最小限の面だけを宣言する。`fetch` を
- * `fetch.d.ts` に写しているのと同じ理由で、`DOM` を足すと `window` や
- * `localStorage` まで型が通り NFR-5 のガードが緩む。X-1 / X-4 が待機を求める以上
- * タイマーは要るが、要るのは呼び出しの1つだけである。
- */
-declare function setTimeout(callback: () => void, milliseconds: number): unknown;
-
 const WRITE_INTERVAL_MS = 1000;
 
 /**

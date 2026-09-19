@@ -33,3 +33,11 @@ interface AbortSignal {
 declare const AbortSignal: {
   timeout(milliseconds: number): AbortSignal;
 };
+
+/**
+ * 戻り値を `unknown` にしておく。Node は `Timeout` オブジェクトを、ブラウザは数値を
+ * 返す。どちらかの型に決めると、決めた側でしか `clearTimeout` を書けない形になる。
+ * NFR-5 が許すのは X-1 / X-4 の待機に要る呼び出しだけなので、`clearTimeout` は
+ * 宣言しない。
+ */
+declare function setTimeout(callback: () => void, milliseconds: number): unknown;

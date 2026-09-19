@@ -16,6 +16,12 @@ const stageRank = (stage: Diagnostic["stage"]): number => STAGE_ORDER.indexOf(st
 const lineRank = (diagnostic: Diagnostic): number => diagnostic.line ?? Number.POSITIVE_INFINITY;
 
 export const orderDiagnostics = (diagnostics: Diagnostic[]): Diagnostic[] =>
+  /**
+   * `toSorted` に置き換えない。基底の tsconfig が `lib: ES2022` を置いているため
+   * （NFR-5）、ES2023 のメソッドは型検査で落ちる。複製済みの配列を並べ替えるので
+   * 破壊的でもない。
+   */
+  // oxlint-disable-next-line unicorn/no-array-sort
   [...diagnostics].sort(
     (left, right) =>
       stageRank(left.stage) - stageRank(right.stage) || lineRank(left) - lineRank(right),
