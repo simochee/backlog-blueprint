@@ -9,6 +9,16 @@ export type ResultingOrder = {
   customFields: string[];
 };
 
+/**
+ * `space` と `project` を持たない（§2.3）。`validate` は Backlog に一切アクセスせず
+ * （CL-1）、プロジェクトが存在するかどうかも知らない。
+ */
+export type ValidateReport = {
+  tool: { name: string; version: string };
+  manifest: { path: string };
+  diagnostics: Diagnostic[];
+};
+
 export type PlanReport = {
   tool: { name: string; version: string };
   space: string;

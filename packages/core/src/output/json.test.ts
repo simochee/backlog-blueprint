@@ -2,8 +2,15 @@ import { describe, expect, it } from "vitest";
 
 import { type Action } from "../action";
 import { type ResolutionTable } from "../resolution";
-import { walkthroughActions, walkthroughReport } from "./fixtures";
-import { applyJson, planJson, renderApplyJson, renderPlanJson } from "./json";
+import { walkthroughActions, walkthroughReport, walkthroughValidateReport } from "./fixtures";
+import {
+  applyJson,
+  planJson,
+  renderApplyJson,
+  renderPlanJson,
+  renderValidateJson,
+  validateJson,
+} from "./json";
 
 const actionOf = (id: string): Action => {
   const action = walkthroughActions().find((candidate) => candidate.id === id);
@@ -19,6 +26,52 @@ const executed = (): Action[] => walkthroughActions().filter(({ op }) => op !== 
 
 const parsed = (text: string): Record<string, unknown> =>
   JSON.parse(text) as Record<string, unknown>;
+
+describe("validate の機械向け出力", () => {
+  it("形式の版・ツール・マニフェスト・診断だけを持つ", () => {
+    expect(Object.keys(validateJson(walkthroughValidateReport()))).toEqual([
+      "formatVersion",
+      "tool",
+      "manifest",
+      "diagnostics",
+    ]);
+  });
+
+  it("スペースとプロジェクトを持たない", () => {
+    const json = validateJson(walkthroughValidateReport());
+
+    expect(json).not.toHaveProperty("space");
+    expect(json).not.toHaveProperty("project");
+  });
+
+  it("計画に関わる項目を持たない", () => {
+    const json = validateJson(walkthroughValidateReport());
+
+    expect(json).not.toHaveProperty("summary");
+    expect(json).not.toHaveProperty("actions");
+    expect(json).not.toHaveProperty("resultingOrder");
+  });
+
+  it("診断はステージ順に並ぶ", () => {
+    const json = validateJson(
+      walkthroughValidateReport({
+        diagnostics: [
+          { id: "V-A5", severity: "error", stage: "semantic", path: "issueTypes", message: "dup" },
+          { id: "V-A23", severity: "error", stage: "syntax", path: "", message: "broken" },
+        ],
+      }),
+    );
+
+    expect(json.diagnostics.map(({ id }) => id)).toEqual(["V-A23", "V-A5"]);
+  });
+
+  it("改行で終わる JSON を書き出す", () => {
+    const text = renderValidateJson(walkthroughValidateReport());
+
+    expect(text.endsWith("\n")).toBe(true);
+    expect(parsed(text)["formatVersion"]).toBe(1);
+  });
+});
 
 describe("plan の機械向け出力", () => {
   it("スペース・マニフェスト・プロジェクト・集計・診断・Action・適用後の並びを持つ", () => {

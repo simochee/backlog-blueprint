@@ -18,6 +18,7 @@ import {
   type ResultingOrder,
   summarize,
   type Summary,
+  type ValidateReport,
 } from "./report";
 import { orderDiagnostics } from "../validation/gate";
 
@@ -38,6 +39,13 @@ export type ActionJson = {
   notes?: Note[];
   changes?: Change[];
   request?: HttpRequest;
+};
+
+export type ValidateJson = {
+  formatVersion: number;
+  tool: { name: string; version: string };
+  manifest: { path: string };
+  diagnostics: Diagnostic[];
 };
 
 export type PlanJson = {
@@ -95,6 +103,13 @@ const actionJson = ({
   notes,
   changes,
   request,
+});
+
+export const validateJson = (report: ValidateReport): ValidateJson => ({
+  formatVersion: FORMAT_VERSION,
+  tool: report.tool,
+  manifest: report.manifest,
+  diagnostics: orderDiagnostics(report.diagnostics),
 });
 
 export const planJson = (report: PlanReport): PlanJson => ({
@@ -183,6 +198,9 @@ export const applyJson = (
 };
 
 const INDENT = 2;
+
+export const renderValidateJson = (report: ValidateReport): string =>
+  `${JSON.stringify(validateJson(report), null, INDENT)}\n`;
 
 export const renderPlanJson = (report: PlanReport): string =>
   `${JSON.stringify(planJson(report), null, INDENT)}\n`;

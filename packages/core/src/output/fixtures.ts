@@ -1,7 +1,7 @@
 import { type Action } from "../action";
 import { type Diagnostic } from "../diagnostic";
 import { Secret } from "../secret";
-import { type PlanReport } from "./report";
+import { type PlanReport, type ValidateReport } from "./report";
 
 /**
  * plan の出力仕様 §1.1 の通し例を固定値で組み立てる。テストは実 API も
@@ -198,5 +198,14 @@ export const walkthroughReport = (overrides: Partial<PlanReport> = {}): PlanRepo
     milestones: [],
     customFields: [],
   },
+  ...overrides,
+});
+
+export const walkthroughValidateReport = (
+  overrides: Partial<ValidateReport> = {},
+): ValidateReport => ({
+  tool: { name: "@simochee/backlog-blueprint", version: "0.1.0" },
+  manifest: { path: "projects/PROJ_A.yaml" },
+  diagnostics: [],
   ...overrides,
 });
