@@ -30,7 +30,14 @@ export type ExecutionEvent =
       response: unknown
       resolved: Array<{ ref: ProvidedRef; id: number }>
     }
-  | { type: 'actionFailed'; action: Action; status: number; errors: Array<{ message: string }> }
+  /**
+   * status は任意である（plan の出力仕様 §3.3）。タイムアウト・名前解決の失敗・
+   * ブラウザの CORS 失敗では HTTP のやり取りが成立せず、ステータスが存在しない。
+   * `0` などの偽の値で埋めない。埋めると消費側が「Backlog が拒否した」と
+   * 「Backlog に届かなかった」を区別できなくなる。未解決の Ref を偽の ID で
+   * 埋めないこと（PO-5）と同じで、無い値は無いまま表す。
+   */
+  | { type: 'actionFailed'; action: Action; status?: number; errors: Array<{ message: string }> }
   | { type: 'waiting'; seconds: number }
   | { type: 'finished' }
   | { type: 'aborted'; applied: Action[]; failed: Action; pending: Action[] }
