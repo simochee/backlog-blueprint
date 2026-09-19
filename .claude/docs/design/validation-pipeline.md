@@ -89,6 +89,17 @@ Yaml のパース。失敗したら位置付きで報告して終了。
 | V-A11 カスタム属性の型別必須パラメータ | `allOf` + `if`/`then` |
 | V-A13 `access` 各リスト内の重複 | `uniqueItems: true` |
 | V-A18 色が文字列である | `type: string` + Y-3 による専用メッセージ |
+| V-A21 上記以外のすべての型・制約違反 | `type` / `enum` / `minLength` / `minimum` / `pattern` |
+
+V-A21 は受け皿である。スキーマが表現する制約のうち要件定義が個別に ID を振っているのは一部だけで、
+`settings.textFormattingRule` の enum、`name` の `minLength`、`milestones[].startDate` の日付パターン、
+課題種別の色の enum（[K-4](manifest-schema.md#k-4-課題種別の色は-enum-としパレット外はエラーにする)）などは
+対応する ID を持たない。`Diagnostic.id` は必須（[§5](#5-診断diagnostic-の形)）なので、
+これらをまとめて V-A21 として報告する。
+
+**個別の ID があるものが V-A21 に落ちてはならない。** V-A21 が出ることは
+「スキーマには違反しているが、要件定義が名前を付けていない誤り」を意味し、
+頻出するなら ID を新設する合図になる。
 
 V-A18 は、引用符の付け忘れで `color: null` になった場合に
 「引用符で囲んでください」という固有のメッセージを出す。
