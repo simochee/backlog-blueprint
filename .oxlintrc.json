@@ -41,22 +41,40 @@
     "no-var": "warn",
     "no-implicit-coercion": "warn",
     "no-duplicate-imports": "warn",
-    "typescript/array-type": ["warn", { "default": "array" }],
+    "typescript/array-type": [
+      "warn",
+      {
+        "default": "array"
+      }
+    ],
     "typescript/consistent-type-definitions": ["warn", "type"],
     "typescript/consistent-type-imports": [
       "warn",
-      { "prefer": "type-imports", "fixStyle": "inline-type-imports" }
+      {
+        "prefer": "type-imports",
+        "fixStyle": "inline-type-imports"
+      }
     ],
     "typescript/consistent-indexed-object-style": ["warn", "record"],
     "typescript/consistent-generic-constructors": ["warn", "constructor"],
-    "typescript/consistent-type-assertions": ["warn", { "assertionStyle": "as" }],
+    "typescript/consistent-type-assertions": [
+      "warn",
+      {
+        "assertionStyle": "as"
+      }
+    ],
     "typescript/prefer-includes": "warn",
     "typescript/prefer-optional-chain": "warn",
     "typescript/consistent-type-exports": "warn",
     "typescript/dot-notation": "warn",
     "typescript/no-require-imports": "warn",
     "unicorn/no-null": "off",
-    "unicorn/catch-error-name": ["warn", { "name": "error" }],
+    "unicorn/catch-error-name": [
+      "warn",
+      {
+        "name": "error"
+      }
+    ],
     "unicorn/explicit-length-check": "warn",
     "unicorn/prefer-array-some": "warn",
     "unicorn/prefer-at": "warn",
@@ -76,13 +94,6 @@
     "import/no-named-as-default": "off"
   },
   "overrides": [
-    {
-      "files": ["apps/web/src/main.ts"],
-      "rules": {
-        "unicorn/no-empty-file": "off",
-        "unicorn/require-module-specifiers": "off"
-      }
-    },
     {
       "files": ["apps/cli/src/**"],
       "rules": {
