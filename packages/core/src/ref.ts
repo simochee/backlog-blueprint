@@ -1,6 +1,8 @@
+import type { HttpRequest, ResolvedHttpRequest } from './action'
 import type { ResolutionKey, ResolutionTable } from './resolution'
 import { RESOURCE_KINDS } from './resource'
-import type { Ref } from './value'
+import { Secret } from './secret'
+import type { Ref, ResolvedValue, Value } from './value'
 
 export type ResolveResult<T> =
   | { resolved: true; value: T }
@@ -46,4 +48,51 @@ export const resolvePath = (path: string, resolutions: ResolutionTable): Resolve
   })
 
   return unresolved.length === 0 ? { resolved: true, value } : { resolved: false, unresolved }
+}
+
+const resolveValue = (
+  value: Value,
+  resolutions: ResolutionTable,
+  unresolved: Ref[],
+): ResolvedValue => {
+  if (Array.isArray(value)) {
+    return value.map((item) => resolveValue(item, resolutions, unresolved))
+  }
+
+  if (value instanceof Secret || typeof value !== 'object' || value === null) {
+    return value
+  }
+
+  const id = resolveRef(value, resolutions)
+
+  if (id === undefined) {
+    unresolved.push(value)
+    return null
+  }
+
+  return id
+}
+
+export const resolveRequest = (
+  request: HttpRequest,
+  resolutions: ResolutionTable,
+): ResolveResult<ResolvedHttpRequest> => {
+  const unresolved: Ref[] = []
+  const path = resolvePath(request.path, resolutions)
+  const params = Object.fromEntries(
+    Object.entries(request.params).map(([field, value]) => [
+      field,
+      resolveValue(value, resolutions, unresolved),
+    ]),
+  )
+
+  if (!path.resolved) {
+    return { resolved: false, unresolved: [...path.unresolved, ...unresolved] }
+  }
+
+  if (unresolved.length > 0) {
+    return { resolved: false, unresolved }
+  }
+
+  return { resolved: true, value: { method: request.method, path: path.value, params } }
 }

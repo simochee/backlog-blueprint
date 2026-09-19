@@ -1,4 +1,4 @@
-import type { Action, HttpRequest, ProvidedRef } from './action'
+import type { Action, ProvidedRef, ResolvedHttpRequest } from './action'
 import type { ResolutionTable } from './resolution'
 
 /**
@@ -10,7 +10,15 @@ export type ExecuteContext = {
   projectKey: string
   resolutions: ResolutionTable
   get: (path: string) => Promise<unknown>
-  send: (request: HttpRequest) => Promise<unknown>
+  /**
+   * 受け取るのは Ref が解決済みのリクエストである。解決表を持つのは実行側（§3.2）なので、
+   * path と params の Ref を潰すのは Executor の仕事。送信側に HttpRequest を渡すと、
+   * 解決表を送信側にも配ることになり、解決の責任が二箇所に分かれる。
+   *
+   * 一方で Secret は Secret のまま渡る。剥がすのは §2.4 の通り送信の直前、
+   * つまりこの関数の実装（トランスポート）側である。
+   */
+  send: (request: ResolvedHttpRequest) => Promise<unknown>
 }
 
 export type ExecutionEvent =

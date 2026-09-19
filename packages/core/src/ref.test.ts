@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { embedRef, resolutionKey, resolvePath } from './ref'
+import { embedRef, resolutionKey, resolvePath, resolveRequest } from './ref'
+import { Secret } from './secret'
 import type { ResolutionTable } from './resolution'
 import type { Ref } from './value'
 
@@ -84,5 +85,104 @@ describe('path に埋め込まれた参照', () => {
     const result = resolvePath(embedRef(otherIssueType), resolutions)
 
     expect(result).toEqual({ resolved: false, unresolved: [otherIssueType] })
+  })
+})
+
+describe('Ref を解決したリクエスト', () => {
+  const bug: Ref = { $ref: { kind: 'issueType', name: 'バグ' } }
+
+  it('params にある参照も ID に置き換わる', () => {
+    const resolutions: ResolutionTable = new Map([['issueType:バグ', 1234]])
+
+    const result = resolveRequest(
+      {
+        method: 'POST',
+        path: '/api/v2/projects/PROJ_A/customFields',
+        params: { name: '影響範囲', applicableIssueTypes: bug },
+      },
+      resolutions,
+    )
+
+    expect(result).toEqual({
+      resolved: true,
+      value: {
+        method: 'POST',
+        path: '/api/v2/projects/PROJ_A/customFields',
+        params: { name: '影響範囲', applicableIssueTypes: 1234 },
+      },
+    })
+  })
+
+  it('配列に並んだ参照はすべて ID に置き換わる', () => {
+    const resolutions: ResolutionTable = new Map([
+      ['issueType:バグ', 1234],
+      ['issueType:調査', 5678],
+    ])
+
+    const result = resolveRequest(
+      {
+        method: 'POST',
+        path: '/api/v2/projects/PROJ_A/customFields',
+        params: { applicableIssueTypes: [bug, { $ref: { kind: 'issueType', name: '調査' } }] },
+      },
+      resolutions,
+    )
+
+    expect(result).toEqual({
+      resolved: true,
+      value: {
+        method: 'POST',
+        path: '/api/v2/projects/PROJ_A/customFields',
+        params: { applicableIssueTypes: [1234, 5678] },
+      },
+    })
+  })
+
+  it('Secret は解決を通しても Secret のまま残り、実値は現れない', () => {
+    const result = resolveRequest(
+      {
+        method: 'POST',
+        path: '/api/v2/projects/PROJ_A/webhooks',
+        params: { name: 'Slack 通知', hookUrl: new Secret('https://hooks.example.test/T000/B000') },
+      },
+      new Map(),
+    )
+
+    expect(result.resolved).toBe(true)
+
+    if (!result.resolved) {
+      return
+    }
+
+    expect(result.value.params['hookUrl']).toBeInstanceOf(Secret)
+    expect(JSON.stringify(result.value.params)).toBe(
+      '{"name":"Slack 通知","hookUrl":"***"}',
+    )
+  })
+
+  it('params の参照が解決できなければリクエストは組み上がらない', () => {
+    const result = resolveRequest(
+      {
+        method: 'POST',
+        path: '/api/v2/projects/PROJ_A/customFields',
+        params: { applicableIssueTypes: [bug] },
+      },
+      new Map(),
+    )
+
+    expect(result).toEqual({ resolved: false, unresolved: [bug] })
+  })
+
+  it('path と params のどちらの参照も取りこぼさず列挙される', () => {
+    const result = resolveRequest(
+      {
+        method: 'PATCH',
+        path: `/api/v2/projects/PROJ_A/issueTypes/${embedRef(otherIssueType)}`,
+        params: { applicableIssueTypes: [bug] },
+      },
+      new Map(),
+    )
+
+    expect(result).toEqual({ resolved: false, unresolved: [otherIssueType, bug] })
   })
 })
