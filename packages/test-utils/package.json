@@ -1,10 +1,10 @@
 {
-  "name": "@simochee/backlog-blueprint",
+  "name": "@backlog-blueprint/test-utils",
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "bin": {
-    "backlog-blueprint": "./dist/main.js"
+  "exports": {
+    ".": "./src/index.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
@@ -14,8 +14,8 @@
     "@backlog-blueprint/core": "workspace:*"
   },
   "devDependencies": {
-    "@types/node": "^24.10.1",
-    "typescript": "^5.9.3",
-    "vitest": "^3.2.4"
+    "@backlog-blueprint/tsconfigs": "workspace:*",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

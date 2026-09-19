@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    // 先行事例の bee は基底に "types": ["node"] を置いているが、それは借りない（B-4 / §3）。
+    // 基底が @types/node を読み込むと、core で `process` や `Buffer` を書いても
+    // 型検査が通るようになり、NFR-5 を担保しているガードが黙って消える。
+    // Node が要るパッケージは node.json を継承して types を足す。
+    "types": [],
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "resolveJsonModule": true,
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
+  }
+}

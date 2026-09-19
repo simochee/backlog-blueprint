@@ -1,0 +1,26 @@
+{
+  "name": "@simochee/backlog-blueprint",
+  "version": "0.0.0",
+  "private": true,
+  "bin": {
+    "backlog-blueprint": "./dist/main.js"
+  },
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@backlog-blueprint/backlog-client": "workspace:*",
+    "@backlog-blueprint/core": "workspace:*",
+    "commander": "catalog:",
+    "consola": "catalog:"
+  },
+  "devDependencies": {
+    "@backlog-blueprint/test-utils": "workspace:*",
+    "@backlog-blueprint/tsconfigs": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

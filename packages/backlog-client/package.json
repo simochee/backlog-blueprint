@@ -1,5 +1,5 @@
 {
-  "name": "@backlog-blueprint/schema",
+  "name": "@backlog-blueprint/backlog-client",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -11,7 +11,8 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@backlog-blueprint/core": "workspace:*"
+    "@backlog-blueprint/core": "workspace:*",
+    "backlog-js": "catalog:"
   },
   "devDependencies": {
     "@backlog-blueprint/tsconfigs": "workspace:*",

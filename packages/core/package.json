@@ -10,12 +10,13 @@
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json",
     "test": "vitest run --passWithNoTests"
   },
-  "devDependencies": {
-    "ajv": "^8.20.0",
-    "typescript": "^5.9.3",
-    "vitest": "^3.2.4"
-  },
   "dependencies": {
-    "@sinclair/typebox": "^0.34.52"
+    "@sinclair/typebox": "catalog:"
+  },
+  "devDependencies": {
+    "@backlog-blueprint/tsconfigs": "workspace:*",
+    "ajv": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }
