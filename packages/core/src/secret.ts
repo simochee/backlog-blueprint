@@ -47,8 +47,8 @@ export const sealer = (isSecret: (path: string) => boolean): Seal => {
 };
 
 /**
- * `Action` のフィールド名とマニフェストの path が一致する場所でだけ使う。
- * 一致しない場所（`settings.*` のように表示名を変えているところ）でこれを呼ぶと、
+ * リクエストのキー名がマニフェストの path の末尾と一致する場所でだけ使う。
+ * 一致しない場所（`settings` の項目のように、リクエストでは平らに並ぶもの）で呼ぶと、
  * 引く path がずれて包むべき値を素通しするので、その場合は path を直に書く。
  */
 export const sealFields = (

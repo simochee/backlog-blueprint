@@ -17,9 +17,7 @@ import { type ResourceKind } from "./resource";
 
 const WRITE_INTERVAL_MS = 1000;
 
-/**
- * X-4 の「上限回数」に相当する値。設計文書は回数を定めていないため、ここで決め打つ。
- */
+/** X-4 が定める再試行の上限3回 */
 const RATE_LIMIT_RETRY_LIMIT = 3;
 
 /**
