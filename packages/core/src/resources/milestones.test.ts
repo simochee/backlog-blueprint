@@ -263,6 +263,20 @@ describe("環境変数から展開した値", () => {
     expect(actions[0]?.request?.params.description).toBeInstanceOf(Secret);
     expect(JSON.stringify(actions)).not.toContain("社外秘の説明");
   });
+
+  it("マイルストーン名は同定名なので ${ENV} 由来でもリクエストにも差分にも平文で出る", () => {
+    const actions = milestonesReconciler.plan(
+      [{ name: "社外秘マイルストーン" }],
+      [],
+      fixedPlanContext({ isSecret: secretPaths("milestones/0/name") }),
+    );
+
+    expect(actions[0]?.request?.params.name).toBe("社外秘マイルストーン");
+    expect(actions[0]?.changes).toEqual([
+      { field: "name", before: null, after: "社外秘マイルストーン" },
+    ]);
+    expect(actions[0]?.id).toBe("milestones/create/社外秘マイルストーン");
+  });
 });
 
 describe("冪等性（NFR-4）", () => {

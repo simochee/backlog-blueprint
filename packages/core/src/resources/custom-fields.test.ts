@@ -441,6 +441,22 @@ describe("環境変数から展開した値", () => {
     expect(actions[0]?.request?.params.description).toBeInstanceOf(Secret);
     expect(JSON.stringify(actions)).not.toContain("社外秘の説明");
   });
+
+  it("カスタム属性名は同定名なので ${ENV} 由来でもリクエストにも差分にも平文で出る", () => {
+    const actions = customFieldsReconciler.plan(
+      [{ name: "社外秘の属性", type: "text" }],
+      { customFields: [], issueTypes: [] },
+      fixedPlanContext({ isSecret: secretPaths("customFields/0/name") }),
+    );
+
+    expect(actions[0]?.request?.params.name).toBe("社外秘の属性");
+    expect(actions[0]?.changes).toContainEqual({
+      field: "name",
+      before: null,
+      after: "社外秘の属性",
+    });
+    expect(actions[0]?.id).toBe("customFields/create/社外秘の属性");
+  });
 });
 
 describe("カスタム属性の型の変更", () => {

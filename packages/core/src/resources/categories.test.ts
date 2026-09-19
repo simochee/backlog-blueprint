@@ -6,7 +6,6 @@ import {
   fixedSnapshot,
   secretPaths,
 } from "../../../test-utils/src/index";
-import { Secret } from "../secret";
 import { type Category } from "../manifest";
 import { categoriesReconciler, type CategoriesSnapshot } from "./categories";
 
@@ -162,16 +161,16 @@ describe("カテゴリーの oldname", () => {
 });
 
 describe("環境変数から展開した値", () => {
-  it("カテゴリー名が ${ENV} 由来ならリクエストにも差分にも実値が現れない", () => {
+  it("カテゴリー名は同定名なので ${ENV} 由来でもリクエストにも差分にも平文で出る", () => {
     const [action] = categoriesReconciler.plan(
       [{ name: "社外秘カテゴリー" }],
       [],
       fixedPlanContext({ isSecret: secretPaths("categories/0/name") }),
     );
 
-    expect(action?.request?.params.name).toBeInstanceOf(Secret);
-    expect(JSON.stringify(action?.request)).not.toContain("社外秘カテゴリー");
-    expect(JSON.stringify(action?.changes)).not.toContain("社外秘カテゴリー");
+    expect(action?.request?.params.name).toBe("社外秘カテゴリー");
+    expect(action?.changes).toEqual([{ field: "name", before: null, after: "社外秘カテゴリー" }]);
+    expect(action?.id).toBe("categories/create/社外秘カテゴリー");
   });
 });
 

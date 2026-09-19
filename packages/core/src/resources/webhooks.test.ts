@@ -240,7 +240,7 @@ describe("Webhook の hookUrl", () => {
     expect(action?.request?.params.hookUrl).toBe("https://hooks.example.test/T1/B1");
   });
 
-  it("環境変数から展開した name や description も同じようにマスクされる", () => {
+  it("環境変数から展開した description も同じようにマスクされる", () => {
     const [action] = plan(
       [
         {
@@ -256,6 +256,22 @@ describe("Webhook の hookUrl", () => {
 
     expect(action?.request?.params.description).toBeInstanceOf(Secret);
     expect(JSON.stringify(action)).not.toContain("秘密の説明");
+  });
+
+  it("Webhook 名は同定名なので ${ENV} 由来でもリクエストにも差分にも平文で出る", () => {
+    const [action] = plan(
+      [{ name: "社外秘の Webhook", hookUrl: SLACK_URL, events: [1, 2] }],
+      [],
+      secretPaths("webhooks/0/name"),
+    );
+
+    expect(action?.request?.params.name).toBe("社外秘の Webhook");
+    expect(action?.changes).toContainEqual({
+      field: "name",
+      before: null,
+      after: "社外秘の Webhook",
+    });
+    expect(action?.id).toBe("webhooks/create/社外秘の Webhook");
   });
 });
 

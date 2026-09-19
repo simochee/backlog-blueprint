@@ -328,6 +328,22 @@ describe("環境変数から展開した値", () => {
     expect(actions[0]?.request?.params.templateDescription).toBeInstanceOf(Secret);
     expect(JSON.stringify(actions)).not.toContain("社外秘の手順");
   });
+
+  it("課題種別の名前は同定名なので ${ENV} 由来でもリクエストにも差分にも平文で出る", () => {
+    const actions = issueTypesReconciler.plan(
+      [{ name: "社外秘の課題種別", color: "#990000" }],
+      { source: "project", issueTypes: [] },
+      fixedPlanContext({ isSecret: secretPaths("issueTypes/0/name") }),
+    );
+
+    expect(actions[0]?.request?.params.name).toBe("社外秘の課題種別");
+    expect(actions[0]?.changes).toContainEqual({
+      field: "name",
+      before: null,
+      after: "社外秘の課題種別",
+    });
+    expect(actions[0]?.id).toBe("issueTypes/create/社外秘の課題種別");
+  });
 });
 
 describe("冪等性（NFR-4）", () => {

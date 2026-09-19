@@ -34,13 +34,29 @@ export class Secret {
  */
 export type Seal = (path: string, value: Value) => Value;
 
+/**
+ * 同定名を `request.params` と `changes` でだけ包める形にしない（E-7）。同じ `Action` の
+ * `id` / `name` / `target` / `provides[].name` / `request.path` には平文が要るので、
+ * 片側だけ `***` にすると守られていると誤解させるだけで実値は隣に並ぶ。警告は V-A25 が出す。
+ *
+ * トップレベルの `name` はプロジェクト名であり、同定名ではない。プロジェクトを指すのは `key`。
+ */
+const isIdentifyingName = (path: string): boolean => {
+  const segments = path.split("/");
+  const field = segments.at(-1);
+
+  return segments.length === 1 ? field === "key" : field === "name" || field === "oldname";
+};
+
 export const sealer = (isSecret: (path: string) => boolean): Seal => {
   const seal: Seal = (path, value) => {
     if (Array.isArray(value)) {
       return value.map((item, index) => seal(`${path}/${index}`, item));
     }
 
-    return typeof value === "string" && isSecret(path) ? new Secret(value) : value;
+    return typeof value === "string" && !isIdentifyingName(path) && isSecret(path)
+      ? new Secret(value)
+      : value;
   };
 
   return seal;

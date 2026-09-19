@@ -185,6 +185,18 @@ describe("環境変数から展開した値", () => {
     expect(actions[0]?.request?.params.textFormattingRule).toBeInstanceOf(Secret);
     expect(actions[0]?.request?.params.name).toBe("プロジェクトA");
   });
+
+  it("プロジェクトキーは同定名なので ${ENV} 由来でもリクエストにも差分にも平文で出る", () => {
+    const actions = projectReconciler.plan(
+      desired(),
+      { exists: false },
+      fixedPlanContext({ isSecret: secretPaths("key") }),
+    );
+
+    expect(actions[0]?.request?.params.key).toBe("PROJ_A");
+    expect(actions[0]?.changes).toContainEqual({ field: "key", before: null, after: "PROJ_A" });
+    expect(actions[0]?.id).toBe("project/create/PROJ_A");
+  });
 });
 
 describe("送るものと前後差分の対応（PO-11）", () => {

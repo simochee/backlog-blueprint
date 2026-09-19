@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { fixedPlanContext, fixedReadContext, fixedSnapshot } from "../../../test-utils/src/index";
+import {
+  fixedPlanContext,
+  fixedReadContext,
+  fixedSnapshot,
+  secretPaths,
+} from "../../../test-utils/src/index";
 import { type Status } from "../manifest";
 import {
   DEFAULT_STATUSES_EN,
@@ -228,6 +233,24 @@ describe("表示順", () => {
       op: "noop",
       writeRequest: false,
     });
+  });
+});
+
+describe("環境変数から展開した値", () => {
+  it("ステータス名は同定名なので ${ENV} 由来でもリクエストにも差分にも平文で出る", () => {
+    const [create] = statusesReconciler.plan(
+      [{ name: "社外秘ステータス", color: "#3b9dbd" }],
+      { source: "project", statuses: [] },
+      fixedPlanContext({ isSecret: secretPaths("statuses/0/name") }),
+    );
+
+    expect(create?.request?.params.name).toBe("社外秘ステータス");
+    expect(create?.changes).toContainEqual({
+      field: "name",
+      before: null,
+      after: "社外秘ステータス",
+    });
+    expect(create?.id).toBe("statuses/create/社外秘ステータス");
   });
 });
 
