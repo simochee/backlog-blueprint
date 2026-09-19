@@ -6,6 +6,7 @@ import {
   fixedSpaceResponses,
   httpFailure,
   recordingGet,
+  recordingSend,
   secretPaths,
 } from "../../test-utils/src/index";
 import { buildPlan, createPlan } from "./planner";
@@ -32,16 +33,33 @@ const plan = async (responses: Record<string, unknown> = {}, text = manifestText
 const NOT_FOUND = httpFailure({ status: 404, errors: [{ message: "No project." }] });
 
 describe("スナップショットを根拠にした中断（S5 / S6）", () => {
-  it("既定ステータスを1つ省いたマニフェストは V-A6 で中断し、Backlog を一切変更しない", async () => {
-    const {
-      ids,
-      plan: created,
-      requested,
-    } = await plan({}, manifestText("未対応\n  - name: 処理中\n  - name: 完了"));
+  it("既定ステータスを1つ省いたマニフェストは V-A6 で中断する", async () => {
+    const { ids, plan: created } = await plan(
+      {},
+      manifestText("未対応\n  - name: 処理中\n  - name: 完了"),
+    );
 
     expect(ids).toContain("V-A6");
     expect(created).toBeUndefined();
-    expect(requested.every((path) => path.startsWith("/api/v2/"))).toBe(true);
+  });
+
+  /**
+   * `send` を渡せないことを型で確かめる。`@ts-expect-error` は受け取るようになった
+   * 瞬間に「不要な抑制」として型検査が落ちるので、GET だけで計画を組む（C-2 / FR-3.1）
+   * という構造上の保証がテストから外れない。
+   */
+  it("計画の組み立てには Backlog を変更する口が渡らない", async () => {
+    const { send, sent } = recordingSend();
+
+    await createPlan({
+      text: manifestText(),
+      schemaStage,
+      get: fixedGet(fixedSpaceResponses()),
+      // @ts-expect-error createPlan は送信の口を受け取らない
+      send,
+    });
+
+    expect(sent).toEqual([]);
   });
 
   it("課題が1件あるプロジェクトは V-B3 で中断する", async () => {
