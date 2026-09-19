@@ -1,5 +1,4 @@
 {
   "extends": "@backlog-blueprint/tsconfigs/base.json",
-  "include": ["src"],
-  "exclude": ["src/**/*.test.ts"]
+  "include": ["src"]
 }
