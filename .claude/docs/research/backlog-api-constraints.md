@@ -155,8 +155,11 @@ plan の段階で所要時間を見積もって提示し、apply 中は進捗を
 | --- | --- |
 | 種別 | 1:文字列 / 2:文章 / 3:数値 / 4:日付 / 5:単一リスト / 6:複数リスト / 7:チェックボックス / 8:ラジオ |
 | 共通パラメータ | `name`（必須）, `typeId`（必須）, `description`, `required`, `applicableIssueTypes[]`（空なら全種別） |
-| 数値型 | `min` `max` `initialValue` `unit` |
-| 日付型 | `min` `max` `initialValueType`（1:当日 2:当日+シフト 3:指定日）`initialDate` `initialShift` |
+| 数値型 | `min` `max` `initialValue`（Number）/ `unit`（String） |
+| 日付型 | `min` `max` `initialDate` は **String（yyyy-MM-dd）**。`initialValueType`（Number。1:当日 2:当日+シフト 3:指定日）`initialShift`（Number） |
+
+**`min` / `max` はキー名が共有されているが型が違う。** 数値型は Number、日付型は
+yyyy-MM-dd の String（[Add Custom Field](https://developer.nulab.com/docs/backlog/api/2/add-custom-field/) のリファレンス記載）。
 | リスト型 | `items[]` `allowInput` `allowAddItem` |
 
 `applicableIssueTypes[]` が課題種別 ID を要求するため、
