@@ -83,7 +83,7 @@ strict parse（V-A1）でここだけエラーにすると、「スキーマを�
 
 | ID | 決定 |
 | --- | --- |
-| E-7 | `name` / `oldname` / `access` の各要素 / `applicableIssueTypes[]` は、`${ENV}` 由来でも `Secret` にしない。出力に平文で現れる。同定名に `${ENV}` を書いたら **V-A25 で警告する** |
+| E-7 | **`key`** / `name` / `oldname` / `access` の各要素 / `applicableIssueTypes[]` は、`${ENV}` 由来でも `Secret` にしない。出力に平文で現れる。同定名に `${ENV}` を書いたら **V-A25 で警告する** |
 
 理由は構造的である。名前は[同定キー](../requirements/requirements-definition.md#1-用語)であり、
 解決表のキー（§3.2）と `Action.id` の安定識別子（§2.2）を兼ねている。
@@ -93,6 +93,14 @@ strict parse（V-A1）でここだけエラーにすると、「スキーマを�
 つまり `request.params` と `changes` はマスクできるが、`id` / `name` / `target` /
 `provides[].name` / `request.path` の埋め込みは**できない**。E-1 が「すべての文字列値」と
 言っているので、ここが例外であることを明記する。
+
+**`key`（プロジェクトキー）も対象に含める。** `Action.id` と更新時の `request.path` に平文で出る。
+`request.params.key` だけを包むと、params が `***` で path に実キーが出る状態になり、
+**マスクされていると誤解させるぶん一貫した平文より悪い**。
+
+**トップレベルの `name`（プロジェクト名）は対象外。** プロジェクトを指す同定キーは `key` であり、
+`name` は `request.params` と `changes` にしか載らない。つまり包めるので、E-4 のとおりマスクする。
+V-A22 がトップレベル `name` を対象外にしているのと同じ線引きである。
 
 **NFR-3 / AC-10 は無傷である。** API キーは `Action` にも `Secret` にも現れない
 （[§2.4](core-reconciler.md#24-secret)）。影響するのは FR-3.6 / E-4 の範囲で、
