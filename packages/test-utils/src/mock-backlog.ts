@@ -150,6 +150,14 @@ const DEFAULT_ISSUE_TYPES_JA: { name: string; color: string }[] = [
 /** 既定ステータスは全プロジェクト共通で ID 1〜4 の固定値（実測） */
 const LAST_DEFAULT_STATUS_ID = 4;
 
+/**
+ * 実 API は既定ステータスの更新に `No such status`、削除に
+ * `Default status cannot be deleted. id: N` を返す（research「ステータス」）。
+ * 受け付ける実装にすると、適用順序 §6 フェーズ3の「既定4つには何もしない」を
+ * 破る計画でも受け入れが通ってしまう。
+ */
+const isDefaultStatus = ({ id }: MockStatus): boolean => id <= LAST_DEFAULT_STATUS_ID;
+
 const FIRST_GENERATED_ID = 1000;
 
 const NOT_FOUND = 404;
@@ -679,9 +687,21 @@ export const mockBacklog = (options: MockBacklogOptions = {}): MockBacklog => {
       const target = memberOf(project.statuses, Number(member));
 
       if (method === "DELETE") {
+        if (isDefaultStatus(target)) {
+          failWith(BAD_REQUEST, `Default status cannot be deleted. id: ${target.id}`);
+        }
+
+        if (digits(params, "substituteStatusId") === undefined) {
+          failWith(BAD_REQUEST, "substituteStatusId is required.");
+        }
+
         project.statuses = project.statuses.filter(({ id }) => id !== target.id);
 
         return target;
+      }
+
+      if (isDefaultStatus(target)) {
+        failWith(NOT_FOUND, "No such status");
       }
 
       target.name = text(params, "name") ?? target.name;

@@ -1,0 +1,92 @@
+import { describe, expect, it } from "vitest";
+
+import { mockBacklog, type MockBacklog } from "./mock-backlog";
+
+const YAMADA = { id: 1, userId: "yamada" };
+
+const TANAKA = { id: 2, userId: "tanaka" };
+
+const space = (): MockBacklog =>
+  mockBacklog({
+    executor: { ...YAMADA, roleType: 1 },
+    spaceUsers: [YAMADA, TANAKA],
+    spaceTeams: [{ name: "開発チーム", members: ["tanaka"] }],
+    projects: [
+      { key: "PROJ_A", name: "プロジェクトA", members: ["yamada"], teams: ["開発チーム"] },
+    ],
+  });
+
+type Reply = { status: number; body: unknown };
+
+const call = async (
+  backlog: MockBacklog,
+  method: "GET" | "POST" | "PATCH" | "DELETE",
+  path: string,
+  body = "",
+): Promise<Reply> => {
+  const response = await backlog.fetch(`https://example.backlog.com${path}`, { method, body });
+
+  return { status: response.status, body: await response.json() };
+};
+
+const messageOf = ({ body }: Reply): unknown =>
+  (body as { errors?: { message: string }[] }).errors?.[0]?.message;
+
+const idOf = ({ body }: Reply): number => (body as { id: number }).id;
+
+const addReview = (backlog: MockBacklog): Promise<Reply> =>
+  call(backlog, "POST", "/api/v2/projects/PROJ_A/statuses", "name=レビュー中&color=%233b9dbd");
+
+describe("既定ステータス", () => {
+  it("名前も色も変えられない", async () => {
+    const backlog = space();
+    const reply = await call(backlog, "PATCH", "/api/v2/projects/PROJ_A/statuses/1", "name=新規");
+
+    expect(reply.status).not.toBe(200);
+    expect(messageOf(reply)).toBe("No such status");
+    expect(backlog.project("PROJ_A")?.statuses[0]?.name).toBe("未対応");
+  });
+
+  it("振替先を添えても削除できない", async () => {
+    const backlog = space();
+    const reply = await call(
+      backlog,
+      "DELETE",
+      "/api/v2/projects/PROJ_A/statuses/1",
+      "substituteStatusId=2",
+    );
+
+    expect(reply.status).not.toBe(200);
+    expect(messageOf(reply)).toBe("Default status cannot be deleted. id: 1");
+    expect(backlog.project("PROJ_A")?.statuses).toHaveLength(4);
+  });
+});
+
+describe("カスタムステータスの削除", () => {
+  it("振替先を書かなければ受け付けない", async () => {
+    const backlog = space();
+    const created = await addReview(backlog);
+    const reply = await call(
+      backlog,
+      "DELETE",
+      `/api/v2/projects/PROJ_A/statuses/${idOf(created)}`,
+    );
+
+    expect(reply.status).not.toBe(200);
+    expect(backlog.project("PROJ_A")?.statuses).toHaveLength(5);
+  });
+
+  it("振替先を書けば消える", async () => {
+    const backlog = space();
+    const created = await addReview(backlog);
+    const reply = await call(
+      backlog,
+      "DELETE",
+      `/api/v2/projects/PROJ_A/statuses/${idOf(created)}`,
+      "substituteStatusId=1",
+    );
+
+    expect(reply.status).toBe(200);
+    expect(backlog.project("PROJ_A")?.statuses.map(({ name }) => name)).not.toContain("レビュー中");
+  });
+});
