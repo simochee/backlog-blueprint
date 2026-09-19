@@ -9,7 +9,13 @@
 /// <reference path="./fetch.d.ts" />
 
 import { type Action, type ProvidedRef } from "./action";
-import { asArrayOf, asRecord, requiredNumber, requiredString } from "./api-response";
+import {
+  asArrayOf,
+  asRecord,
+  requiredNumber,
+  requiredString,
+  type HttpFailure,
+} from "./api-response";
 import { type ExecuteContext, type ExecutionEvent } from "./execution";
 import { resolveRequest } from "./ref";
 import { type ResolutionKey } from "./resolution";
@@ -49,11 +55,9 @@ const REFRESHED = [
   positional: boolean;
 }[];
 
-type Failure = { status?: number; errors: { message: string }[] };
-
 type Outcome =
   | { ok: true; response: unknown; resolved: { ref: ProvidedRef; id: number }[] }
-  | ({ ok: false } & Failure);
+  | ({ ok: false } & HttpFailure);
 
 const delay = (milliseconds: number): Promise<void> =>
   new Promise((resolve) => {
@@ -89,12 +93,10 @@ const messagesOf = (value: unknown): { message: string }[] | undefined => {
 };
 
 /**
- * `status` を必ず埋めない。HTTP のやり取りが成立しなかった失敗（タイムアウト・
- * 名前解決の失敗・ブラウザの CORS 失敗）には状態コードが存在せず、`0` などで
- * 埋めると消費側が「Backlog が拒否した」と「Backlog に届かなかった」を
- * 区別できなくなる（plan の出力仕様 §3.3）。
+ * 投げられたものが `HttpFailure` である保証は型にできないので、形が違えば
+ * `message` から組み直す。`status` はあるときだけ載せる（§7.0）。
  */
-const toFailure = (error: unknown): Failure => {
+const toFailure = (error: unknown): HttpFailure => {
   const status = optionalRecord(error)?.["status"];
   const errors = messagesOf(error) ?? [
     { message: String(optionalRecord(error)?.["message"] ?? error) },

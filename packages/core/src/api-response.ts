@@ -7,6 +7,21 @@ const fail = (detail: string): never => {
   throw new TypeError(`Unexpected Backlog API response: ${detail}`);
 };
 
+/**
+ * `ReadContext.get` と `ExecuteContext.send` が失敗したときに投げる形（§7.0）。
+ *
+ * `status` は任意である。HTTP のやり取りが成立しなかった失敗（タイムアウト・名前解決の
+ * 失敗・ブラウザの CORS 失敗）には状態コードが存在せず、`0` などで埋めると消費側が
+ * 「Backlog が拒否した」と「Backlog に届かなかった」を区別できなくなる（§7.2 / PO-7）。
+ *
+ * 404 もこの形で投げる。存在しないプロジェクトを情報として読むのは呼び出し側で、
+ * 送信層に「どの 404 が情報か」を判断させると、その知識が core と送信層に分かれる。
+ */
+export type HttpFailure = {
+  status?: number;
+  errors: { message: string }[];
+};
+
 export const asArray = (value: unknown): unknown[] =>
   Array.isArray(value) ? value : fail("expected an array");
 

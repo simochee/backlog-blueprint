@@ -53,6 +53,7 @@ export type {
   ProvidedRef,
   ResolvedHttpRequest,
 } from "./action";
+export type { HttpFailure } from "./api-response";
 export type { Diagnostic } from "./diagnostic";
 export type { ExecuteContext, ExecutionEvent } from "./execution";
 export type {
