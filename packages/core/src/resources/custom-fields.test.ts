@@ -8,15 +8,34 @@ import {
 } from "../../../test-utils/src/index";
 import { Secret } from "../secret";
 import { type CustomField } from "../manifest";
-import { customFieldsReconciler, type CustomFieldsSnapshot } from "./custom-fields";
+import { customFieldsReconciler, type ExistingCustomField } from "./custom-fields";
 
-const plan = (desired: CustomField[], snapshot: CustomFieldsSnapshot) =>
-  customFieldsReconciler.plan(desired, snapshot, fixedPlanContext());
+type Existing = Omit<ExistingCustomField, "applicableIssueTypes"> & {
+  applicableIssueTypes?: number[];
+};
+
+const plan = (
+  desired: CustomField[],
+  customFields: Existing[],
+  issueTypes: { id: number; name: string }[] = [],
+) =>
+  customFieldsReconciler.plan(
+    desired,
+    {
+      customFields: customFields.map((customField) => ({
+        applicableIssueTypes: [],
+        ...customField,
+      })),
+      issueTypes,
+    },
+    fixedPlanContext(),
+  );
 
 describe("カスタム属性の現状取得", () => {
   it("リスト型の選択肢は名前の並びとして持つ", async () => {
     const snapshot = await customFieldsReconciler.read(
       fixedReadContext({
+        "/api/v2/projects/PROJ_A/issueTypes": [{ id: 101, name: "バグ" }],
         "/api/v2/projects/PROJ_A/customFields": [
           {
             id: 31,
@@ -36,7 +55,7 @@ describe("カスタム属性の現状取得", () => {
       }),
     );
 
-    expect(snapshot).toEqual([
+    expect(snapshot.customFields).toEqual([
       {
         id: 31,
         name: "環境",
@@ -46,7 +65,25 @@ describe("カスタム属性の現状取得", () => {
         items: ["本番", "検証"],
         allowInput: false,
         allowAddItem: false,
+        applicableIssueTypes: [101],
       },
+    ]);
+  });
+
+  it("適用課題種別を突き合わせるために課題種別も取得する", async () => {
+    const snapshot = await customFieldsReconciler.read(
+      fixedReadContext({
+        "/api/v2/projects/PROJ_A/issueTypes": [
+          { id: 101, name: "バグ", color: "#990000" },
+          { id: 102, name: "タスク", color: "#7ea800" },
+        ],
+        "/api/v2/projects/PROJ_A/customFields": [],
+      }),
+    );
+
+    expect(snapshot.issueTypes).toEqual([
+      { id: 101, name: "バグ" },
+      { id: 102, name: "タスク" },
     ]);
   });
 
@@ -55,7 +92,7 @@ describe("カスタム属性の現状取得", () => {
       fixedReadContext({}, { snapshot: fixedSnapshot({ project: { exists: false } }) }),
     );
 
-    expect(snapshot).toEqual([]);
+    expect(snapshot).toEqual({ customFields: [], issueTypes: [] });
   });
 });
 
@@ -143,6 +180,67 @@ describe("カスタム属性の適用課題種別", () => {
     const [action] = plan([{ name: "環境", type: "text" }], []);
 
     expect(action?.request?.params).toEqual({ name: "環境", typeId: 1 });
+  });
+
+  it("適用する課題種別だけが変わっても差分になる", () => {
+    const actions = plan(
+      [{ name: "環境", type: "text", applicableIssueTypes: ["バグ"] }],
+      [{ id: 31, name: "環境", typeId: 1, applicableIssueTypes: [101, 102] }],
+      [
+        { id: 101, name: "バグ" },
+        { id: 102, name: "タスク" },
+      ],
+    );
+
+    expect(actions.map(({ op }) => op)).toEqual(["update"]);
+    expect(actions[0]?.changes).toContainEqual({
+      field: "applicableIssueTypes",
+      before: ["バグ", "タスク"],
+      after: ["バグ"],
+    });
+  });
+
+  it("適用する課題種別が一致していれば差分にならない", () => {
+    const actions = plan(
+      [{ name: "環境", type: "text", applicableIssueTypes: ["バグ", "タスク"] }],
+      [{ id: 31, name: "環境", typeId: 1, applicableIssueTypes: [101, 102] }],
+      [
+        { id: 101, name: "バグ" },
+        { id: 102, name: "タスク" },
+      ],
+    );
+
+    expect(actions.map(({ op }) => op)).toEqual(["noop"]);
+  });
+
+  it("適用する課題種別の並びが違っても差分にならない", () => {
+    const actions = plan(
+      [{ name: "環境", type: "text", applicableIssueTypes: ["タスク", "バグ"] }],
+      [{ id: 31, name: "環境", typeId: 1, applicableIssueTypes: [101, 102] }],
+      [
+        { id: 101, name: "バグ" },
+        { id: 102, name: "タスク" },
+      ],
+    );
+
+    expect(actions.map(({ op }) => op)).toEqual(["noop"]);
+  });
+
+  it("前後差分には課題種別の名前が並び、送信には参照が載る", () => {
+    const [action] = plan(
+      [{ name: "環境", type: "text", applicableIssueTypes: ["バグ"] }],
+      [{ id: 31, name: "環境", typeId: 1, applicableIssueTypes: [] }],
+      [{ id: 101, name: "バグ" }],
+    );
+
+    expect(action?.changes).toContainEqual({
+      field: "applicableIssueTypes",
+      before: [],
+      after: ["バグ"],
+    });
+    expect(action?.request?.params.applicableIssueTypes).toEqual([
+      { $ref: { kind: "issueType", name: "バグ" } },
+    ]);
   });
 });
 
@@ -310,7 +408,7 @@ describe("環境変数から展開した値", () => {
   it("説明が ${ENV} 由来なら計画に実値が現れない", () => {
     const actions = customFieldsReconciler.plan(
       [{ name: "顧客名", type: "text", description: "社外秘の説明" }],
-      [],
+      { customFields: [], issueTypes: [] },
       fixedPlanContext({ isSecret: secretPaths("customFields/0/description") }),
     );
 

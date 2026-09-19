@@ -21,9 +21,20 @@ type CustomFieldFields = {
   allowAddItem?: boolean;
 };
 
-export type ExistingCustomField = { id: number } & CustomFieldFields;
+export type ExistingCustomField = {
+  id: number;
+  applicableIssueTypes: number[];
+} & CustomFieldFields;
 
-export type CustomFieldsSnapshot = ExistingCustomField[];
+/**
+ * 課題種別も一緒に持つ（§4.1）。マニフェストは課題種別を名前で指し、カスタム属性の
+ * 応答が持つのは ID なので、対応表が無いと `applicableIssueTypes` を突き合わせられない。
+ * 突き合わせを諦めると「`applicableIssueTypes` だけを変えても差分が出ない」穴ができる。
+ */
+export type CustomFieldsSnapshot = {
+  customFields: ExistingCustomField[];
+  issueTypes: { id: number; name: string }[];
+};
 
 const FIELDS = [
   "name",
@@ -49,7 +60,11 @@ const FIELDS = [
  */
 const UPDATABLE_FIELDS = FIELDS.filter((field) => field !== "typeId");
 
+const APPLICABLE = "applicableIssueTypes";
+
 const collectionPath = (projectKey: string) => `/api/v2/projects/${projectKey}/customFields`;
+
+const issueTypesPath = (projectKey: string) => `/api/v2/projects/${projectKey}/issueTypes`;
 
 const memberPath = (projectKey: string, id: number) => `${collectionPath(projectKey)}/${id}`;
 
@@ -87,17 +102,13 @@ const fieldsOf = (desired: CustomField): CustomFieldFields => ({
   allowAddItem: desired.allowAddItem,
 });
 
-const findExisting = (snapshot: CustomFieldsSnapshot, { name, oldname }: CustomField) =>
+const findExisting = (snapshot: ExistingCustomField[], { name, oldname }: CustomField) =>
   snapshot.find((customField) => customField.name === name) ??
   snapshot.find((customField) => customField.name === oldname);
 
 /**
  * マニフェストに書かれていないキーは比較にも送信にも載せない（K-3）。
- *
- * `applicableIssueTypes` はここに載せない。マニフェストは課題種別を名前で指し、
- * スナップショット（§4.1）が持つのは ID で、課題種別の名前は phase 6 の read の
- * 範囲外にある。突き合わせられない値を差分に載せると、一致していても毎回
- * update が出て L-5 / NFR-4 が崩れる。送信には常に載せる（L-3）。
+ * `applicableIssueTypes` は ID と名前の突き合わせが要るので、この表には載せない。
  */
 const changesOf = (
   desired: CustomFieldFields,
@@ -120,8 +131,15 @@ const sameValue = (before: Value | null, after: Value | null) => {
   return before === after;
 };
 
+/**
+ * 送信は課題種別の ID を要求する（API 制約）が、差分は名前のまま持つ。ID は適用の
+ * 途中でしか分からないものが混ざるため、参照をそのまま前後差分に置くと
+ * 「何がどう変わるのか」が読めなくなる。`statuses` の displayOrder と同じ扱い。
+ */
 const paramsOf = (changes: Change[], applicableIssueTypes: string[]) => ({
-  ...Object.fromEntries(changes.map(({ field, after }) => [field, after])),
+  ...Object.fromEntries(
+    changes.filter(({ field }) => field !== APPLICABLE).map(({ field, after }) => [field, after]),
+  ),
   ...(applicableIssueTypes.length === 0
     ? {}
     : {
@@ -131,14 +149,33 @@ const paramsOf = (changes: Change[], applicableIssueTypes: string[]) => ({
       }),
 });
 
+/**
+ * 並びを無視した集合として比べる。Backlog が返す順序はマニフェストの記述順と
+ * 関係が無く、順序で比べると一致していても毎回 update が出て NFR-4 が崩れる。
+ */
+const sameNames = (left: string[], right: string[]): boolean => {
+  const expected = new Set(right);
+
+  return new Set(left).size === expected.size && left.every((name) => expected.has(name));
+};
+
+/**
+ * 名前を引けなかった ID を落とさない。落とすと現状が短く見えて「一致した」と
+ * 誤判定し、`applicableIssueTypes` の差分が出なくなる。
+ */
+const applicableNames = (ids: number[], issueTypes: { id: number; name: string }[]): string[] =>
+  ids.map((id) => issueTypes.find((issueType) => issueType.id === id)?.name ?? String(id));
+
 export const customFieldsReconciler: Reconciler<CustomField[], CustomFieldsSnapshot> = {
   kind: "customField",
   phase: 6,
 
   read: async ({ projectKey, snapshot, get }) => {
     if (!snapshot.project.exists) {
-      return [];
+      return { customFields: [], issueTypes: [] };
     }
+
+    const issueTypes = (await get(issueTypesPath(projectKey))) as { id: number; name: string }[];
 
     const customFields = (await get(collectionPath(projectKey))) as {
       id: number;
@@ -156,9 +193,10 @@ export const customFieldsReconciler: Reconciler<CustomField[], CustomFieldsSnaps
       items?: { name: string }[] | null;
       allowInput?: boolean;
       allowAddItem?: boolean;
+      applicableIssueTypes?: number[] | null;
     }[];
 
-    return customFields.map((customField) => ({
+    const mapped = customFields.map((customField) => ({
       id: customField.id,
       name: customField.name,
       typeId: customField.typeId,
@@ -174,10 +212,13 @@ export const customFieldsReconciler: Reconciler<CustomField[], CustomFieldsSnaps
       items: customField.items?.map(({ name }) => name),
       allowInput: customField.allowInput,
       allowAddItem: customField.allowAddItem,
+      applicableIssueTypes: customField.applicableIssueTypes ?? [],
     }));
+
+    return { customFields: mapped, issueTypes: issueTypes.map(({ id, name }) => ({ id, name })) };
   },
 
-  plan: (desired, snapshot, { manifest, isSecret }) => {
+  plan: (desired, { customFields: snapshot, issueTypes }, { manifest, isSecret }) => {
     const seal = sealer(isSecret);
     const creates: Action[] = [];
     const updates: Action[] = [];
@@ -203,8 +244,20 @@ export const customFieldsReconciler: Reconciler<CustomField[], CustomFieldsSnaps
         existing,
         existing === undefined ? FIELDS : UPDATABLE_FIELDS,
       );
-      const changes = sealChanges(declared, basePath(index), seal);
-      const params = paramsOf(changes, customField.applicableIssueTypes ?? []);
+      const applicable = customField.applicableIssueTypes ?? [];
+      const current =
+        existing === undefined
+          ? undefined
+          : applicableNames(existing.applicableIssueTypes, issueTypes);
+      const applicableMatches =
+        applicable.length === 0 || (current !== undefined && sameNames(current, applicable));
+      const changes = [
+        ...sealChanges(declared, basePath(index), seal),
+        ...(applicable.length === 0
+          ? []
+          : [{ field: APPLICABLE, before: current ?? null, after: applicable }]),
+      ];
+      const params = paramsOf(changes, applicable);
 
       if (found !== undefined && recreated) {
         kept.add(found.id);
@@ -229,7 +282,7 @@ export const customFieldsReconciler: Reconciler<CustomField[], CustomFieldsSnaps
 
       kept.add(existing.id);
 
-      if (declared.every(({ before, after }) => sameValue(before, after))) {
+      if (applicableMatches && declared.every(({ before, after }) => sameValue(before, after))) {
         updates.push({
           id: `customFields/noop/${customField.name}`,
           phase: 6,
