@@ -81,6 +81,11 @@ webhooks:
 
 const withoutResolvedStatus = MANIFEST.replace("  - name: 処理済み\n", "");
 
+const withoutNarrowedCustomField = MANIFEST.replace(
+  "    applicableIssueTypes:\n      - バグ\n",
+  "",
+);
+
 const YAMADA = { id: 1, userId: "yamada" };
 
 const SUZUKI = { id: 2, userId: "suzuki" };
@@ -401,6 +406,36 @@ describe("受け入れ基準", () => {
       expect(io.stdout).not.toContain(API_KEY);
       expect(io.stderr).not.toContain(API_KEY);
     }
+  });
+});
+
+describe("カスタム属性の絞り", () => {
+  it("課題種別の絞りを消したマニフェストを適用するとどの課題種別でも使えるようになり、続けて plan しても差分は出ない", async () => {
+    const backlog = space();
+
+    await expect(apply(backlog, MANIFEST).code).resolves.toBe(0);
+    expect(backlog.project("PROJ_A")?.customFields[0]?.applicableIssueTypes).toHaveLength(1);
+
+    const planned = plan(backlog, withoutNarrowedCustomField);
+
+    await expect(planned.code).resolves.toBe(2);
+    expect(planned.io.stdout).toContain("applicableIssueTypes");
+
+    await expect(apply(backlog, withoutNarrowedCustomField).code).resolves.toBe(0);
+
+    const released = backlog.writes.filter(
+      ({ method, path }) =>
+        method === "PATCH" && path.startsWith("/api/v2/projects/PROJ_A/customFields/"),
+    );
+
+    expect(released).toHaveLength(1);
+    expect(released[0]?.body).toContain("applicableIssueTypes%5B%5D=");
+    expect(backlog.project("PROJ_A")?.customFields[0]?.applicableIssueTypes).toEqual([]);
+
+    const replanned = plan(backlog, withoutNarrowedCustomField);
+
+    await expect(replanned.code).resolves.toBe(0);
+    expect(replanned.io.stdout).toContain(NO_CHANGES);
   });
 });
 

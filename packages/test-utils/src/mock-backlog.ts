@@ -15,6 +15,8 @@ export type MockRequest = {
   method: MockMethod;
   path: string;
   params: Record<string, unknown>;
+  /** 符号化されたままの本文。`params` に畳むと `key[]=` と `key[]=""` の区別が消える */
+  body: string;
 };
 
 export type MockUser = { id: number; userId: string };
@@ -896,7 +898,8 @@ export const mockBacklog = (options: MockBacklogOptions = {}): MockBacklog => {
     const path = decodeURIComponent(url)
       .replace(/^https:\/\/[^/]+/, "")
       .replace(/\?$/, "");
-    const request: MockRequest = { method, path, params: parseFormBody(init?.body ?? "") };
+    const body = init?.body ?? "";
+    const request: MockRequest = { method, path, params: parseFormBody(body), body };
 
     requests.push(request);
     (method === "GET" ? reads : writes).push(request);
