@@ -1,182 +1,123 @@
 # AGENTS.md
 
-AI コーディングエージェントがこのリポジトリで作業するときの手引き。
+Constraints for anyone — human or AI — changing this repository. Everything here is something that
+breaks, silently or loudly, if it is not observed.
 
-## 概要
+How to build, test and release is in [DEVELOPMENT.md](DEVELOPMENT.md), and the package layout is
+described there too. This file does not repeat it.
 
-backlog-blueprint は Backlog のプロジェクト設定を Yaml で宣言し、plan / apply で反映する
-ツール。CLI（npm `@simochee/backlog-blueprint`）とブラウザで動く Web UI の2つを成果物とする
-pnpm workspace のモノレポで、パッケージはすべて ESM only。
+## `.claude/docs/` is the only specification
 
-## 仕様は `.claude/docs/` にしかない
+Every decision in the code traces back to a document there.
 
-`.claude/docs/` が唯一の仕様である。実装の判断は必ずここを根拠にする。
+| Directory                    | Contents                                                                                                      |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `.claude/docs/requirements/` | Requirements: FR, NFR, V-A, V-B, AC                                                                           |
+| `.claude/docs/design/`       | Design: manifest schema, validation pipeline, reconcilers, plan output, CLI and Web UI, versioning, prior art |
+| `.claude/docs/research/`     | Measured behavior of the Backlog API (X-\*)                                                                   |
 
-| ディレクトリ | 内容 |
-| --- | --- |
-| `.claude/docs/requirements/` | 要件定義（FR / NFR / V-A / V-B / AC） |
-| `.claude/docs/design/` | 設計（マニフェストのスキーマ定義・検証パイプライン・reconciler・plan 出力・CLI と Web UI・バージョニング・先行事例 bee） |
-| `.claude/docs/research/` | Backlog API の実測（X-*） |
+- **Refer to a decision by its ID, never by copying its text.** Write "for NFR-5" or "K-1 requires
+  this", not a paraphrase of what those say. A paraphrase in the code is a second copy that will not
+  be updated when the document is.
+- **Do not fill a gap in the specification by guessing.** When a decision is needed and no document
+  makes it, stop and report it. The document gets the decision first, then the code.
 
-- **決定は ID で参照する。** 「NFR-5 のため」「K-1 のため」のように書き、内容を写さない。
-  写すと文書と実装で二重管理になり、文書を直しても実装のコメントが古いまま残る。
-- **仕様に書いていないことを推測で埋めない。** 判断が要るところに行き当たったら、
-  埋めずに報告する。文書に決定を足してから実装する。
+## The tool initializes a project once
 
-## コマンド
+It is not a control loop. There is no state file, no drift detection, and no support for a project
+that is already in use; the only targets are a project being created and a project that exists but
+has no issues (requirement-design §6, validation-pipeline §7). The `reconciler` vocabulary does not
+change that, and no change should quietly widen it.
 
-```sh
-# 依存のインストール
-pnpm install
+Within core, a reconciler reads the current state and computes the difference. **It does not apply
+anything** (C-1). Every write goes through the single Executor, over the `Action[]` the reconcilers
+produced. That is what guarantees that nothing happens during `apply` which was not visible in
+`plan`, and it keeps rate limiting, retries, progress reporting and the abort report in one place
+(NFR-8). Applying from inside a reconciler would break all of that at once.
 
-# リント（oxlint。ESLint ではない）
-pnpm run lint
-pnpm run lint:fix
+## `packages/core` must not touch Node or the DOM (NFR-5)
 
-# フォーマット（oxfmt）
-pnpm run format
-pnpm run format:check
+Core runs in Node and in the browser, so it may use ECMAScript and `fetch` and nothing else: no
+`node:*`, `process` or `Buffer`, and no `document`, `window` or `localStorage`.
 
-# 型検査（turbo 経由で各パッケージの tsc --noEmit）
-pnpm run typecheck
+This is enforced by the type checker, not by discipline. `packages/tsconfigs/base.json` sets
+`types: []` and `lib: ["ES2022"]`, and `fetch` exists only as the ambient declaration in
+`packages/core/src/fetch.d.ts`. Packages that genuinely need Node extend
+`packages/tsconfigs/node.json` instead.
 
-# テスト（vitest）
-pnpm run test
-pnpm --filter @backlog-blueprint/core exec vitest run src/manifest.test.ts
-
-# ビルド
-pnpm run build
-```
-
-依存のバージョンは `pnpm-workspace.yaml` の `catalog:` に集める（B-6）。
-追加は `pnpm add --save-catalog <pkg>`（devDependencies は `-D` を添える）で行い、
-`package.json` にバージョン範囲を直接書かない。
-
-## パッケージ構成
-
-```
-apps/
-  cli/             @simochee/backlog-blueprint。実行ファイル名 backlog-blueprint
-  web/             @backlog-blueprint/web。Vite の SPA
-packages/
-  core/            @backlog-blueprint/core。パース・検証・plan 算出・apply 実行
-  backlog-client/  @backlog-blueprint/backlog-client。backlog-js を包む送信層
-  schema/          @backlog-blueprint/schema。JSON Schema の生成物（M-1）
-  test-utils/      @backlog-blueprint/test-utils。テストの共有ヘルパ（B-3）
-  tsconfigs/       @backlog-blueprint/tsconfigs。共有 TypeScript 設定（B-4）
-```
-
-`apps/` が配布するもの、`packages/` が共有する部品（B-1）。
-`apps/cli` と `apps/web` は「入出力の違い」だけを担い、検証と計画は `packages/core` に閉じる。
-
-`packages/core` の構成と各リソースの reconciler については
-[core のデータモデルと reconciler](.claude/docs/design/core-reconciler.md) を読む。
-
-## `packages/core` に Node 専用 API を書かない（NFR-5）
-
-`packages/core` で使ってよいのは ECMAScript の標準と `fetch` だけである。
-`node:*` / `process` / `Buffer` も `document` / `window` / `localStorage` も書けない。
-
-これは注意事項ではなく**型検査で落ちる**。`packages/tsconfigs/base.json` が
-`types: []` / `lib: ["ES2022"]` を置き、`fetch` は `packages/core/src/fetch.d.ts` の
-ambient 宣言で必要な面だけを持っている。Node が要るパッケージだけが
-`packages/tsconfigs/node.json` を継承して `types: ["node"]` を足す。
-
-**このガードは依存の `.d.ts` にある `/// <reference types="node" />` 1つで黙って無効になる。**
-`types: []` が止めるのは自動読み込みだけで、参照ディレクティブは止められない。
-`packages/core` に依存を足したら、足した後に次を実行してガードが生きていることを確かめる。
+**A single `/// <reference types="node" />` inside a dependency's `.d.ts` disables the guard without
+a word.** `types: []` only stops automatic loading; it cannot stop a reference directive. So after
+adding any dependency to `packages/core`, confirm the guard still bites:
 
 ```sh
-# packages/core/src/ に一時ファイルを置いて typecheck が落ちることを確認し、確認後に消す
+# typecheck must FAIL with this file present
 printf "import { readFileSync } from 'node:fs'\nexport const probe = () => [readFileSync, process.env.HOME, Buffer.from('x')]\n" > packages/core/src/nfr5-probe.ts
-pnpm --filter @backlog-blueprint/core run typecheck   # 落ちなければガードが壊れている
+pnpm --filter @backlog-blueprint/core run typecheck
 rm packages/core/src/nfr5-probe.ts
 ```
 
-送信層を `packages/backlog-client` に切り出しているのはこのためでもある（B-2 / 要件定義 §7.0）。
-backlog-js とその型定義を `packages/core` に入れない。
+If that passes, the guard is already broken. This is also why backlog-js and its type definitions
+live in `packages/backlog-client` and not in core (B-2).
 
-## 情報の置き場所
+The same hazard applies to new packages that have to run in a browser — `core`, `schema`,
+`backlog-client`, `web`. Keep their tests in a separate tsconfig from the source: putting both in
+one config pulls `@types/node` in through vitest and vite, and the guard dies quietly.
 
-- **How = コード。** 実現方法はコードだけが表す。コメントで補いたくなったら、
-  名前を変える・関数を切り出すなどコード側を直す。
-- **What = テスト。** テストは仕様の実行可能な記述である。テスト名は挙動を述べる
-  （「日付型のカスタム属性の範囲は日付文字列で書く」。「validate が false を返す」ではない）。
-- **Why = コミットログ。** なぜ必要だったかを本文に書く。diff で分かる What は書かない。
-- **Why not = コードコメント。** 自然な書き方を採らなかった理由だけを書く。
-  「削られると壊れる」ところに置き、将来の読み手が「単純化」して壊すのを止めるために書く。
-  コードが何をしているかの説明は書かない。
+## Tests never reach the network
 
-## テスト
+No test may call the real Backlog API, or any other host. Build from fixed values instead, and put
+shared helpers in `@backlog-blueprint/test-utils` rather than reinventing them per package (B-3).
 
-- **実 Backlog API を叩かない。** テストは固定値で組み立てる。
-  ネットワークに出るテストは書かない。
-- 共有ヘルパは `@backlog-blueprint/test-utils` に置く。各パッケージに散らさない（B-3）。
-  現在あるもの:
+**`packages/core` imports those helpers by relative path.** Adding
+`@backlog-blueprint/test-utils` to core's `devDependencies` creates a workspace cycle — test-utils
+depends on core — and turbo then refuses to build any task at all.
 
-  | ヘルパ | 用途 |
-  | --- | --- |
-  | `fixedSnapshot(overrides?)` | フェーズ0の `Snapshot` を固定値で組み立てる |
-  | `fixedResourceSnapshots(overrides?)` | 各 reconciler の `read()` が返す `ResourceSnapshots` を固定値で組み立てる |
-  | `fixedManifest(overrides?)` | 正規化済みの `Manifest` を固定値で組み立てる |
-  | `fixedGet(responses)` | `ReadContext['get']` を path → 応答の表で差し替える。表に無い path は失敗する |
-  | `fixedSpaceResponses(overrides?)` | 課題0件の既存プロジェクトに対する GET の応答をひととおり持つ表 |
-  | `httpFailure(failure)` | 応答の表に「その path では `HttpFailure` を投げる」と書く |
-  | `recordingGet(responses)` | `fixedGet` に加えて、取得した path を `requested` に記録する |
-  | `recordingSend(respond?)` | `ExecuteContext['send']` を差し替え、送られた `ResolvedHttpRequest` を `sent` に記録する |
-  | `fixedReadContext(responses, overrides?)` | `ReadContext` を組み立てる |
-  | `fixedPlanContext(overrides?)` | `PlanContext` を組み立てる |
-  | `secretPaths(...paths)` | `PlanContext['isSecret']` を、展開された path の集合で差し替える |
+## Where each kind of information goes
 
-- 足りないヘルパは `packages/test-utils` に足してから使う。
-- **`packages/core` からは相対 path で読む。** core の devDependencies に
-  `@backlog-blueprint/test-utils` を足すと turbo がワークスペースの循環を検出して
-  すべてのタスクが組めなくなる（test-utils は core に依存しているため）。
+- **How — the code.** Only the code says how something is done. If a comment is needed to explain
+  it, rename something or extract a function instead.
+- **What — the tests.** A test name states behavior: "a date custom field's range is written as a
+  date string", not "validate returns false".
+- **Why — the commit message.** The body explains why the change was needed and cites the decision
+  ID. The diff already shows what changed.
+- **Why not — code comments.** Only where the code departs from the obvious implementation, to stop
+  a later reader from "simplifying" it back into a bug. Never a description of what the code does.
 
-## メッセージとコミットログの言語
+## Language
 
-- **利用者に見えるメッセージは英語のみ**（NFR-9）。CLI / Web UI / JSON Schema の
-  description・エラー・ヒントが対象。i18n の仕組みは入れない。
-- **コミットログは日本語。** 本文の Why に決定 ID を書く。
+- **Everything a user can see is English, and only English** (NFR-9): CLI output, the Web UI, and
+  the descriptions inside the JSON Schema. No i18n machinery. Names that users gave their own
+  Backlog resources are printed as they are and never translated.
+- **Commit messages are Japanese.**
 
-## ESM とモジュール解決
+## TypeScript conventions
 
-`module: "preserve"` / `moduleResolution: "bundler"`。
+`module: "preserve"` with `moduleResolution: "bundler"`.
 
-- **相対 import は拡張子を書かない。**
+- **Relative imports carry no file extension.**
 
   ```ts
-  import { resolveRef } from './ref' // 正しい
-  import { resolveRef } from './ref.js' // 誤り
+  import { resolveRef } from "./ref"; // correct
+  import { resolveRef } from "./ref.js"; // wrong
   ```
 
-- **`type` はインラインで書く。** `import { type Manifest, normalizeManifest } from './manifest'`
-  のように1つの import にまとめる（oxlint が指摘する）。
-- 型定義は `interface` ではなく `type` を使う。配列は `T[]`。名前付き export のみ。
+- **`type` goes inline**, in the same import as the values:
+  `import { type Manifest, normalizeManifest } from "./manifest"`. oxlint enforces this.
+- Declare types with `type`, not `interface`. Write arrays as `T[]`. Export by name only; no default
+  exports.
 
-## ツール
+## Disabled lint rules have reasons
 
-| 用途 | ツール |
-| --- | --- |
-| パッケージマネージャ | pnpm（依存バージョンは `catalog:`） |
-| タスクランナー | turbo（`turbo.json` の `dependsOn` で依存順に流す） |
-| リンタ | oxlint（**ESLint ではない**） |
-| フォーマッタ | oxfmt（`.md` は対象外。仕様文書を書き換えないため） |
-| 型検査 | パッケージごとの `tsc --noEmit` |
-| テスト | vitest |
+Each entry in `.oxlintrc.json` is there for a specific problem. Check before removing one.
 
-`lint` と `typecheck` は別物で、どちらも通す。`lint` は高速な静的解析、
-`typecheck` は `tsc` による型検査である。
-
-`.oxlintrc.json` で無効にしている規則には理由がある。消す前に確かめる。
-
-- `unicorn/no-thenable`（`packages/core/src/manifest.ts` のみ）— JSON Schema の
-  `then` キーワードを `Promise` と誤認するため。
-- `unicorn/no-empty-file` / `unicorn/require-module-specifiers`（骨組みのファイルのみ）—
-  実装が入るまでの `export {}` を許すため。**実装を入れたら `.oxlintrc.json` から
-  そのパスを消す。**
-- `no-template-curly-in-string` — 仕様上 `${ENV}` を含む文字列を書く場面が多いため（E-1）。
-- `import/no-unassigned-import`（`apps/web/src/test-setup.ts` のみ）— jest-dom の
-  matcher は副作用の import でしか登録できないため。
-- `import/no-nodejs-modules`（`apps/cli/src/` のみ）— CLI は Node のアプリで、
-  ファイル読み込みと標準入力に `node:*` が要るため。`packages/` では有効のままにする（NFR-5）。
+- `unicorn/no-thenable` (`packages/core/src/manifest.ts` only) — the JSON Schema `then` keyword
+  reads as a `Promise` to the rule.
+- `unicorn/no-empty-file` and `unicorn/require-module-specifiers` (scaffolding only) — they allow
+  the `export {}` placeholder in files that have no implementation yet. **Once a file has an
+  implementation, delete its path from `.oxlintrc.json`.**
+- `no-template-curly-in-string` — `${ENV}` appears in string literals all over the specification
+  (E-1).
+- `import/no-unassigned-import` (`apps/web/src/test-setup.ts` only) — jest-dom matchers can only be
+  registered by a side-effecting import.
+- `import/no-nodejs-modules` (`apps/cli/src/` only) — the CLI is a Node application and needs
+  `node:*` for file and stdin access. It stays enabled everywhere under `packages/` (NFR-5).
