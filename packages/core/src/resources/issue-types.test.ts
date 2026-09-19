@@ -294,6 +294,7 @@ describe("未作成のプロジェクト", () => {
       ["issueTypes/delete/slot/3", "delete"],
     ]);
     expect(actions.at(-1)).toMatchObject({
+      name: "3",
       target: { $ref: { kind: "issueTypeSlot", name: "3" } },
       request: {
         method: "DELETE",
