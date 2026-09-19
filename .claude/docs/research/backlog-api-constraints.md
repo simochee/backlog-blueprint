@@ -77,6 +77,7 @@ V-A6 が正しいマニフェストを止めうる。適用を壊す向きでは
 | 更新系の本文 | `Content-Type: application/x-www-form-urlencoded` |
 | 配列パラメータ | `qs.stringify(params, { arrayFormat: 'brackets' })`。`statusId[]=1&statusId[]=2` の形 |
 | 低レベル API | `request({ method, path, params })` が公開されている。型付きのエンドポイント別メソッドを経由せずに任意のパスを叩ける |
+| 空配列 | **`qs` がキーごと落とす**（実測）。`{ applicableIssueTypes: [] }` は本文に現れない。「絞りを解除する」意図を空配列では送れない（V-B10） |
 | 実行環境 | `globalThis.fetch` を使う。差し替えも可能。ブラウザ向けビルドがある |
 
 本文書が配列パラメータを一貫して `statusId[]` `applicableIssueTypes[]` `activityTypeIds[]` と
@@ -383,6 +384,7 @@ yyyy-MM-dd の String（[Add Custom Field](https://developer.nulab.com/docs/back
 | 3 | プロジェクトメンバー / チーム / 管理者の**削除**エンドポイント | 本文書には追加系しか記録が無い。同じパスへの `DELETE` と、追加時と同じパラメータ（`userId` / `teamId`）を使っている。これも**リファレンスに載っているはず**なので記録を足せば外せる |
 | 4 | 既定**ステータス**の英語名（課題種別は枠で引き継ぐので不要になった） | `ja` 以外のスペースで新規プロジェクトを作るとき、V-A6 の名前照合が誤検出しうる。適用を壊す向きではなく、正しいマニフェストを止める向きの誤り |
 | 5 | `GET /rateLimit` の本文の構造 | `{ rateLimit: { read \| update: { limit, remaining, reset } } }` と仮定。読めなければ 429 の再試行を諦める（勝手な既定秒数で待たない） |
+| 6 | `applicableIssueTypes` の絞りを解除する書き方 | 空配列は form-urlencoded の段で消える。解除の計画は V-B10 で止め、削除して作り直す道を案内する |
 
 1 と 4 は読み取りだけで確認できる。2 と 3 はリファレンスの読み直しで済む見込み。5 も読み取りだけで確認できる。
 

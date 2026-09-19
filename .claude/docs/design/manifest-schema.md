@@ -457,7 +457,7 @@ Backlog 側で増えたイベントは数値で書いて使う（W-1）。
 | 検証 | 載せない理由 |
 | --- | --- |
 | V-A5 同一配列内の `name` 重複 | `uniqueItems` はオブジェクト全体の一致しか見ない。プロパティ単位の一意性を表現できない |
-| V-A6 / V-A6a / V-A8 / V-A14 ステータス関連 | 既定かどうかの判定に ID（＝スナップショット）が要る（K-5） |
+| V-A6 / V-A6a / V-A14 ステータス関連 | 既定かどうかの判定に ID（＝スナップショット）が要る（K-5）。**V-A8（色）は S3 に置く**（[検証パイプライン S3](validation-pipeline.md#s3-スキーマ)） |
 | V-A10 `applicableIssueTypes` の参照 | 同一ドキュメント内の別配列を参照する記述ができない |
 | V-A12 `grandchildIssueEnabled` → `subtaskingEnabled` | 書けなくはないが、依存を表す `if`/`then` が増えるほど生成 JSON が読めなくなる。他の相互制約と同じ場所に置く |
 | V-A17 `oldname` と `name` の衝突 | 同上 |
