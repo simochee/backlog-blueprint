@@ -1,13 +1,12 @@
 import { type Action } from "../action";
 import { type Diagnostic } from "../diagnostic";
+import { type ResourceOrder } from "../resulting-order";
 
-export type ResultingOrder = {
-  issueTypes: string[];
-  statuses: string[];
-  categories: string[];
-  milestones: string[];
-  customFields: string[];
-};
+/**
+ * 描画の側で同じ形を書き直さない。`resultingOrder` は V-A15 が判定する値そのもの
+ * （plan の出力仕様 §1.4）で、2つに分かれると片方だけにリソースが増える。
+ */
+export type ResultingOrder = ResourceOrder;
 
 /**
  * `space` と `project` を持たない（§2.3）。`validate` は Backlog に一切アクセスせず
