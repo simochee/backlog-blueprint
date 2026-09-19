@@ -1,4 +1,5 @@
 import type { Action } from './action'
+import type { Manifest } from './manifest'
 import type { Phase, ResourceKind } from './resource'
 import type { Snapshot } from './snapshot'
 
@@ -13,8 +14,8 @@ export type ReadContext = {
  * ここに fetch を1つ足すと FR-3.1（plan は GET しか行わない）が型の保証から
  * 実装の注意事項に落ちる。
  */
-export type PlanContext<ManifestShape = unknown> = {
-  manifest: ManifestShape
+export type PlanContext = {
+  manifest: Manifest
   snapshot: Snapshot
 }
 
@@ -26,11 +27,11 @@ export type PlanContext<ManifestShape = unknown> = {
  * plan() は Promise を返さない。非同期にできると read() を経由しない取得を
  * 書く余地が戻ってくる。
  */
-export interface Reconciler<Desired, ResourceSnapshot, ManifestShape = unknown> {
+export interface Reconciler<Desired, ResourceSnapshot> {
   readonly kind: ResourceKind
   readonly phase: Phase
 
   read(ctx: ReadContext): Promise<ResourceSnapshot>
 
-  plan(desired: Desired, snapshot: ResourceSnapshot, ctx: PlanContext<ManifestShape>): Action[]
+  plan(desired: Desired, snapshot: ResourceSnapshot, ctx: PlanContext): Action[]
 }
