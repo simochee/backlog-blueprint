@@ -90,3 +90,21 @@ describe("カスタムステータスの削除", () => {
     expect(backlog.project("PROJ_A")?.statuses.map(({ name }) => name)).not.toContain("レビュー中");
   });
 });
+
+describe("プロジェクトの参加者", () => {
+  it("既定ではチーム経由の参加者まで返る", async () => {
+    const reply = await call(space(), "GET", "/api/v2/projects/PROJ_A/users");
+
+    expect(reply.body).toEqual([YAMADA, TANAKA]);
+  });
+
+  it("excludeGroupMembers=true を付けると個人参加者だけになる", async () => {
+    const reply = await call(
+      space(),
+      "GET",
+      "/api/v2/projects/PROJ_A/users?excludeGroupMembers=true",
+    );
+
+    expect(reply.body).toEqual([YAMADA]);
+  });
+});

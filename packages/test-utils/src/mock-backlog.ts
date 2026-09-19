@@ -564,6 +564,26 @@ export const mockBacklog = (options: MockBacklogOptions = {}): MockBacklog => {
     return undefined;
   };
 
+  /**
+   * `excludeGroupMembers=true` が無ければチーム経由の参加者まで返る（要件定義 §6 フェーズ7）。
+   * 常に個人参加者だけを返すと、問い合わせ側が付け忘れても受け入れが気づけない。
+   */
+  const projectUsers = (project: MockProject, query: string): MockUser[] => {
+    if (query.includes("excludeGroupMembers=true")) {
+      return project.members;
+    }
+
+    const joined = new Map(project.members.map((user) => [user.id, user]));
+
+    for (const { id } of project.teams) {
+      for (const user of teamById(id)?.members ?? []) {
+        joined.set(user.id, user);
+      }
+    }
+
+    return [...joined.values()];
+  };
+
   const readProject = (path: string): unknown => {
     const matched = /^\/api\/v2\/projects\/([^/?]+)(\/[^?]*)?(\?.*)?$/.exec(path);
 
@@ -573,6 +593,7 @@ export const mockBacklog = (options: MockBacklogOptions = {}): MockBacklog => {
 
     const project = projectByKey(matched[1] ?? "");
     const section = matched[2] ?? "";
+    const query = matched[3] ?? "";
 
     if (section === "") {
       return projectBody(project);
@@ -610,7 +631,7 @@ export const mockBacklog = (options: MockBacklogOptions = {}): MockBacklog => {
       return project.administrators;
     }
 
-    return section === "/users" ? project.members : undefined;
+    return section === "/users" ? projectUsers(project, query) : undefined;
   };
 
   const writeProject = (

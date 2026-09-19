@@ -85,12 +85,15 @@ const YAMADA = { id: 1, userId: "yamada" };
 
 const SUZUKI = { id: 2, userId: "suzuki" };
 
+/** 開発チームにしか属さない人。マニフェストの `access.members` には出てこない */
+const TANAKA = { id: 3, userId: "tanaka" };
+
 /** どの受け入れも同じスペースから始める。違うのは投入する前提だけ */
 const space = (options: MockBacklogOptions = {}): MockBacklog =>
   mockBacklog({
     executor: { ...YAMADA, roleType: 1 },
-    spaceUsers: [YAMADA, SUZUKI],
-    spaceTeams: [{ name: "開発チーム" }],
+    spaceUsers: [YAMADA, SUZUKI, TANAKA],
+    spaceTeams: [{ name: "開発チーム", members: ["tanaka"] }],
     ...options,
   });
 
