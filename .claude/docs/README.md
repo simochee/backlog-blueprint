@@ -44,7 +44,7 @@ requirement-design ─▶ requirements-definition ─┬─▶ manifest-schema
 | 接頭辞 | 定義している文書 | 対象 |
 | --- | --- | --- |
 | `P` / `UC` / `R` | requirement-design | ペルソナ / ユースケース / 中核要求 |
-| `FR` / `NFR` / `V-A` / `V-B` / `V-C` / `AC` | requirements-definition | 機能要件 / 非機能要件 / 検証 / 受け入れ基準 |
+| `FR` / `NFR` / `V-A` / `V-B` / `AC` | requirements-definition | 機能要件 / 非機能要件 / 検証 / 受け入れ基準 |
 | `O` / `L` / `A` / `W` | requirements-definition | oldname / リクエスト削減 / access / webhooks |
 | `D` | manifest-versioning | バージョニング |
 | `G` | syntax-reference-github | 先行事例から借りた原則 |

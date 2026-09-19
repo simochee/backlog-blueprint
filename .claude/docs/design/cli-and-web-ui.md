@@ -1,6 +1,6 @@
 # CLI と Web UI の設計
 
-最終更新: 2026-09-18
+最終更新: 2026-09-19
 前提: [要件定義 FR-6 / FR-7](../requirements/requirements-definition.md#fr-6-cli) / [plan の出力仕様](plan-output.md) / [検証パイプライン](validation-pipeline.md)
 
 CLI と Web UI は「入出力の違い」だけを担う（要件定義 §7）。
@@ -174,8 +174,8 @@ CI で `--auto-approve` を付け忘れたとき、マニフェストの内容�
 │                                       [ Plan ] │
 └────────────────────────────────────────────────┘
 ┌ 3 Plan ────────────────────────────────────────┐
-│ [+] issueType  調査      rename of その他       │
-│ [-] issueType  要望      issues move to タスク  │
+│ [~] issueType  調査      renamed from その他    │
+│ [-] issueType  要望                             │
 │ ...                                            │
 │ ! [V-A15] categories: resulting order differs  │
 │ 4 to add, 2 to change, 1 to destroy            │

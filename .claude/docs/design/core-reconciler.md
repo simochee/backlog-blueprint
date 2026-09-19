@@ -1,6 +1,6 @@
 # core のデータモデルと reconciler
 
-最終更新: 2026-09-18
+最終更新: 2026-09-19
 前提: [要件定義 §6 適用順序](../requirements/requirements-definition.md#6-適用順序) / [要件定義 §7 アーキテクチャ](../requirements/requirements-definition.md#7-アーキテクチャ) / [API 制約](../research/backlog-api-constraints.md)
 
 `core` の中心は「リソース種別ごとの reconciler が `Action[]` を吐き、共通の Executor がそれを直列に流す」構造。
@@ -99,7 +99,7 @@ type Action = {
   request?: HttpRequest            // op が noop / refresh のときは無い
   provides?: ProvidedRef[]         // 成功時に解決表へ登録するもの
   changes?: Change[]               // 表示用の前後差分
-  notes?: Note[]                   // "rename of X" / "issues move to Y"
+  notes?: Note[]                   // 現状は "renamed from X" のみ（FR-3.3）
   writeRequest: boolean            // 所要時間の見積もりに数えるか
 }
 
@@ -179,7 +179,9 @@ type ResolutionTable = Map<`${ResourceKind}:${string}`, number>
 `<issueType "バグ" (to be created)>` のように記す。
 `--output json` では `{"$ref":{"kind":"issueType","name":"バグ"}}` をそのまま出す。
 
-### 3.4 V-C1 参照解決シミュレーション（新規提案）
+### 3.4 V-C1 参照解決シミュレーション（未採用）
+
+依頼者の判断により**未採用**。以下は提案内容と、採らなかったことの帰結の記録である。
 
 `Action[]` を実行順に走査し、スナップショット由来のエントリだけを入れた解決表から始めて、
 各 Action の `provides` を順に足していく。ある Action に到達した時点で
@@ -193,10 +195,15 @@ type ResolutionTable = Map<`${ResourceKind}:${string}`, number>
 適用前に捕まえるための網である。要件定義 R-2 の「実行を始めてから気付くのは許容しない」を
 マニフェストの誤りだけでなくツールの誤りにも広げる。
 
-V-A10（`applicableIssueTypes` が存在する課題種別を指す）はマニフェストの静的検証として別途走るが、
-V-C1 はその一般化にあたる。両方残す理由は、V-A10 のほうが
-「どのキーが」「どう直すか」を利用者の言葉で言えるため。
-V-C1 のメッセージは利用者に直せるものではなく、バグ報告への誘導になる。
+V-A10（`applicableIssueTypes` が存在する課題種別を指す）はマニフェストの静的検証として別途走り、
+V-C1 はその一般化にあたる。**未採用にしたことで、`Ref` の解決可能性を担保するのは V-A10 だけになる。**
+V-A10 が見ていない経路（フェーズ順序の誤り、`provides` の付け忘れ）でツール側が `Ref` を
+解決し損ねた場合、それは計画段階ではなく適用の実行時エラーとして現れる。
+
+V-C1 のメッセージはもともと利用者に直せるものではなくバグ報告への誘導であり、
+利用者向けの検証としての価値が無い点が判断の材料になった。
+同じく設計フェーズで提案した V-A19 / V-A20 が採用されたのは、
+そちらが利用者の直せる誤りを指すため（[検証パイプライン S4](validation-pipeline.md#s4-静的意味)）。
 
 ## 4. read と、ただ1つの再取得点
 
@@ -401,7 +408,7 @@ function execute(actions: Action[], ctx: ExecuteContext): AsyncIterable<Executio
 | `started` | 総数 M |
 | `actionStarted` | N/M と Action |
 | `actionSucceeded` | レスポンス、解決表への登録結果 |
-| `actionFailed` | API エラー。直後に `aborted` |
+| `actionFailed` | API エラー、または HTTP まで到達しなかった失敗。直後に `aborted` |
 | `waiting` | レート制限による待機（残り秒数） |
 | `finished` | 全件成功 |
 | `aborted` | 適用済み / 失敗 / 未適用 の3分割（FR-4.4） |
