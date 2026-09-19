@@ -101,7 +101,8 @@ plan の段階で所要時間を見積もって提示し、apply 中は進捗を
 
 | 制約 | 内容 |
 | --- | --- |
-| 既定ステータス | 未対応 / 処理中 / 処理済み / 完了 の4つが最初から存在する |
+| 既定ステータス | 4つが最初から存在する。表示名はスペースの言語設定で変わる |
+| 既定ステータスの表示名 | 日本語: 未対応 / 処理中 / 処理済み / 完了。英語: `Open` / `In Progress` / `Resolved` / `Closed`（[Get Status List of Project](https://developer.nulab.com/docs/backlog/api/2/get-status-list-of-project/) の例が id 1 = `Open`、[Customize issue status](https://support.backlog.com/hc/en-us/articles/360035098894-Customize-issue-status) が4つの英語名を記載） |
 | 既定ステータスの ID | **全プロジェクト共通で 1 / 2 / 3 / 4 の固定値**（実測）。プロジェクト固有の ID ではない |
 | 既定ステータスの削除 | **できない**（実測）。`Default status cannot be deleted. id: 1` が返る |
 | 既定ステータスのリネーム・色変更 | **できない**（実測）。`PATCH` は `No such status` を返す。プロジェクト固有のステータスしか更新対象にならない |
@@ -342,6 +343,20 @@ yyyy-MM-dd の String（[Add Custom Field](https://developer.nulab.com/docs/back
 | `GET /teams` にメンバーが含まれるか | **含まれる。** `members[]` にユーザーオブジェクトの配列 |
 | `issues/count` が数える範囲 | **完了済みを含む全件。** 全件数が、ステータス別に数えた件数の合計と一致することを確認した |
 | 課題種別の色 | **10色の固定パレット**（観測による。拒否挙動は未確認） |
+
+## 実装中に見つかった未検証事項
+
+いずれも実装を進められる形（安全側の既定、または通常形の採用）にしてあるが、裏が取れていない。
+
+| # | 確認すること | 現在の扱い |
+| --- | --- | --- |
+| 1 | `GET /projects/:key/versions` と `GET /projects/:key/customFields` が返す日付の形式 | 時刻付きで返る場合に毎回差分が出るのを避けるため、read で先頭10文字（`yyyy-MM-dd`）に切り詰めている。タイムゾーン次第で1日ずれる可能性が残る |
+| 2 | カテゴリー / マイルストーン / カスタム属性 / Webhook の更新・削除のパス | リファレンスに記録が無いので Backlog API の通常形（`PATCH` / `DELETE /api/v2/projects/:key/{categories\|versions\|customFields\|webhooks}/:id`）を使っている |
+| 3 | プロジェクトメンバー / チーム / 管理者の**削除**エンドポイント | 追加系しか記録が無い。同じパスへの `DELETE` と、追加時と同じパラメータ（`userId` / `teamId`）を使っている |
+| 4 | `PATCH` でカスタム属性の `typeId` を変更できるか | 型変更を差分として出す以上、更新リクエストに `typeId` を載せている |
+| 5 | `GET /rateLimit` の本文の構造 | `{ rateLimit: { read \| update: { limit, remaining, reset } } }` と仮定。読めなければ 429 の再試行を諦める（勝手な既定秒数で待たない） |
+
+1〜4 はいずれも**確認に書き込みを伴う**。5 は読み取りだけで確認できる。
 
 ## 残る未検証事項
 

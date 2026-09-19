@@ -342,7 +342,7 @@ FR-2 の具体。**すべて適用開始前に判定する。**
 | V-A9 | `issueTypes` が1件以上ある | エラー |
 | V-A10 | `customFields[].applicableIssueTypes` が `issueTypes` に存在する名前を参照している | エラー |
 | V-A11 | カスタム属性の型ごとの必須パラメータが揃っている（リスト型の `items` など） | エラー |
-| V-A12 | `settings.grandchildIssueEnabled` が真なら `settings.subtaskingEnabled` も真 | エラー |
+| V-A12 | `settings.grandchildIssueEnabled` が真なら `settings.subtaskingEnabled` も真（省略時は現状の値で判定するため[スナップショットが要る](../design/validation-pipeline.md#s6-スナップショット)） | エラー |
 | V-A13 | `access.teams` / `access.members` / `access.administrators` の各リスト内に重複が無い | エラー |
 | V-A14 | ステータスの並びが API の順序制約を満たす（未対応が先頭・完了が末尾・処理中が処理済みより前） | エラー |
 | V-A15 | 課題種別・カテゴリー・マイルストーン・カスタム属性の記述順が、適用後の表示順と一致する | 警告 |
@@ -353,6 +353,8 @@ FR-2 の具体。**すべて適用開始前に判定する。**
 | V-A20 | カスタム属性の `min` が `max` 以下である | エラー |
 | V-A21 | 個別の ID を持たないスキーマ上の型・制約（enum・`minLength`・数値範囲・日付パターンなど）に適合する | エラー |
 | V-A22 | `name` / `oldname` に `}` を含まない | エラー |
+| V-A23 | Yaml として妥当である | エラー |
+| V-A24 | `webhooks[].events` の数値が既知の activityTypeId である | 警告 |
 
 **V-A6 と V-A9 が依頼者要求 R-2 の中核。** いずれも実 API で裏を取った。
 
