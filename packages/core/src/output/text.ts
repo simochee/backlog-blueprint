@@ -67,12 +67,28 @@ export const APPLY_CONFIRMATION = [
   "  Enter a value: ",
 ].join("\n");
 
+/**
+ * 待機は X-1 の1秒間隔では流れない。`waitingSeconds` を持つ行が出るのは 429 を
+ * 受けたときだけである（§3.1 / core §7.1）。
+ */
+export type ProgressOutcome = "done" | "failed" | { waitingSeconds: number };
+
 export type ProgressLine = {
   /** `ExecutionEvent.actionStarted` の添字は0始まりなので、ここで +1 する（core §7） */
   index: number;
   total: number;
   action: Action;
-  outcome?: "done" | "failed";
+  outcome?: ProgressOutcome;
+};
+
+const outcomeSuffix = (outcome: ProgressOutcome | undefined): string => {
+  if (outcome === undefined) {
+    return "";
+  }
+
+  return typeof outcome === "string"
+    ? ` ${outcome}`
+    : ` rate limited, waiting ${outcome.waitingSeconds}s`;
 };
 
 export const renderProgress = (
@@ -81,9 +97,8 @@ export const renderProgress = (
 ): string => {
   const paint = painter(options.color === true);
   const counter = `[${String(index + 1).padStart(String(total).length)}/${total}]`;
-  const suffix = outcome === undefined ? "" : ` ${outcome}`;
 
-  return `${counter} ${actionLine(action, "progress", paint)} ...${suffix}`;
+  return `${counter} ${actionLine(action, "progress", paint)} ...${outcomeSuffix(outcome)}`;
 };
 
 export const renderApplyComplete = (applied: Action[]): string => {

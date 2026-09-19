@@ -118,6 +118,7 @@ export type {
   PlanJson,
   PlanReport,
   ProgressLine,
+  ProgressOutcome,
   ResultingOrder,
   Style,
   Summary,

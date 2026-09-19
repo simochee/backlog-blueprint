@@ -249,6 +249,20 @@ describe("レート制限", () => {
     expect(sentAt[1]! - sentAt[0]!).toBeGreaterThanOrEqual(1000);
   });
 
+  it("1秒間隔をあけるだけの待機は進捗に流さない", async () => {
+    const { ctx } = harness();
+
+    const events = await run(
+      [
+        anAction({ id: "issueTypes/create/1", name: "1" }),
+        anAction({ id: "issueTypes/create/2", name: "2" }),
+      ],
+      ctx,
+    );
+
+    expect(events.filter(({ type }) => type === "waiting")).toEqual([]);
+  });
+
   it("429 を受けるとリセット時刻まで待って送り直す", async () => {
     const resetAt = Math.floor(Date.now() / 1000) + 5;
     let attempts = 0;

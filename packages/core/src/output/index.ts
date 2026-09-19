@@ -27,5 +27,5 @@ export type { Paint, Style } from "./color";
 export type { DiagnosticOptions } from "./diagnostics";
 export type { ActionJson, ApplyJson, FailedJson, PlanJson, ValidateJson } from "./json";
 export type { PlanReport, ResultingOrder, Summary, ValidateReport } from "./report";
-export type { ProgressLine, TextOptions } from "./text";
+export type { ProgressLine, ProgressOutcome, TextOptions } from "./text";
 export type { ValueFormat } from "./value";

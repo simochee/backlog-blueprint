@@ -240,6 +240,17 @@ describe("apply の人間向け出力", () => {
     ).toBe("[ 2/10] ↻ refresh        reading back default issue types and statuses ... done");
   });
 
+  it("レート制限で待っている間は、残り秒数を進捗の行に足す", () => {
+    expect(
+      renderProgress({
+        index: 4,
+        total: executed().length,
+        action: actionOf("statuses/create/レビュー中"),
+        outcome: { waitingSeconds: 42 },
+      }),
+    ).toBe('[ 5/10] + status         "レビュー中" ... rate limited, waiting 42s');
+  });
+
   it("完了の行は追加・変更・削除の件数を伝える", () => {
     expect(renderApplyComplete(executed())).toBe(
       "Apply complete. 5 added, 3 changed, 1 destroyed.",

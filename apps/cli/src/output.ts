@@ -9,7 +9,9 @@ import {
   renderProgress,
   renderValidateJson,
   type Action,
+  type ExecutionEvent,
   type PlanReport,
+  type ProgressOutcome,
 } from "@backlog-blueprint/core";
 
 import { type Output, type OutputContext, type PlanResult } from "./ports";
@@ -32,6 +34,22 @@ const report = (context: OutputContext, plan: PlanResult): PlanReport => ({
 const block = (text: string): string => (text.endsWith("\n") ? text : `${text}\n`);
 
 type Started = { index: number; total: number; action: Action };
+
+/**
+ * `waiting` も行にする。捨てると、429 を受けて待っている間 apply が黙って
+ * 止まって見える（plan の出力仕様 §3.1）。
+ */
+const outcomeOf = (event: ExecutionEvent): ProgressOutcome | undefined => {
+  if (event.type === "actionSucceeded") {
+    return "done";
+  }
+
+  if (event.type === "actionFailed") {
+    return "failed";
+  }
+
+  return event.type === "waiting" ? { waitingSeconds: event.seconds } : undefined;
+};
 
 /**
  * 進捗の行を成否が分かってから書く。`renderProgress` は位置と結果を1行にまとめる
@@ -62,14 +80,11 @@ export const createOutput = (): Output => {
         return undefined;
       }
 
-      if (
-        started === undefined ||
-        (event.type !== "actionSucceeded" && event.type !== "actionFailed")
-      ) {
+      const outcome = outcomeOf(event);
+
+      if (started === undefined || outcome === undefined) {
         return undefined;
       }
-
-      const outcome = event.type === "actionSucceeded" ? "done" : "failed";
 
       return block(renderProgress({ ...started, outcome }, { color }));
     },
