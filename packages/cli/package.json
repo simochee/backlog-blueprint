@@ -1,0 +1,21 @@
+{
+  "name": "@simochee/backlog-blueprint",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "backlog-blueprint": "./dist/main.js"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@backlog-blueprint/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}
