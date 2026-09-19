@@ -2,6 +2,7 @@ import { type Action, type Change } from "../action";
 import { type Manifest, type Settings } from "../manifest";
 import { type Reconciler } from "../reconciler";
 import { asRecord, requiredNumber, requiredString } from "../api-response";
+import { defaultIssueTypeSlotRefs } from "./issue-types";
 import { sealer, type Seal } from "../secret";
 import { type Value } from "../value";
 
@@ -181,6 +182,12 @@ export const projectReconciler: Reconciler<ProjectDesired, ProjectSnapshot> = {
       kind: "project",
       op: "refresh",
       name: desired.key,
+      /**
+       * 既定課題種別の枠に与える名前を、枠の位置の順に並べて持つ（§4.1 / RF-1）。
+       * 取得した既定は名前を持たないものとして扱うので、i 番目をどの名前で
+       * 解決表に載せるかは、計画の側からしか渡せない。
+       */
+      provides: defaultIssueTypeSlotRefs(ctx.manifest.issueTypes),
       writeRequest: false,
     };
 

@@ -12,7 +12,7 @@ import { type Action, type ProvidedRef } from "./action";
 import { asArrayOf, asRecord, requiredNumber, requiredString } from "./api-response";
 import { type ExecuteContext, type ExecutionEvent } from "./execution";
 import { resolveRequest } from "./ref";
-import { defaultSlotName, type ResolutionKey } from "./resolution";
+import { type ResolutionKey } from "./resolution";
 import { type ResourceKind } from "./resource";
 
 const WRITE_INTERVAL_MS = 1000;
@@ -30,9 +30,10 @@ const RATE_LIMIT_RETRY_LIMIT = 3;
  */
 const REFRESHED = [
   /**
-   * 課題種別だけ位置キーも登録する。新規プロジェクトの計画は既定の表示名を知らず、
-   * 枠の位置でしか既定4件を指せない（§4.1）。ステータスは ID が 1〜4 の固定値なので
-   * 位置で指す必要がない。
+   * 課題種別だけ Action の `provides` を位置の順に当てる。既定の表示名はスペースの
+   * 言語設定で変わり、新規プロジェクトでは取得するまで分からないので、返ってきた名前で
+   * 登録すると計画が指す名前と食い違う（§4.1）。ステータスは ID が 1〜4 の固定値で、
+   * 計画が名前ではなく ID で指すため、返ってきた名前をそのまま使ってよい。
    */
   {
     kind: "issueType",
@@ -176,9 +177,10 @@ export const execute = async function* (
     return [...registered.values()];
   };
 
-  const refresh = async (): Promise<Outcome> => {
+  const refresh = async (action: Action): Promise<Outcome> => {
     const responses: unknown[] = [];
     const resolved: { ref: ProvidedRef; id: number }[] = [];
+    const slots = action.provides ?? [];
 
     for (const { kind, path, positional } of REFRESHED) {
       const response = await ctx.get(path(ctx.projectKey));
@@ -186,12 +188,20 @@ export const execute = async function* (
       responses.push(response);
 
       for (const [slot, { id, name }] of toNamedResources(response).entries()) {
-        const names = positional ? [name, defaultSlotName(slot)] : [name];
+        /**
+         * 枠に当てる名前が無ければ登録しない。返ってきた名前で埋めると、計画が
+         * 知らない名前が解決表に入るだけでなく、利用者がその名前を書いていた場合に
+         * 別の枠を指させる（§4.1）。登録されなければ、その枠を指す Action が
+         * 未解決参照として止まる。
+         */
+        const ref = positional ? slots[slot] : { kind, name };
 
-        for (const registered of names) {
-          ctx.resolutions.set(`${kind}:${registered}`, id);
-          resolved.push({ ref: { kind, name: registered }, id });
+        if (ref === undefined) {
+          continue;
         }
+
+        ctx.resolutions.set(`${ref.kind}:${ref.name}`, id);
+        resolved.push({ ref, id });
       }
     }
 
@@ -220,7 +230,7 @@ export const execute = async function* (
   const perform = async (action: Action): Promise<Outcome> => {
     try {
       if (action.op === "refresh") {
-        return await refresh();
+        return await refresh(action);
       }
 
       if (action.request === undefined) {

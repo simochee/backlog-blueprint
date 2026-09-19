@@ -1,8 +1,7 @@
-import { type Action, type Change } from "../action";
+import { type Action, type Change, type ProvidedRef } from "../action";
 import { type IssueType } from "../manifest";
 import { type Reconciler } from "../reconciler";
 import { embedRef } from "../ref";
-import { defaultSlotName } from "../resolution";
 import { sealChanges, sealFields, sealer, type Seal } from "../secret";
 import { type IdOrRef, type Ref, type Value } from "../value";
 import {
@@ -38,7 +37,31 @@ const issueTypesPath = (key: string): string => `/api/v2/projects/${key}/issueTy
 
 const issueTypeRef = (name: string): Ref => ({ $ref: { kind: "issueType", name } });
 
-const slotRef = (slot: number): Ref => issueTypeRef(defaultSlotName(slot));
+/**
+ * 引き継ぐ枠は、枠の識別子ではなくマニフェストの名前で指す（§4.1）。中間の識別子を
+ * 作ると利用者の名前と同じ名前空間に入り、その表記を名前に書かれたときに黙って
+ * 別の枠を書き換える。解決表は RF-1 の `refresh` が i 番目の既定を
+ * マニフェストの i 番目の名前で登録するので、最初から最終的な名前で引ける。
+ */
+const slotPosition = (slot: number): string => String(slot);
+
+/** 余った枠だけは対応する名前が無いので、位置を別の名前空間（§2.1）で指す */
+const spareSlotRef = (slot: number): Ref => ({
+  $ref: { kind: "issueTypeSlot", name: slotPosition(slot) },
+});
+
+/**
+ * `refresh` が「どの枠をどの名前で登録するか」を持つ唯一の場所（RF-1）。枠の割り当ては
+ * ここでしか決まらないので、`project` の reconciler に同じ規則を書き写さない。
+ */
+export const defaultIssueTypeSlotRefs = (desired: IssueType[]): ProvidedRef[] =>
+  Array.from({ length: DEFAULT_ISSUE_TYPE_SLOTS }, (_, slot): ProvidedRef => {
+    const adopted = desired[slot];
+
+    return adopted === undefined
+      ? { kind: "issueTypeSlot", name: slotPosition(slot) }
+      : { kind: "issueType", name: adopted.name };
+  });
 
 const basePath = (index: number): string => `issueTypes/${index}`;
 
@@ -96,18 +119,18 @@ const createAction = (
   index: number,
   key: string,
   seal: Seal,
-  slot?: number,
+  adoptsSlot = false,
 ): Action => ({
   id: `issueTypes/create/${item.name}`,
   phase: 2,
   kind: "issueType",
   op: "create",
   name: item.name,
-  ...(slot === undefined ? {} : { target: slotRef(slot) }),
+  ...(adoptsSlot ? { target: issueTypeRef(item.name) } : {}),
   request: {
-    ...(slot === undefined
-      ? { method: "POST" as const, path: issueTypesPath(key) }
-      : { method: "PATCH" as const, path: memberPath(key, slotRef(slot)) }),
+    ...(adoptsSlot
+      ? { method: "PATCH" as const, path: memberPath(key, issueTypeRef(item.name)) }
+      : { method: "POST" as const, path: issueTypesPath(key) }),
     params: sealFields(declaredFields(item), basePath(index), seal),
   },
   provides: [{ kind: "issueType", name: item.name }],
@@ -118,30 +141,29 @@ const createAction = (
 const planDefaults = (desired: IssueType[], slots: number, key: string, seal: Seal): Action[] => {
   const adopted = desired
     .slice(0, slots)
-    .map((item, slot) => createAction(item, slot, key, seal, slot));
+    .map((item, slot) => createAction(item, slot, key, seal, true));
   const creates = desired
     .slice(slots)
     .map((item, offset) => createAction(item, slots + offset, key, seal));
   const substitute = desired.at(0);
-  const spare = Array.from({ length: Math.max(0, slots - desired.length) }, (_, offset) => {
-    const slot = desired.length + offset;
-
-    return { slot, name: defaultSlotName(slot) };
-  });
+  const spare = Array.from(
+    { length: Math.max(0, slots - desired.length) },
+    (_, offset) => desired.length + offset,
+  );
 
   const deletes =
     substitute === undefined
       ? []
-      : spare.map(({ slot, name }): Action => ({
-          id: `issueTypes/delete/${name}`,
+      : spare.map((slot): Action => ({
+          id: `issueTypes/delete/slot/${slotPosition(slot)}`,
           phase: 2,
           kind: "issueType",
           op: "delete",
-          name,
-          target: slotRef(slot),
+          name: slotPosition(slot),
+          target: spareSlotRef(slot),
           request: {
             method: "DELETE",
-            path: memberPath(key, slotRef(slot)),
+            path: memberPath(key, spareSlotRef(slot)),
             params: { substituteIssueTypeId: issueTypeRef(substitute.name) },
           },
           writeRequest: true,

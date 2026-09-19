@@ -10,12 +10,15 @@ export {
 } from "./manifest";
 export { seedResolutions } from "./plan";
 export { embedRef, resolutionKey, resolvePath, resolveRef, resolveRequest } from "./ref";
-export { defaultSlotName } from "./resolution";
 export { RESOURCE_KINDS } from "./resource";
 export { accessReconciler } from "./resources/access";
 export { categoriesReconciler } from "./resources/categories";
 export { customFieldsReconciler } from "./resources/custom-fields";
-export { DEFAULT_ISSUE_TYPE_SLOTS, issueTypesReconciler } from "./resources/issue-types";
+export {
+  DEFAULT_ISSUE_TYPE_SLOTS,
+  defaultIssueTypeSlotRefs,
+  issueTypesReconciler,
+} from "./resources/issue-types";
 export { milestonesReconciler } from "./resources/milestones";
 export { projectReconciler } from "./resources/project";
 export { DEFAULT_STATUSES, statusesReconciler } from "./resources/statuses";

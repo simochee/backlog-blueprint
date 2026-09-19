@@ -10,6 +10,7 @@ import { Secret } from "../secret";
 import { type IssueType } from "../manifest";
 import {
   DEFAULT_ISSUE_TYPE_SLOTS,
+  defaultIssueTypeSlotRefs,
   issueTypesReconciler,
   type ExistingIssueType,
 } from "./issue-types";
@@ -207,10 +208,10 @@ describe("未作成のプロジェクト", () => {
       {
         id: "issueTypes/create/調査",
         op: "create",
-        target: { $ref: { kind: "issueType", name: "#0" } },
+        target: { $ref: { kind: "issueType", name: "調査" } },
         request: {
           method: "PATCH",
-          path: "/api/v2/projects/PROJ_A/issueTypes/{$ref:issueType:#0}",
+          path: "/api/v2/projects/PROJ_A/issueTypes/{$ref:issueType:調査}",
           params: { name: "調査", color: "#2779ca" },
         },
         provides: [{ kind: "issueType", name: "調査" }],
@@ -218,9 +219,44 @@ describe("未作成のプロジェクト", () => {
       {
         id: "issueTypes/create/バグ",
         op: "create",
-        target: { $ref: { kind: "issueType", name: "#1" } },
+        target: { $ref: { kind: "issueType", name: "バグ" } },
       },
     ]);
+  });
+
+  it("引き継ぐ枠は、枠の位置ではなくその要素自身の名前で指す", () => {
+    const actions = planNewProject([
+      { name: "#1", color: "#2779ca" },
+      { name: "X", color: "#990000" },
+    ]);
+
+    expect(actions.map(({ target }) => target)).toEqual([
+      { $ref: { kind: "issueType", name: "#1" } },
+      { $ref: { kind: "issueType", name: "X" } },
+      { $ref: { kind: "issueTypeSlot", name: "2" } },
+      { $ref: { kind: "issueTypeSlot", name: "3" } },
+    ]);
+  });
+
+  it("枠に与える名前は、余った枠だけが位置で、それ以外はマニフェストの記述順の名前になる", () => {
+    expect(defaultIssueTypeSlotRefs([{ name: "調査", color: "#2779ca" }])).toEqual([
+      { kind: "issueType", name: "調査" },
+      { kind: "issueTypeSlot", name: "1" },
+      { kind: "issueTypeSlot", name: "2" },
+      { kind: "issueTypeSlot", name: "3" },
+    ]);
+  });
+
+  it("既定の枠より多く書いても、枠に与える名前は4件で止まる", () => {
+    const desired: IssueType[] = [
+      { name: "A", color: "#e30000" },
+      { name: "B", color: "#990000" },
+      { name: "C", color: "#934981" },
+      { name: "D", color: "#814fbc" },
+      { name: "E", color: "#2779ca" },
+    ];
+
+    expect(defaultIssueTypeSlotRefs(desired).map(({ name }) => name)).toEqual(["A", "B", "C", "D"]);
   });
 
   it("枠を引き継いでも、利用者が書いていない改名は注記しない", () => {
@@ -253,15 +289,15 @@ describe("未作成のプロジェクト", () => {
     const actions = planNewProject([{ name: "調査", color: "#2779ca" }]);
 
     expect(actions.slice(1).map(({ id, op }) => [id, op])).toEqual([
-      ["issueTypes/delete/#1", "delete"],
-      ["issueTypes/delete/#2", "delete"],
-      ["issueTypes/delete/#3", "delete"],
+      ["issueTypes/delete/slot/1", "delete"],
+      ["issueTypes/delete/slot/2", "delete"],
+      ["issueTypes/delete/slot/3", "delete"],
     ]);
     expect(actions.at(-1)).toMatchObject({
-      target: { $ref: { kind: "issueType", name: "#3" } },
+      target: { $ref: { kind: "issueTypeSlot", name: "3" } },
       request: {
         method: "DELETE",
-        path: "/api/v2/projects/PROJ_A/issueTypes/{$ref:issueType:#3}",
+        path: "/api/v2/projects/PROJ_A/issueTypes/{$ref:issueTypeSlot:3}",
         params: { substituteIssueTypeId: { $ref: { kind: "issueType", name: "調査" } } },
       },
     });

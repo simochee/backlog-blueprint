@@ -1,9 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { recordingSend } from "../../test-utils/src/index";
-import { type Action, type HttpRequest } from "./action";
+import {
+  fixedPlanContext,
+  fixedSnapshot,
+  fixedManifest,
+  recordingSend,
+} from "../../test-utils/src/index";
+import { type Action, type HttpRequest, type ProvidedRef } from "./action";
 import { type ExecuteContext, type ExecutionEvent } from "./execution";
 import { execute } from "./executor";
+import { DEFAULT_ISSUE_TYPE_SLOTS, issueTypesReconciler } from "./resources/issue-types";
+import { projectReconciler } from "./resources/project";
 import { type ResolutionTable } from "./resolution";
 import { Secret } from "./secret";
 
@@ -44,12 +51,13 @@ const aNoop = (name: string): Action => ({
   writeRequest: false,
 });
 
-const aRefresh = (): Action => ({
+const aRefresh = (provides: ProvidedRef[] = []): Action => ({
   id: "project/refresh",
   phase: 1,
   kind: "project",
   op: "refresh",
   name: "PROJ",
+  provides,
   writeRequest: false,
 });
 
@@ -60,6 +68,11 @@ const REFRESH_RESPONSES: Record<string, unknown> = {
   ],
   "/api/v2/projects/PROJ/statuses": [{ id: 1, name: "未対応" }],
 };
+
+const ADOPTED_SLOTS: ProvidedRef[] = [
+  { kind: "issueType", name: "調査" },
+  { kind: "issueTypeSlot", name: "1" },
+];
 
 const rateLimitBody = (resetAtSeconds: number) => ({
   rateLimit: {
@@ -160,28 +173,38 @@ describe("適用の進行", () => {
 
   it("再取得は更新系ではないが実行される", async () => {
     const { ctx } = harness();
-    const events = await run([aRefresh()], ctx);
+    const events = await run([aRefresh(ADOPTED_SLOTS)], ctx);
 
     expect(typesOf(events)).toEqual(["started", "actionStarted", "actionSucceeded", "finished"]);
-    expect(ctx.resolutions.get("issueType:バグ")).toBe(302);
+    expect(ctx.resolutions.get("issueType:調査")).toBe(301);
     expect(ctx.resolutions.get("status:未対応")).toBe(1);
   });
 
-  it("既定の課題種別は名前と、返ってきた順の枠の両方で引けるようになる", async () => {
+  it("既定の課題種別は、返ってきた順に計画が与えた名前で登録される", async () => {
     const { ctx } = harness();
 
-    await run([aRefresh()], ctx);
+    await run([aRefresh(ADOPTED_SLOTS)], ctx);
 
-    expect(ctx.resolutions.get("issueType:#0")).toBe(301);
-    expect(ctx.resolutions.get("issueType:#1")).toBe(302);
+    expect(ctx.resolutions.get("issueType:調査")).toBe(301);
+    expect(ctx.resolutions.get("issueTypeSlot:1")).toBe(302);
   });
 
-  it("ステータスは ID が固定値なので枠では登録しない", async () => {
+  it("既定の課題種別は、Backlog が返した表示名では登録しない", async () => {
     const { ctx } = harness();
 
-    await run([aRefresh()], ctx);
+    await run([aRefresh(ADOPTED_SLOTS)], ctx);
 
-    expect(ctx.resolutions.get("status:#0")).toBeUndefined();
+    expect(ctx.resolutions.get("issueType:タスク")).toBeUndefined();
+    expect(ctx.resolutions.get("issueType:バグ")).toBeUndefined();
+  });
+
+  it("ステータスは ID が固定値なので枠には当てず、返ってきた名前で登録する", async () => {
+    const { ctx } = harness();
+
+    await run([aRefresh(ADOPTED_SLOTS)], ctx);
+
+    expect(ctx.resolutions.get("status:未対応")).toBe(1);
+    expect(ctx.resolutions.get("status:調査")).toBeUndefined();
   });
 
   it("全件が成功すると finished で終わる", async () => {
@@ -386,5 +409,68 @@ describe("秘匿値の扱い", () => {
 
     expect(sent[0]?.params["hookUrl"]).toBe(hookUrl);
     expect(String(sent[0]?.params["hookUrl"])).toBe("***");
+  });
+});
+
+describe("新規プロジェクトの既定課題種別（§4.1）", () => {
+  const manifest = fixedManifest({
+    key: "PROJ",
+    issueTypes: [
+      { name: "#1", color: "#2779ca" },
+      { name: "X", color: "#990000" },
+    ],
+  });
+
+  const planNewProject = (): Action[] => {
+    const ctx = fixedPlanContext({
+      manifest,
+      snapshot: fixedSnapshot({ project: { exists: false } }),
+    });
+
+    return [
+      ...projectReconciler.plan(
+        { key: manifest.key, name: manifest.name, settings: manifest.settings },
+        { exists: false },
+        ctx,
+      ),
+      ...issueTypesReconciler.plan(
+        manifest.issueTypes,
+        { source: "defaults", slots: DEFAULT_ISSUE_TYPE_SLOTS },
+        ctx,
+      ),
+    ];
+  };
+
+  const defaults = {
+    "/api/v2/projects/PROJ/issueTypes": [
+      { id: 301, name: "タスク" },
+      { id: 302, name: "バグ" },
+      { id: 303, name: "要望" },
+      { id: 304, name: "その他" },
+    ],
+  };
+
+  it("枠の表記を課題種別の名前に使っても、枠ごとに別のリソースが操作される", async () => {
+    const { ctx, sent } = harness({ responses: defaults });
+
+    await run(planNewProject(), ctx);
+
+    expect(sent.filter(({ path }) => path.includes("/issueTypes")).map(({ path }) => path)).toEqual(
+      [
+        "/api/v2/projects/PROJ/issueTypes/301",
+        "/api/v2/projects/PROJ/issueTypes/302",
+        "/api/v2/projects/PROJ/issueTypes/303",
+        "/api/v2/projects/PROJ/issueTypes/304",
+      ],
+    );
+  });
+
+  it("余った枠の削除は、利用者の名前と交わらない枠の名前空間で解決される", async () => {
+    const { ctx } = harness({ responses: defaults });
+
+    await run(planNewProject(), ctx);
+
+    expect(ctx.resolutions.get("issueTypeSlot:2")).toBe(303);
+    expect(ctx.resolutions.get("issueTypeSlot:3")).toBe(304);
   });
 });
