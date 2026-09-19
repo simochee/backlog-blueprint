@@ -1,1 +1,7 @@
 export { Secret } from './secret'
+export type { Action, ActionId, Change, HttpRequest, Note, ProvidedRef } from './action'
+export type { PlanContext, ReadContext, Reconciler } from './reconciler'
+export type { ResolutionTable } from './resolution'
+export type { Op, Phase, ResourceKind } from './resource'
+export type { Snapshot } from './snapshot'
+export type { IdOrRef, Ref, Value } from './value'
