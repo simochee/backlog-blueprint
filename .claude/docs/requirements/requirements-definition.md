@@ -418,6 +418,10 @@ ERROR [V-B3] key: project already has issues
   → only projects with zero issues can be targeted
 ```
 
+先頭の集計行は**常に出す**。`N validation errors.` に続けて、
+`apply` のときだけ `Nothing has been applied.` を添える。
+`validate` と `plan` はもともと何も適用しないので、そこで言うと意味をなさない。
+
 ステータス名や課題種別名など、**利用者が Backlog 上で付けた名前はそのまま表示する**。
 翻訳の対象はツールが発するメッセージだけ。
 
