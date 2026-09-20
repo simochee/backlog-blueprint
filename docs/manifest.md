@@ -101,8 +101,11 @@ statuses:
 ```
 
 Everything else about statuses follows from Backlog's own constraints. There can be twelve at most,
-including the four. 未対応 must come first and 完了 last, and 処理中 must appear before 処理済み. A
-custom status takes its `color` from a fixed palette, which your editor offers as completions.
+including the four. 未対応 must come first and 完了 last, and 処理中 must appear before 処理済み.
+
+A custom status must have a `color`, chosen from a fixed palette that your editor offers as
+completions. This holds even for a custom status that already exists in Backlog, so that a manifest
+that worked on an existing project does not fail the day it is applied to a new one.
 
 The tool identifies the default statuses by ID rather than by name, so a space whose display
 language is not Japanese still works; write the names as that space shows them.
