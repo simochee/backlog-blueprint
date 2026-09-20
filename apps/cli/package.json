@@ -1,28 +1,52 @@
 {
   "name": "@simochee/backlog-blueprint",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.0",
+  "description": "Create a Backlog project from a YAML manifest: validate it, review the plan, then apply it.",
+  "keywords": [
+    "backlog",
+    "cli",
+    "infrastructure-as-code",
+    "manifest",
+    "nulab",
+    "project-management",
+    "yaml"
+  ],
+  "homepage": "https://github.com/simochee/backlog-blueprint#readme",
+  "bugs": "https://github.com/simochee/backlog-blueprint/issues",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/simochee/backlog-blueprint.git",
+    "directory": "apps/cli"
+  },
   "bin": {
     "backlog-blueprint": "./dist/main.js"
   },
+  "files": [
+    "dist"
+  ],
   "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "vite build --configLoader runner",
+    "prepack": "pnpm run build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests"
   },
-  "dependencies": {
+  "devDependencies": {
     "@backlog-blueprint/backlog-client": "workspace:*",
     "@backlog-blueprint/core": "workspace:*",
-    "commander": "catalog:"
-  },
-  "devDependencies": {
     "@backlog-blueprint/test-utils": "workspace:*",
     "@backlog-blueprint/tsconfigs": "workspace:*",
     "@types/node": "catalog:",
+    "commander": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }

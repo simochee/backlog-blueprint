@@ -88,17 +88,13 @@ importers:
         version: 5.9.3
 
   apps/cli:
-    dependencies:
+    devDependencies:
       '@backlog-blueprint/backlog-client':
         specifier: workspace:*
         version: link:../../packages/backlog-client
       '@backlog-blueprint/core':
         specifier: workspace:*
         version: link:../../packages/core
-      commander:
-        specifier: 'catalog:'
-        version: 15.0.0
-    devDependencies:
       '@backlog-blueprint/test-utils':
         specifier: workspace:*
         version: link:../../packages/test-utils
@@ -108,6 +104,9 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 24.13.5
+      commander:
+        specifier: 'catalog:'
+        version: 15.0.0
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
