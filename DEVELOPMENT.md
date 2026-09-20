@@ -141,6 +141,12 @@ not change is not rebuilt.
 
 ## Releasing
 
+The first release is pinned to `0.1.0` with a `Release-As: 0.1.0` footer on a commit, because
+release-please would otherwise read the whole history — 49 `feat` commits with no tag before them —
+and propose `0.2.0`. The schema URL carries the same version as the npm package (D-2), and the
+documentation already points at `schema/0.1.0/project.json`, so the first published version has to
+be that one.
+
 Nothing has been published yet. `.github/workflows/release.yml` and the release-please
 configuration next to it are in place but have never run.
 
