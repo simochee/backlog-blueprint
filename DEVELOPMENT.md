@@ -135,7 +135,7 @@ observable behavior should show up there.
 
 `.github/workflows/ci.yml` runs on every pull request and on every push to `main`. It is the five
 commands listed above — `lint`, `format:check`, `typecheck`, `build`, `test` — in a single job, on
-the Node version the CLI is built for, with the pnpm version from `packageManager` supplied by
+the Node version pinned in `mise.toml`, with the pnpm version from `packageManager` supplied by
 Corepack. The pnpm store and the turbo cache are both carried between runs, so a package that did
 not change is not rebuilt.
 

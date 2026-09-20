@@ -23,7 +23,8 @@
     "backlog-blueprint": "./dist/main.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md"
   ],
   "type": "module",
   "publishConfig": {
@@ -31,9 +32,10 @@
   },
   "scripts": {
     "build": "vite build --configLoader runner",
-    "prepack": "pnpm run build",
+    "prepack": "cp ../../README.md ./README.md && pnpm run build",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run --passWithNoTests",
+    "postpack": "rm -f ./README.md"
   },
   "devDependencies": {
     "@backlog-blueprint/backlog-client": "workspace:*",

@@ -3,3 +3,4 @@ dist/
 .turbo/
 *.tsbuildinfo
 .orca/
+apps/cli/README.md
