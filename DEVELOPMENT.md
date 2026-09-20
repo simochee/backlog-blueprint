@@ -198,10 +198,10 @@ and `.release-please-manifest.json` records the last version that was released �
    and creates the GitHub Release, and the second job of the same run builds the site, restores the
    schema versions already on Pages into it, deploys Pages, and publishes the CLI to npm — in that
    order, stopping at the first failure.
-4. **Write the GitHub Release body, in English. That part is a person's job.** release-please fills
-   the Release with the generated CHANGELOG entry, which is Japanese and addressed to whoever works
-   on this repository. The Release is what users of the CLI read, so replace that body with English
-   prose: what changed for them and what they have to do about it (NFR-9).
+4. Read the GitHub Release that release-please created. Its body is the generated CHANGELOG entry,
+   which needs no rewriting so long as the commit subjects were written for the people who read it.
+   Add prose above it only when a version asks something of its users — a manifest that has to be
+   rewritten, an option that no longer exists.
 
 The release pull request carries no CI run, because a pull request opened with `GITHUB_TOKEN` does
 not start workflows. Everything in it has already been checked on `main`; the only thing CI would
@@ -214,10 +214,13 @@ released that version and the second job would be skipped.
 
 ### CHANGELOG.md
 
-`CHANGELOG.md` at the repository root is generated from commit subjects, which are Japanese
-(AGENTS.md). It is **a record for whoever works on this repository**, not documentation for users;
-what users read is the GitHub Release body. Editing it by hand is pointless, as the next release
-rewrites it from the commits.
+`CHANGELOG.md` at the repository root is generated from commit subjects, which are English
+(AGENTS.md), and release-please puts the same text into the GitHub Release. It is therefore **what
+users read**, and a commit subject is worth writing with that in mind. Editing the file by hand is
+pointless, as the next release rewrites it from the commits.
+
+`0.1.0` is the exception. The commits it was generated from predate that rule and are Japanese, so
+its Release body was written by hand and does not match the file.
 
 Which types reach it is `changelog-sections` in `release-please-config.json`. Listed are `feat`,
 `fix`, `perf`, `revert`, `refactor` and `build` — the types that can change how the published CLI

@@ -95,7 +95,15 @@ depends on core — and turbo then refuses to build any task at all.
 - **Everything a user can see is English, and only English** (NFR-9): CLI output, the Web UI, and
   the descriptions inside the JSON Schema. No i18n machinery. Names that users gave their own
   Backlog resources are printed as they are and never translated.
-- **Commit messages are Japanese.**
+- **Commit messages are English**, subject and body alike. `CHANGELOG.md` is generated from the
+  subjects and release-please puts it straight into the GitHub Release, so a Japanese subject
+  arrives untranslated in front of people who were promised an English tool. Everything up to the
+  `v0.1.0` tag is Japanese and stays that way: those bodies are this project's record of why each
+  decision was taken, and translating them afterwards would replace the author's reasoning with
+  someone else's paraphrase.
+- **`.claude/docs/` stays Japanese.** It is written for whoever works on this repository, and the
+  decision identifiers a commit body cites — `V-A19`, `D-2`, `K-1` — read the same in either
+  language, so they are what joins an English commit to a Japanese document.
 
 ## TypeScript conventions
 
