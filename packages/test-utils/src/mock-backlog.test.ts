@@ -91,6 +91,22 @@ describe("カスタムステータスの削除", () => {
   });
 });
 
+describe("プロジェクト管理者の付与", () => {
+  it("スペース管理者は、プロジェクトに参加していても管理者にできない", async () => {
+    const backlog = space();
+    const reply = await call(
+      backlog,
+      "POST",
+      "/api/v2/projects/PROJ_A/administrators",
+      `userId=${YAMADA.id}`,
+    );
+
+    expect(reply.status).not.toBe(200);
+    expect(messageOf(reply)).toBe("Only normal-user role can be a project administrator.");
+    expect(backlog.project("PROJ_A")?.administrators).toEqual([]);
+  });
+});
+
 describe("プロジェクトの参加者", () => {
   it("既定ではチーム経由の参加者まで返る", async () => {
     const reply = await call(space(), "GET", "/api/v2/projects/PROJ_A/users");

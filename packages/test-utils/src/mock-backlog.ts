@@ -22,6 +22,8 @@ export type MockRequest = {
 /** `roleType` はスペース全体の権限。1 がスペース管理者（実測。research「権限」） */
 export type MockUser = { id: number; userId: string; roleType: number };
 
+const SPACE_ADMINISTRATOR_ROLE_TYPE = 1;
+
 export type MockTeam = { id: number; name: string };
 
 export type MockSpaceTeam = MockTeam & { members: MockUser[] };
@@ -859,10 +861,16 @@ export const mockBacklog = (options: MockBacklogOptions = {}): MockBacklog => {
       }
 
       /**
-       * チーム経由のみの参加者には管理者を付与できない（実測。`No such project member`）。
-       * 通す実装にすると、フェーズ7が「管理者の未参加者を必ず個人参加させる」順序で
-       * 並んでいることを受け入れが確かめられなくなる。
+       * スペース管理者には付与できない（A-5。実測。`Only normal-user role can be a
+       * project administrator.`）。チーム経由のみの参加者にも付与できない（実測。
+       * `No such project member`）。どちらも通す実装にすると、V-B11 が無くても、
+       * またフェーズ7が「管理者の未参加者を必ず個人参加させる」順序でなくても
+       * 受け入れが通ってしまう。
        */
+      if (method !== "DELETE" && user.roleType === SPACE_ADMINISTRATOR_ROLE_TYPE) {
+        failWith(BAD_REQUEST, "Only normal-user role can be a project administrator.");
+      }
+
       if (method !== "DELETE" && !project.members.some((joined) => joined.id === user.id)) {
         failWith(BAD_REQUEST, "No such project member.");
       }
