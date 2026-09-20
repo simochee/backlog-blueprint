@@ -111,7 +111,8 @@ Check it without touching Backlog at all:
 npx @simochee/backlog-blueprint validate -f projects/PROJ_A.yaml
 ```
 
-Point the tool at your space and see what would happen:
+Point the tool at your space and see what would happen. Here `PROJ_A` already exists and holds no
+issues:
 
 ```sh
 export BACKLOG_SPACE=example.backlog.com
@@ -123,10 +124,7 @@ npx @simochee/backlog-blueprint plan -f projects/PROJ_A.yaml
 
 ```
 Blueprint: PROJ_A (example.backlog.com)
-Project does not exist and will be created.
 
-  + project        PROJ_A  "プロジェクトA"
-  ↻ refresh        reading back default issue types and statuses
   ~ issueType      "バグ"
       templateSummary: (none) -> "【不具合】"
   ~ issueType      "調査"  renamed from "その他"
@@ -141,8 +139,8 @@ Warnings:
   ! [V-A16] access.members: "suzuki" already belongs to team "開発チーム"
       Remove it from access.members to save one write request.
 
-Plan: 5 to add, 3 to change, 1 to destroy, 5 unchanged.
-Write requests: 9 (estimated 9s)
+Plan: 4 to add, 3 to change, 1 to destroy, 5 unchanged.
+Write requests: 8 (estimated 8s)
 ```
 
 Then carry it out:
@@ -154,9 +152,11 @@ npx @simochee/backlog-blueprint apply -f projects/PROJ_A.yaml
 `apply` prints the same plan, asks for confirmation, and executes the write requests one at a time.
 
 Notice what the plan above does not contain: not a single issue type is created. Three of the four
-that Backlog sets up for a new project are kept — one of them renamed in place by `oldname` — and
-only the unused fourth is deleted. How a manifest is written is the main thing that decides how long
-a run takes, and [Writing a manifest](docs/manifest.md) explains why.
+that Backlog created with the project are kept — one of them renamed in place by `oldname` — and
+only the unused fourth is deleted. On a project that does not exist yet the picture is different:
+the default names cannot be known in advance, so the first four entries in `issueTypes` take over
+the four default slots, one request each. Either way, how a manifest is written is the main thing
+that decides how long a run takes, and [Writing a manifest](docs/manifest.md) explains why.
 
 ## Commands
 
