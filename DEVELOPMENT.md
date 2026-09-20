@@ -131,10 +131,18 @@ The acceptance criteria from the requirements (AC-1 to AC-10) are covered end to
 `apps/cli/src/acceptance.test.ts` and `apps/cli/src/end-to-end.test.ts`. A change to the CLI's
 observable behavior should show up there.
 
+## Continuous integration
+
+`.github/workflows/ci.yml` runs on every pull request and on every push to `main`. It is the five
+commands listed above — `lint`, `format:check`, `typecheck`, `build`, `test` — in a single job, on
+the Node version the CLI is built for, with the pnpm version from `packageManager` supplied by
+Corepack. The pnpm store and the turbo cache are both carried between runs, so a package that did
+not change is not rebuilt.
+
 ## Releasing
 
-Nothing has been released yet: `apps/cli/package.json` is still marked `private` at version `0.0.0`,
-and the repository contains no release workflow. What follows is what a release has to satisfy.
+Nothing has been published yet. `apps/cli/package.json` carries `0.1.0`, the version the first
+release will bear, and `.github/workflows/release.yml` is in place but has never run.
 
 A release consists of three artifacts that are produced from the same version number:
 
@@ -149,17 +157,42 @@ A release consists of three artifacts that are produced from the same version nu
 because the schema version and the CLI version are deliberately the same number (D-2) — the root
 `package.json` is private and its version means nothing.
 
-Three properties have to hold, and they are the reason this should be automated rather than done by
-hand:
+### Cutting one
+
+1. Bump `version` in `apps/cli/package.json` and merge that to `main`. Nothing derives the number
+   for you; it is the one place a release version is decided.
+2. Push the tag `v<version>`. The tag is the only trigger, and pushing one for a version that
+   `apps/cli/package.json` does not carry fails the run before anything is published.
+
+The workflow then builds the site, restores the schema versions already on Pages into it, deploys
+Pages, and publishes the CLI to npm — in that order, in one job, stopping at the first failure.
+
+### What the workflow has to guarantee
 
 - **npm publish and the Pages deployment happen together.** Publish a CLI whose schema URL is not on
-  Pages yet, and every editor pointed at that version silently stops offering completion. Put both
-  in one job and never let one half succeed alone (requirements-definition §7.1).
+  Pages yet, and every editor pointed at that version silently stops offering completion. Both are
+  steps of one job (requirements-definition §7.1), and Pages is deployed first: a schema URL that no
+  published CLI mentions yet harms nobody, whereas the reverse breaks completion with nothing to
+  see.
 - **Previously published schema versions survive the deployment.** Old manifests keep pointing at
-  old URLs and must keep working (D-3). The build only emits the version being released, so the
-  deployment has to add to what is already published rather than replace it.
+  old URLs and must keep working (D-3). The build emits only the version being released, and
+  `actions/deploy-pages` replaces the site wholesale, so the workflow asks npm which versions exist
+  — the same number as the schema version, by D-2 — downloads each `schema/<version>/project.json`
+  from the live site, and adds them to the artifact before uploading it. A package that npm does not
+  know yet is the first release and has nothing to preserve; any other failure to reach npm or Pages
+  aborts the release rather than quietly dropping a version.
 - **A breaking change to the manifest format bumps the major version** and ships as a new schema
   URL, leaving the old one in place. The CLI is then expected to recognize the superseded syntax and
   say how to rewrite it, rather than interpreting it in a way the author did not intend. The
   reasoning, and the automatic-migration command that was considered and deferred, are in
   [`.claude/docs/design/manifest-versioning.md`](.claude/docs/design/manifest-versioning.md).
+
+### What the repository has to provide
+
+The workflow cannot create any of these itself.
+
+| What                       | Value                                                              |
+| -------------------------- | ------------------------------------------------------------------ |
+| Pages source               | Settings, Pages, Build and deployment, Source: **GitHub Actions**  |
+| `NPM_TOKEN` secret         | An npm granular or automation token allowed to publish the package |
+| `github-pages` environment | Created by GitHub with the Pages source; must allow the `v*` tags  |
