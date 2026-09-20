@@ -367,6 +367,7 @@ yyyy-MM-dd の String（[Add Custom Field](https://developer.nulab.com/docs/back
 | CORS プリフライトと API キーの渡し方 | `Backlog-API-Key` ヘッダで可。`expose-headers` が無くレート制限ヘッダは読めない |
 | 更新系リクエストの本文の形式 | form-urlencoded、配列は `key[]` の繰り返し（[リクエストの形式](#リクエストの形式)） |
 | 管理者付与の前提 | 事前のプロジェクト参加が必須 |
+| 管理者にできる役割 | **スペース管理者はプロジェクト管理者になれない**。`Only normal-user role can be a project administrator.` が返る |
 | カテゴリー・マイルストーンの表示順 | いずれも作成順 |
 | `GET /projects/:key/administrators` の存在 | **存在する。** ユーザー配列を返す |
 | `GET /teams` にメンバーが含まれるか | **含まれる。** `members[]` にユーザーオブジェクトの配列 |
