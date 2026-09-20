@@ -19,8 +19,8 @@ surprise you.
   it is easier to never make it.
 - **Dates are plain strings.** `2026-10-01` and `"2026-10-01"` mean the same thing here. The tool
   never converts a date into a timestamp, so there is no timezone in the picture.
-- **One document per file.** A `---` separator starting a second document is an error rather than a
-  silently ignored half of the file.
+- **One document per file.** A `---` separator starting a second document is an error rather than
+  half a file that is silently ignored.
 - **Anchors and aliases work.** `&name` and `*name` are ordinary YAML and are expanded before
   anything else looks at the file.
 - **An unknown key is an error.** A misspelled key is never skipped over, and neither is a key from a
@@ -65,7 +65,7 @@ plan will delete one issue type and create another, because that is genuinely al
 available. On a project with no issues nothing is lost by that, which is exactly why the tool
 restricts itself to such projects.
 
-It still costs two write requests, and `oldname` is how you avoid them:
+It still costs two write requests, and `oldname` brings that down to one:
 
 ```yaml
 issueTypes:
@@ -112,8 +112,8 @@ display language is not Japanese still works; write the names as that space show
 project that does not exist yet, the Japanese and the English names are accepted.
 
 Issue types have no such protection. The four that Backlog creates — タスク, バグ, 要望, その他 —
-are deleted if the manifest does not mention them, subject to one floor: a project must always keep
-at least one issue type, so a manifest with an empty `issueTypes` is rejected before anything runs.
+are deleted if the manifest does not mention them, with one floor: a project must always keep at
+least one issue type, so a manifest with an empty `issueTypes` is rejected before anything runs.
 On a project that does not exist yet those four names are not known in advance, so the first four
 entries in `issueTypes` take over the four default slots whatever they are called, and a slot left
 over is deleted.
@@ -133,7 +133,7 @@ actually end up with, and warns when it differs from the file.
 One detail is easy to miss: a newly created custom status is inserted *before* 完了, not at the end.
 That is why applying a manifest that adds a status always ends with an explicit reordering request.
 
-## How long apply takes
+## How long `apply` takes
 
 Backlog's write APIs are meant to be called one at a time, about a second apart, and the tool does
 not try to be cleverer than that. So the number of write requests *is* the running time, which is

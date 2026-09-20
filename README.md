@@ -28,15 +28,21 @@ The internal design documents call the per-resource modules *reconcilers*, and `
 look familiar to anyone who has used Terraform. Only the vocabulary is borrowed: nothing watches the
 project after `apply` returns.
 
-Also deliberately out of scope: generating a manifest from an existing project, a form-based editor
-for the YAML, Git repositories (the Backlog API cannot create them), issues and wiki content, space
-settings, priorities and resolutions, and deleting or archiving a project.
+These are deliberately out of scope as well:
+
+- generating a manifest from an existing project
+- a form-based editor for the YAML
+- Git repositories, which the Backlog API cannot create
+- issues and wiki content
+- space settings
+- priorities and resolutions
+- deleting or archiving a project
 
 ## Before you start
 
-- A Backlog space, and an API key that belongs to a **space administrator**. This is required for
-  every run, whether the project is new or already exists, because the status APIs accept nothing
-  less. A project administrator's key is not enough.
+- You need a Backlog space, and an API key that belongs to a **space administrator**. The key is
+  required for every run, whether the project is new or already exists, because the status APIs
+  accept nothing less. A project administrator's key is not enough.
 - The API key is read from the `BACKLOG_API_KEY` environment variable and from nowhere else. There
   is no `--api-key` option, on purpose: an argument would be visible in `ps`, in shell history, and
   in CI command logs.
@@ -65,8 +71,8 @@ from CI.
 
 ## Quick start
 
-Write a manifest. The comment on the first line is what makes your editor complete and check the
-file — see [JSON Schema](#json-schema) below.
+Write a manifest. The comment on the first line is what gives your editor completion and validation
+for the file — see [JSON Schema](#json-schema) below.
 
 ```yaml
 # yaml-language-server: $schema=https://simochee.github.io/backlog-blueprint/schema/0.1.0/project.json
@@ -185,7 +191,7 @@ not only the first.
 | `--show-unchanged`   |                 |         | `plan`     | Also list the resources that already match  |
 | `-y, --auto-approve` |                 |         | `apply`    | Skip the confirmation prompt                |
 
-`-f` may be given once. One manifest is one project, and one command applies one manifest; to
+`-f` may be given only once. One manifest is one project, and one command applies one manifest; to
 process several, loop in the shell.
 
 With `--output json`, standard output carries nothing but the JSON document, so it can be piped
@@ -206,16 +212,16 @@ than waiting for an answer nobody will type.
 `plan` returning 2 is what makes it useful in CI: it separates "this manifest matches the space"
 from "this manifest would change something" without parsing the output.
 
-### When apply stops partway
+### When `apply` stops partway
 
 There is no rollback. Some resources cannot be deleted at all, so an automatic undo could only ever
 produce a differently broken project. Instead, `apply` stops at the failing request and prints what
 was applied, what failed, and what was never attempted.
 
-Running the same manifest again continues from where it stopped, because the work already done is
-recognized as already done. This depends on the project still having no issues at that point: if
-someone files one in the meantime, the run stops at validation and the project can no longer be
-managed with this tool.
+Running the same manifest again continues from where it stopped, because work that has already been
+applied is recognized and skipped. This depends on the project still having no issues at that
+point: if someone files one in the meantime, the run stops at validation and the project can no
+longer be managed with this tool.
 
 ## Web UI
 
@@ -236,8 +242,8 @@ The version in the URL is the version of the CLI, and old URLs are never removed
 keeps working on a manifest written years ago. Pointing at it with the
 `# yaml-language-server: $schema=...` comment gives you completion, inline documentation, and
 red squiggles for spelling mistakes. The schema is a convenience rather than the authority, though:
-the CLI runs a good deal that no schema can express, so a manifest your editor is happy with can
-still be rejected.
+the CLI performs many checks that no schema can express, so a manifest your editor is happy with
+can still be rejected.
 
 ## Further reading
 
@@ -246,9 +252,9 @@ still be rejected.
   write the file decides how long `apply` takes.
 - **[DEVELOPMENT.md](DEVELOPMENT.md)** — working on the tool itself.
 - **`.claude/docs/`** — the specification and the reasoning behind it: the requirements, the
-  measured behavior of the Backlog API that constrains the design, and the decision records every
-  error message's `[V-A6]`-style identifier points back to. Written in Japanese, and the only
-  authority when this README and those documents disagree.
+  measured behavior of the Backlog API that constrains the design, and the decision records that
+  the `[V-A6]`-style identifiers in error messages refer to. They are written in Japanese and are
+  the authority wherever this README disagrees with them.
 
 ## License
 

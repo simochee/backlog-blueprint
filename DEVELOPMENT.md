@@ -82,7 +82,7 @@ packages/
   tsconfigs/       @backlog-blueprint/tsconfigs — shared TypeScript configuration (B-4)
 ```
 
-`apps/` is what gets distributed, `packages/` is what they are built from (B-1). Every package is
+`apps/` is what gets distributed; `packages/` is what it is built from (B-1). Every package is
 ESM only.
 
 **`packages/core` holds all the behavior.** It parses the manifest, runs the validation stages,
@@ -95,8 +95,8 @@ itself: it is handed a `get` and a `send` function and calls them.
 separate package rather than living inside core for the reason described in AGENTS.md.
 
 **`packages/schema`** turns core's schema definition into the published JSON Schema document. It
-writes no files of its own; it returns a path and the contents, and the Web UI's Vite build emits
-them into the site, which is how the schema ends up next to `index.html` without any package gaining
+writes no files of its own: it returns a path and the contents, and the Web UI's Vite build emits
+them into the site. That is how the schema ends up next to `index.html` without any package gaining
 a dependency on Node.
 
 Inside core, one file per resource kind lives under `src/resources/`, and a single Executor carries
@@ -149,7 +149,7 @@ A release consists of three artifacts that are produced from the same version nu
 because the schema version and the CLI version are deliberately the same number (D-2) — the root
 `package.json` is private and its version means nothing.
 
-Three properties have to hold, and they are the reason this needs automating rather than doing by
+Three properties have to hold, and they are the reason this should be automated rather than done by
 hand:
 
 - **npm publish and the Pages deployment happen together.** Publish a CLI whose schema URL is not on
@@ -158,7 +158,7 @@ hand:
 - **Previously published schema versions survive the deployment.** Old manifests keep pointing at
   old URLs and must keep working (D-3). The build only emits the version being released, so the
   deployment has to add to what is already published rather than replace it.
-- **A breaking change to the manifest format raises the major version** and ships as a new schema
+- **A breaking change to the manifest format bumps the major version** and ships as a new schema
   URL, leaving the old one in place. The CLI is then expected to recognize the superseded syntax and
   say how to rewrite it, rather than interpreting it in a way the author did not intend. The
   reasoning, and the automatic-migration command that was considered and deferred, are in
