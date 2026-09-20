@@ -1,7 +1,8 @@
 # AGENTS.md
 
-Constraints for anyone — human or AI — changing this repository. Everything here is something that
-breaks, silently or loudly, if it is not observed.
+Constraints and conventions for anyone — human or AI — changing this repository. Break a constraint
+and the tool breaks with it, silently or loudly; break a convention and the next reader pays for it.
+Follow both.
 
 How to build, test and release is in [DEVELOPMENT.md](DEVELOPMENT.md), and the package layout is
 described there too. This file does not repeat it.
@@ -22,12 +23,14 @@ Every decision in the code traces back to a document there.
 - **Do not fill a gap in the specification by guessing.** When a decision is needed and no document
   makes it, stop and report it. The document gets the decision first, then the code.
 
-## The tool initializes a project once
+## Do not widen the target: one-shot initialization only
 
-It is not a control loop. There is no state file, no drift detection, and no support for a project
-that is already in use; the only targets are a project being created and a project that exists but
-has no issues (requirement-design §6, validation-pipeline §7). The `reconciler` vocabulary does not
-change that, and no change should quietly widen it.
+Keep the targets as they are — a project being created, and a project that exists but has no issues
+(requirement-design §6, validation-pipeline §7). Add no state file, no drift detection, and no
+support for a project that is already in use. The `reconciler` vocabulary is not a license to
+introduce any of them.
+
+## Never write from inside a reconciler
 
 Within core, a reconciler reads the current state and computes the difference. **It does not apply
 anything** (C-1). Every write goes through the single Executor, over the `Action[]` the reconcilers
