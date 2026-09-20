@@ -173,11 +173,20 @@ PO-3 の利点（そのまま監査・不具合報告に使える）ごと損な
 | V-B3 | 対象プロジェクトの課題件数が0（**確認できた**うえで0） | `GET /projects/:key` → `GET /issues/count` | エラー |
 | V-B4 | `access` のユーザー ID がスペースに存在する | `GET /users` | エラー |
 | V-B5 | `access` のチーム名がスペースに存在する | `GET /teams` | エラー |
+| V-B11 | `access.administrators` にスペース管理者（`roleType` が 1）が含まれていない | `GET /users` | エラー |
 | V-A6 | 既定ステータス（ID 1〜4）の名前がすべて `statuses` に含まれる。**既存プロジェクトはスナップショットの ID 1〜4、未作成は[日英2組の表](../research/backlog-api-constraints.md#既定リソースの表示名)で判定する**（どちらの組に一致しても通す） | `GET /projects/:key/statuses` | エラー |
 | V-A6a | 既定ステータスに `color` / `oldname` が無い | 同上 | エラー |
 | V-A26 | カスタムステータス（既定の ID 1〜4 以外）に `color` が指定されている | 同上 | エラー |
 | V-A14 | ステータスの並びが API の順序制約を満たす | 同上 | エラー |
 | V-A12 | `grandchildIssueEnabled` が真なら `subtaskingEnabled` も真。省略時は現状の値で判定し、**プロジェクトが未作成なら現状が無いのでエラー** | `GET /projects/:key` | エラー |
+
+**V-B11 は実 API でしか分からなかった制約である。** スペース管理者はプロジェクト管理者に
+なれない（`Only normal-user role can be a project administrator.`）。実行者は必ず
+スペース管理者なので（FR-5.4）、**実行者を `administrators` に書くと必ず失敗する**。
+判定に要るのは `GET /users` が返す `roleType` だけなので S6 に置く。
+
+`hint` では `members` に書く道を案内する。スペース管理者はプロジェクトに個人参加でき、
+参加していなくてもスペース管理者としてそのプロジェクトを操作できる。
 
 **V-B10 は撤回した。** `applicableIssueTypes` の絞りは
 `applicableIssueTypes[]=`（空の値を1つ）を送れば解除できることを実測で確認したため
