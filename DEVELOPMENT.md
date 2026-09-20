@@ -141,14 +141,14 @@ not change is not rebuilt.
 
 ## Releasing
 
-The first release is pinned to `0.1.0` with a `Release-As: 0.1.0` footer on a commit, because
-release-please would otherwise read the whole history — 49 `feat` commits with no tag before them —
-and propose `0.2.0`. The schema URL carries the same version as the npm package (D-2), and the
-documentation already points at `schema/0.1.0/project.json`, so the first published version has to
-be that one.
+The first release is `0.1.0`. `.release-please-manifest.json` starts at `0.0.0`, because nothing has
+been published yet, and the `feat` commits already in the history carry it to `0.1.0` on their own.
+The schema URL carries the same version as the npm package (D-2), and the documentation already
+points at `schema/0.1.0/project.json`, so the first published version has to be that one.
 
 Nothing has been published yet. `.github/workflows/release.yml` and the release-please
-configuration next to it are in place but have never run.
+configuration next to it are in place and run on every push to `main`, but no release pull request
+has been merged, so the npm package and the Pages site do not exist.
 
 A release consists of three artifacts that are produced from the same version number:
 
@@ -176,11 +176,14 @@ and the schema URL cannot disagree with each other.
 | anything else                           | `0.4.3`         |
 | `feat!:` or a `BREAKING CHANGE:` footer | `1.0.0`         |
 
-A version those rules do not produce — a first release, or a round number a rewrite of the manifest
-format deserves — is forced by putting `Release-As: 1.0.0` in the body of a commit on `main`.
+A version those rules do not produce — a round number that a rewrite of the manifest format deserves
+— is forced by putting `Release-As: 1.0.0` in the body of a commit on `main`. That commit has to
+change a file under `apps/cli/`: release-please attributes a commit to a package by the paths it
+touches, so a footer on a commit that only edits the repository root is never read.
 
 `release-please-config.json` points all of this at `apps/cli`, the only package that is published,
-and `.release-please-manifest.json` records the version the repository is currently at.
+and `.release-please-manifest.json` records the last version that was released — not the version in
+`apps/cli/package.json`, which is where release-please writes the next one.
 
 ### Cutting one
 
