@@ -218,7 +218,7 @@ describe("チーム経由の重複記述（V-A16）", () => {
         teams: [],
         members: [],
         administrators: [],
-        spaceUsers: [{ id: 9, userId: "suzuki" }],
+        spaceUsers: [{ id: 9, userId: "suzuki", roleType: 2 }],
         spaceTeams: [{ id: 3, name: "開発チーム", members: [{ id: 9, userId: "suzuki" }] }],
       },
     },

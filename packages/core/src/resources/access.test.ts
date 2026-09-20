@@ -14,13 +14,16 @@ const suzuki = { id: 11, userId: "suzuki" };
 const tanaka = { id: 12, userId: "tanaka" };
 const yamada = { id: 13, userId: "yamada" };
 
+/** `roleType` を返すのはスペースの利用者一覧だけで、プロジェクト側の取得には現れない */
+const inSpace = (user: { id: number; userId: string }) => ({ ...user, roleType: 2 });
+
 const developers = { id: 21, name: "開発チーム", members: [tanaka] };
 const qa = { id: 22, name: "QA", members: [] };
 
 const joined = (team: { id: number; name: string }) => ({ id: team.id, name: team.name });
 
 const SPACE = {
-  spaceUsers: [suzuki, tanaka, yamada],
+  spaceUsers: [suzuki, tanaka, yamada].map(inSpace),
   spaceTeams: [developers, qa],
 };
 
@@ -81,6 +84,16 @@ describe("現状の取得", () => {
     expect(snapshot.spaceUsers).toEqual(SPACE.spaceUsers);
     expect(snapshot.spaceTeams).toEqual(SPACE.spaceTeams);
     expect(snapshot).toMatchObject({ teams: [], members: [], administrators: [] });
+  });
+
+  it("スペースの利用者には roleType が含まれる", async () => {
+    const snapshot = await accessReconciler.read(
+      fixedReadContext(SPACE_RESPONSES, {
+        snapshot: fixedSnapshot({ project: { exists: false } }),
+      }),
+    );
+
+    expect(snapshot.spaceUsers.map(({ roleType }) => roleType)).toEqual([2, 2, 2]);
   });
 
   it("スペースのチームには所属者が含まれる", async () => {
@@ -233,9 +246,19 @@ describe("応答の検査", () => {
     ).rejects.toThrow(TypeError);
   });
 
+  it("スペースの利用者に roleType が無い応答も落ちる", async () => {
+    await expect(
+      accessReconciler.read(
+        fixedReadContext({ ...SPACE_RESPONSES, "/api/v2/users": [{ id: 1, userId: "suzuki" }] }),
+      ),
+    ).rejects.toThrow("roleType");
+  });
+
   it("ユーザーに userId が無い応答も落ちる", async () => {
     await expect(
-      accessReconciler.read(fixedReadContext({ ...SPACE_RESPONSES, "/api/v2/users": [{ id: 1 }] })),
+      accessReconciler.read(
+        fixedReadContext({ ...SPACE_RESPONSES, "/api/v2/users": [{ id: 1, roleType: 2 }] }),
+      ),
     ).rejects.toThrow("userId");
   });
 });

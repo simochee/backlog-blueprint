@@ -12,7 +12,7 @@ const MYSELF_PATH = "/api/v2/users/myself";
  * FR-5.4 が要求するのは新規・既存を問わず管理者であることなので、判定は
  * 「1 か、それ以外か」だけでよい。
  */
-const SPACE_ADMINISTRATOR_ROLE_TYPE = 1;
+export const SPACE_ADMINISTRATOR_ROLE_TYPE = 1;
 
 export type AuthStageResult = { diagnostics: Diagnostic[]; executor?: Snapshot["executor"] };
 

@@ -17,7 +17,7 @@ const snapshots = (overrides: Partial<ResourceSnapshots> = {}): ResourceSnapshot
     teams: [],
     members: [],
     administrators: [],
-    spaceUsers: [{ id: 11, userId: "suzuki" }],
+    spaceUsers: [{ id: 11, userId: "suzuki", roleType: 2 }],
     spaceTeams: [{ id: 21, name: "開発チーム", members: [] }],
   },
   webhooks: [],

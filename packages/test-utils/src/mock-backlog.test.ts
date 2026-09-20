@@ -2,13 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import { mockBacklog, type MockBacklog } from "./mock-backlog";
 
-const YAMADA = { id: 1, userId: "yamada" };
+const YAMADA = { id: 1, userId: "yamada", roleType: 1 };
 
-const TANAKA = { id: 2, userId: "tanaka" };
+const TANAKA = { id: 2, userId: "tanaka", roleType: 2 };
 
 const space = (): MockBacklog =>
   mockBacklog({
-    executor: { ...YAMADA, roleType: 1 },
+    executor: YAMADA,
     spaceUsers: [YAMADA, TANAKA],
     spaceTeams: [{ name: "開発チーム", members: ["tanaka"] }],
     projects: [

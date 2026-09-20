@@ -112,7 +112,7 @@ export const fixedSpaceResponses = (
   "/api/v2/projects/PROJ_A/users?excludeGroupMembers=true": [],
   "/api/v2/projects/PROJ_A/teams": [],
   "/api/v2/projects/PROJ_A/administrators": [],
-  "/api/v2/users": [{ id: 1, userId: "yamada" }],
+  "/api/v2/users": [{ id: 1, userId: "yamada", roleType: 1 }],
   "/api/v2/teams": [],
   ...overrides,
 });

@@ -6,6 +6,12 @@ import { type Value } from "../value";
 
 export type AccessUser = { id: number; userId: string };
 
+/**
+ * `roleType` はスペース全体の権限で、`GET /users` だけが返す（API 制約「権限」）。
+ * プロジェクト単位の取得には現れないので、`AccessUser` とは別の型にする。
+ */
+export type SpaceUser = AccessUser & { roleType: number };
+
 export type AccessTeam = { id: number; name: string };
 
 export type SpaceTeam = AccessTeam & { members: AccessUser[] };
@@ -14,7 +20,7 @@ export type AccessSnapshot = {
   teams: AccessTeam[];
   members: AccessUser[];
   administrators: AccessUser[];
-  spaceUsers: AccessUser[];
+  spaceUsers: SpaceUser[];
   spaceTeams: SpaceTeam[];
 };
 
@@ -49,6 +55,12 @@ const toUser = (value: unknown): AccessUser => {
 };
 
 const toUsers = (value: unknown): AccessUser[] => asArray(value).map((item) => toUser(item));
+
+const toSpaceUsers = (value: unknown): SpaceUser[] =>
+  asArray(value).map((item) => ({
+    ...toUser(item),
+    roleType: requiredNumber(asRecord(item), "roleType"),
+  }));
 
 const toTeam = (value: unknown): AccessTeam => {
   const team = asRecord(value);
@@ -123,7 +135,7 @@ export const accessReconciler: Reconciler<Access, AccessSnapshot> = {
   phase: PHASE,
 
   read: async ({ projectKey, snapshot, get }) => {
-    const spaceUsers = toUsers(await get("/api/v2/users"));
+    const spaceUsers = toSpaceUsers(await get("/api/v2/users"));
     const spaceTeams = toSpaceTeams(await get("/api/v2/teams"));
 
     if (snapshot.project.exists) {

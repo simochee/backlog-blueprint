@@ -144,7 +144,13 @@ export type { ResolveResult } from "./ref";
 export type { PlanContext, ReadContext, Reconciler } from "./reconciler";
 export type { ResolutionKey, ResolutionTable } from "./resolution";
 export type { Op, Phase, ResourceKind } from "./resource";
-export type { AccessSnapshot, AccessTeam, AccessUser, SpaceTeam } from "./resources/access";
+export type {
+  AccessSnapshot,
+  AccessTeam,
+  AccessUser,
+  SpaceTeam,
+  SpaceUser,
+} from "./resources/access";
 export type { CategoriesSnapshot, ExistingCategory } from "./resources/categories";
 export type { CustomFieldsSnapshot, ExistingCustomField } from "./resources/custom-fields";
 export type { ExistingIssueType, IssueTypesSnapshot } from "./resources/issue-types";

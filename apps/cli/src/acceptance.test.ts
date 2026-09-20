@@ -67,9 +67,9 @@ access:
   teams:
     - 開発チーム
   members:
-    - suzuki
-  administrators:
     - yamada
+  administrators:
+    - suzuki
 webhooks:
   - name: Slack 通知
     description: 課題の追加・更新を Slack に流す
@@ -81,22 +81,32 @@ webhooks:
 
 const withoutResolvedStatus = MANIFEST.replace("  - name: 処理済み\n", "");
 
+/** 実行者はスペース管理者なので、プロジェクト管理者にはできない（A-5） */
+const withExecutorAsAdministrator = MANIFEST.replace(
+  "  administrators:\n    - suzuki\n",
+  "  administrators:\n    - yamada\n",
+);
+
 const withoutNarrowedCustomField = MANIFEST.replace(
   "    applicableIssueTypes:\n      - バグ\n",
   "",
 );
 
-const YAMADA = { id: 1, userId: "yamada" };
+/**
+ * 実行者。スペース管理者なのでプロジェクト管理者にはなれず（A-5）、
+ * プロジェクトに残すなら `access.members` に書く。
+ */
+const YAMADA = { id: 1, userId: "yamada", roleType: 1 };
 
-const SUZUKI = { id: 2, userId: "suzuki" };
+const SUZUKI = { id: 2, userId: "suzuki", roleType: 2 };
 
 /** 開発チームにしか属さない人。マニフェストの `access.members` には出てこない */
-const TANAKA = { id: 3, userId: "tanaka" };
+const TANAKA = { id: 3, userId: "tanaka", roleType: 2 };
 
 /** どの受け入れも同じスペースから始める。違うのは投入する前提だけ */
 const space = (options: MockBacklogOptions = {}): MockBacklog =>
   mockBacklog({
-    executor: { ...YAMADA, roleType: 1 },
+    executor: YAMADA,
     spaceUsers: [YAMADA, SUZUKI, TANAKA],
     spaceTeams: [{ name: "開発チーム", members: ["tanaka"] }],
     ...options,
@@ -257,8 +267,8 @@ describe("受け入れ基準", () => {
       },
     ]);
     expect(project?.teams.map(({ name }) => name)).toEqual(["開発チーム"]);
-    expect(project?.members.map(({ userId }) => userId)).toEqual(["suzuki", "yamada"]);
-    expect(project?.administrators.map(({ userId }) => userId)).toEqual(["yamada"]);
+    expect(project?.members.map(({ userId }) => userId)).toEqual(["yamada", "suzuki"]);
+    expect(project?.administrators.map(({ userId }) => userId)).toEqual(["suzuki"]);
     expect(project?.webhooks).toEqual([
       {
         id: expect.any(Number),
@@ -302,8 +312,19 @@ describe("受け入れ基準", () => {
     expect(backlog.writes).toEqual([]);
   });
 
+  it("実行者をプロジェクト管理者にするマニフェストを apply すると、V-B11 のエラーで中断し、Backlog は一切変更されていない", async () => {
+    const backlog = space();
+    const { io, code } = apply(backlog, withExecutorAsAdministrator);
+
+    await expect(code).resolves.toBe(1);
+    expect(io.stderr).toContain("ERROR [V-B11]");
+    expect(io.stderr).toContain("access.members");
+    expect(backlog.reads.length).toBeGreaterThan(0);
+    expect(backlog.writes).toEqual([]);
+  });
+
   it("一般ユーザーの API キーで apply すると、V-B2 のエラーで中断する", async () => {
-    const backlog = space({ executor: { ...SUZUKI, roleType: 2 } });
+    const backlog = space({ executor: SUZUKI });
     const { io, code } = apply(backlog, MANIFEST);
 
     await expect(code).resolves.toBe(1);

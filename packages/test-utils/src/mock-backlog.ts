@@ -19,7 +19,8 @@ export type MockRequest = {
   body: string;
 };
 
-export type MockUser = { id: number; userId: string };
+/** `roleType` はスペース全体の権限。1 がスペース管理者（実測。research「権限」） */
+export type MockUser = { id: number; userId: string; roleType: number };
 
 export type MockTeam = { id: number; name: string };
 
@@ -110,7 +111,7 @@ export type MockFailure = {
 };
 
 export type MockBacklogOptions = {
-  executor?: MockUser & { roleType: number };
+  executor?: MockUser;
   rateLimit?: { limit: number; remaining: number; reset: number };
   spaceUsers?: MockUser[];
   spaceTeams?: { name: string; members?: string[] }[];

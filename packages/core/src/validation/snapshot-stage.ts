@@ -11,6 +11,7 @@ import {
   type StatusesSnapshot,
 } from "../resources/statuses";
 import { type Snapshot } from "../snapshot";
+import { SPACE_ADMINISTRATOR_ROLE_TYPE } from "./auth-stage";
 
 /**
  * 位置を持たせない（DG-5）。S6 の判定はマニフェストだけでは成り立たず、
@@ -269,6 +270,28 @@ const spaceMembers = (manifest: Manifest, access: AccessSnapshot): Diagnostic[] 
 };
 
 /**
+ * スペース管理者はプロジェクト管理者になれない（A-5。`Only normal-user role can be
+ * a project administrator.`）。実行者は必ずスペース管理者（FR-5.4）なので、
+ * 自分を `administrators` に書いた計画は適用の途中で必ず落ちる。
+ */
+const spaceAdministrators = (manifest: Manifest, access: AccessSnapshot): Diagnostic[] => {
+  const roleTypes = new Map(access.spaceUsers.map(({ userId, roleType }) => [userId, roleType]));
+
+  return manifest.access.administrators.flatMap((userId, index) =>
+    roleTypes.get(userId) === SPACE_ADMINISTRATOR_ROLE_TYPE
+      ? [
+          snapshotDiagnostic(
+            "V-B11",
+            `access/administrators/${index}`,
+            `"${userId}" is a space administrator, and a space administrator cannot be a project administrator`,
+            `remove "${userId}" from access.administrators. to keep them in the project, write "${userId}" under access.members instead: a space administrator can operate the project without joining it`,
+          ),
+        ]
+      : [],
+  );
+};
+
+/**
  * 省略された `subtaskingEnabled` を `false` と見なさない（K-3）。送らなければ現状が
  * 保たれるので、真かどうかは現状を見なければ決まらない。現状を持たない S4 に
  * 置けないのはこのためである。
@@ -327,6 +350,7 @@ export const validateAgainstSnapshot = ({
 }: SnapshotStageInput): Diagnostic[] => [
   ...issueCount(manifest, snapshot),
   ...spaceMembers(manifest, snapshots.access),
+  ...spaceAdministrators(manifest, snapshots.access),
   ...statusDiagnostics(manifest, snapshots.statuses),
   ...grandchildIssues(manifest, snapshots.project),
 ];

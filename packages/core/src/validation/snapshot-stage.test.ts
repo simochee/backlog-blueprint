@@ -92,7 +92,7 @@ describe("access が指す相手の存在（V-B4 / V-B5）", () => {
               teams: [],
               members: [],
               administrators: [],
-              spaceUsers: [{ id: 9, userId: "suzuki" }],
+              spaceUsers: [{ id: 9, userId: "suzuki", roleType: 2 }],
               spaceTeams: [{ id: 3, name: "開発チーム", members: [] }],
             },
           },
@@ -106,6 +106,51 @@ describe("access が指す相手の存在（V-B4 / V-B5）", () => {
       "V-B4",
       "V-B5",
     ]);
+  });
+});
+
+const space = (users: { id: number; userId: string; roleType: number }[]) => ({
+  snapshots: {
+    access: { teams: [], members: [], administrators: [], spaceUsers: users, spaceTeams: [] },
+  },
+});
+
+describe("管理者にできる役割（V-B11）", () => {
+  const YAMADA = { id: 1, userId: "yamada", roleType: 1 };
+
+  const SATO = { id: 2, userId: "sato", roleType: 1 };
+
+  const SUZUKI = { id: 3, userId: "suzuki", roleType: 2 };
+
+  it("スペース管理者を administrators に書くと V-B11 で中断する", () => {
+    expect(idsOf({ access: { administrators: ["yamada"] } }, space([YAMADA]))).toEqual(["V-B11"]);
+  });
+
+  it("スペース管理者を members に書くのは通す", () => {
+    expect(idsOf({ access: { members: ["yamada"] } }, space([YAMADA]))).toEqual([]);
+  });
+
+  it("一般ユーザーを administrators に書くのは通す", () => {
+    expect(idsOf({ access: { administrators: ["suzuki"] } }, space([SUZUKI]))).toEqual([]);
+  });
+
+  it("スペース管理者が複数居れば全員挙げる", () => {
+    const diagnostics = validate(
+      { access: { administrators: ["yamada", "suzuki", "sato"] } },
+      space([YAMADA, SATO, SUZUKI]),
+    );
+
+    expect(diagnostics.map(({ id, path }) => [id, path])).toEqual([
+      ["V-B11", "access/administrators/0"],
+      ["V-B11", "access/administrators/2"],
+    ]);
+  });
+
+  it("members に書き直す道を案内する", () => {
+    const [diagnostic] = validate({ access: { administrators: ["yamada"] } }, space([YAMADA]));
+
+    expect(diagnostic?.message).toContain("yamada");
+    expect(diagnostic?.hint).toContain("access.members");
   });
 });
 
