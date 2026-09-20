@@ -256,6 +256,17 @@ The workflow cannot create any of these itself.
 | What                       | Value                                                                       |
 | -------------------------- | --------------------------------------------------------------------------- |
 | Pages source               | Settings, Pages, Build and deployment, Source: **GitHub Actions**           |
-| `NPM_TOKEN` secret         | An npm granular or automation token allowed to publish the package          |
+| npm trusted publisher      | On the package's npm settings: this repository, workflow `release.yml`, environment `github-pages` |
 | `github-pages` environment | Created by GitHub with the Pages source; must allow `main`                  |
 | Pull requests from Actions | Settings, Actions, General: **Allow GitHub Actions to create and approve pull requests** |
+
+The repository holds no npm token. npm accepts the release job's OIDC token instead, which is why
+`id-token: write` appears in its permissions and why `actions/setup-node` is not given
+`registry-url`.
+
+Trusted publishing cannot cover a package's first release, though. A trusted publisher is
+configured on a package's settings page, and a package nobody has published yet has no settings
+page ([npm/cli#8544](https://github.com/npm/cli/issues/8544)). `0.1.0` therefore has to be
+published by hand — `npm login`, then `pnpm --filter @simochee/backlog-blueprint publish` from a
+local checkout of the `v0.1.0` tag — and the trusted publisher configured once it exists. Every
+release after it is the workflow's.
