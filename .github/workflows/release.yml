@@ -1,0 +1,117 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One release at a time: two overlapping runs would race for the same Pages deployment and the
+# later one could publish a site assembled from a stale list of schema versions.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  # Kept in step with the `target: "node22"` of apps/cli/vite.config.ts and the `engines.node`
+  # of apps/cli/package.json.
+  NODE_VERSION: "22"
+  PACKAGE_NAME: "@simochee/backlog-blueprint"
+  PAGES_URL: "https://simochee.github.io/backlog-blueprint"
+
+jobs:
+  # The CLI on npm, the Web UI and the JSON Schema on Pages are one release produced from one
+  # version number. Publishing the CLI without the matching schema URL on Pages makes editor
+  # completion fail silently for everyone on that version, so both halves live in a single job
+  # and a failure in either one stops the rest (requirements-definition 7.1).
+  release:
+    name: Publish the CLI and deploy Pages
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The schema URL carries the CLI's version (D-2), and the site is built from
+      # apps/cli/package.json rather than from the tag. A tag that disagrees with it would
+      # publish a CLI whose $schema path was never built.
+      - name: Verify the tag matches the CLI version
+        run: |
+          set -euo pipefail
+          tag_version="${GITHUB_REF_NAME#v}"
+          package_version="$(jq -r .version apps/cli/package.json)"
+          if [ "$tag_version" != "$package_version" ]; then
+            echo "tag ${GITHUB_REF_NAME} does not match apps/cli/package.json version ${package_version}" >&2
+            exit 1
+          fi
+
+      - name: Build
+        run: pnpm run build
+
+      # D-3: a manifest written years ago must keep resolving its $schema URL. The build emits
+      # only the version being released and actions/deploy-pages replaces the whole site, so
+      # every schema already published is copied back into the artifact before it is uploaded.
+      # The npm registry is the list of released versions because the schema version and the
+      # CLI version are the same number (D-2).
+      - name: Merge previously published schema versions into the site
+        run: |
+          set -euo pipefail
+
+          error_log="$(mktemp)"
+          if ! published="$(npm view "${PACKAGE_NAME}" versions --json 2>"${error_log}")"; then
+            # Only "the package does not exist yet" is tolerated, which is the first release.
+            # Any other failure is fatal: carrying on with an empty list would silently drop
+            # every schema version already on Pages.
+            if grep -q "E404" "${error_log}"; then
+              echo "${PACKAGE_NAME} has no published version yet; nothing to preserve"
+              exit 0
+            fi
+            cat "${error_log}" >&2
+            exit 1
+          fi
+
+          echo "${published}" | jq -r 'if type == "array" then .[] else . end' | while read -r version; do
+            destination="apps/web/dist/schema/${version}/project.json"
+            if [ -e "${destination}" ]; then
+              continue
+            fi
+            curl --fail --silent --show-error --retry 3 --retry-delay 5 --create-dirs \
+              --output "${destination}" "${PAGES_URL}/schema/${version}/project.json"
+            echo "preserved schema ${version}"
+          done
+
+      - uses: actions/configure-pages@v6
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: apps/web/dist
+
+      # Pages goes before npm on purpose. A schema URL that no published CLI mentions yet is
+      # harmless, whereas a published CLI whose schema URL is not on Pages breaks completion
+      # for its users with no error to see (requirements-definition 7.1). If npm publish fails
+      # after this step, re-running the release rebuilds the same site and publishes again.
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v5
+
+      - name: Publish the CLI to npm
+        run: pnpm --filter "${PACKAGE_NAME}" publish --access public --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
