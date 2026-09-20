@@ -25,8 +25,8 @@ adopt it:
   it is now and computes what to do from the manifest alone.
 
 The internal design documents call the per-resource modules *reconcilers*, and `plan` / `apply` will
-look familiar to anyone who has used Terraform. The vocabulary is borrowed; the continuous
-reconciliation is not.
+look familiar to anyone who has used Terraform. Only the vocabulary is borrowed: nothing watches the
+project after `apply` returns.
 
 Also deliberately out of scope: generating a manifest from an existing project, a form-based editor
 for the YAML, Git repositories (the Backlog API cannot create them), issues and wiki content, space
@@ -43,7 +43,7 @@ settings, priorities and resolutions, and deleting or archiving a project.
 
 ### Security: who can change your space
 
-> **Push access to the repository that holds your manifests is, in practice, space administrator
+> **Push access to the repository that holds your manifests amounts to space administrator
 > access.**
 
 The API key a CI job uses belongs to a space administrator, so anyone who can push a change to a

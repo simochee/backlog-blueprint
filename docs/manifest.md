@@ -139,7 +139,7 @@ Backlog's write APIs are meant to be called one at a time, about a second apart,
 not try to be cleverer than that. So the number of write requests *is* the running time, which is
 why `plan` ends with a count of them and an estimate in seconds.
 
-Six things change that number, roughly in order of how much they are worth:
+Five things change that number, roughly in order of how much they are worth:
 
 **Match what already exists.** A resource whose name and attributes are identical to the one in
 Backlog produces no request at all. A template built on Backlog's four default issue types needs
@@ -148,7 +148,8 @@ happen — when it is applied to a project that already exists. On a new project
 entries cost one request each whatever they are called, so the saving there comes from staying
 within those four and from the other points below. Cleaning the defaults away is a real choice with
 a real price, and when you design an organization-wide template it is worth asking which parts can
-be made to agree with the defaults instead.
+be made to agree with the defaults instead. It is also why the plan in the README reports five
+unchanged resources and eight requests instead of thirteen.
 
 **Rename with `oldname` instead of replacing.** Two requests become one. Where a default cannot be
 kept as it is, renaming it is the next cheapest thing.
@@ -156,17 +157,12 @@ kept as it is, renaming it is the next cheapest thing.
 **Add people through teams.** A team is one request no matter how many people are in it, while
 twenty individual members are twenty requests.
 
-**Do not repeat yourself in `access`.** Someone who joins through a team does not need to appear in
-`members` as well; writing them there works but adds a request, and `plan` warns about it. People
-listed in `administrators` are added to the project automatically, so they do not need a `members`
-entry either.
+**Do not repeat yourself in `access`.** Someone already covered by a team, or by `administrators`,
+costs one more request if they appear in `members` as well; [`access`](#access) below says why.
 
-**Let the bulk keys stay bulk.** All of `settings` travels in a single request, so does the status
-order, and so do `applicableIssueTypes` and a webhook's `events`.
-
-**Leave matching resources alone.** Same name, same color, nothing sent. This is the tool's own
-behavior rather than something you write, but it is why `plan` can report five unchanged resources
-and nine requests instead of fourteen.
+**Some keys cost one request however large.** All of `settings` travels in a single request; so do
+the status order, `applicableIssueTypes`, and a webhook's `events`. Nothing you write there adds to
+the count.
 
 ## Values from the environment
 
@@ -189,13 +185,15 @@ Values that came from the environment are masked everywhere the tool prints anyt
 
 **Names are the exception.** A project `key`, any resource `name` or `oldname`, an entry in
 `access`, and a name in `applicableIssueTypes` are printed as they are even when they came from an
-environment variable, and `validate` warns when you do that. These are how the tool refers to a
-resource: they appear in the plan, in the identifiers the JSON output uses, and in the report you
-get if `apply` stops partway. Masking them would leave that report unable to say which resource it
-had reached — and it would be masking in name only, since the same value is visible in the
-surrounding request anyway. It is a warning rather than an error because varying a project's
-*display* name per environment is a reasonable thing to do; the top-level `name` is masked like any
-other value and is not covered by the warning.
+environment variable. These are how the tool refers to a resource: they appear in the plan, in the
+identifiers the JSON output uses, and in the report you get if `apply` stops partway. Masking them
+would leave that report unable to say which resource it had reached — and the same value would
+still be visible in the surrounding request, so it would be masking in name only.
+
+`validate` warns when a name comes from the environment. It is a warning rather than an error
+because giving a category or milestone a different name per environment is a reasonable thing to
+do. The project's display name — the top-level `name` — is not an identifier, so it is masked like
+any other value and the warning does not apply to it.
 
 In the browser there is no environment, so the Web UI reads the names out of your manifest and asks
 you to fill them in.
@@ -222,8 +220,9 @@ Anyone in `administrators` is added to the project automatically if they are not
 Backlog refuses to grant the role to a non-member, so this is not a convenience — it is the only way
 the grant can succeed.
 
-`members` is for people who are not covered by a team. Listing a team member there is not wrong, but
-it joins them a second time as an individual, which is one more request; `plan` points this out.
+`members` is for people who are not covered by a team, and not covered by `administrators` either.
+Listing someone who is already covered is not wrong, but it joins them a second time as an
+individual, which is one more request; `plan` points this out.
 
 When it decides who to remove, the tool looks only at people who joined individually, so team
 members are never mistaken for individuals who dropped out of the file.
