@@ -258,11 +258,15 @@ Backlog が既定を変えたときに追随できず、「マニフェストに
 | キー | 型 | 必須 | 制約 |
 | --- | --- | --- | --- |
 | `name` | string | **必須** | `minLength: 1` |
-| `color` | string | — | 10色パレットの enum |
+| `color` | string | —（**カスタムには実質必須**。V-A26） | 10色パレットの enum |
 | `oldname` | string | — | `minLength: 1` |
 
 パレット（[実測](../research/backlog-api-constraints.md#ステータス)）:
 `#ea2c00` `#e87758` `#e07b9a` `#868cb7` `#3b9dbd` `#4caf93` `#b0be3c` `#eda62a` `#f42858` `#393939`
+
+**`color` を JSON Schema の `required` に入れられない。** カスタムステータスには必須だが
+（`POST /projects/:key/statuses` の必須パラメータ）、既定ステータスには書いてはならない（V-A6a）。
+S3 はどれが既定かを判定できない（K-5）ので、**必須の判定は S6 に置く（V-A26）**。
 
 ### K-5: 既定ステータスの判定を JSON Schema でやらない
 
