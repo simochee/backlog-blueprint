@@ -13,10 +13,6 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  # Kept in step with the `target: "node22"` of apps/cli/vite.config.ts and the `engines.node`
-  # of apps/cli/package.json: the CLI is built for this version, so it is the one CI proves.
-
 jobs:
   check:
     name: Checks

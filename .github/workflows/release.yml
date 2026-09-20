@@ -17,8 +17,6 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  # Kept in step with the `target: "node22"` of apps/cli/vite.config.ts and the `engines.node`
-  # of apps/cli/package.json.
   PACKAGE_NAME: "@simochee/backlog-blueprint"
   PAGES_URL: "https://simochee.github.io/backlog-blueprint"
 
