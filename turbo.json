@@ -5,6 +5,14 @@
       "dependsOn": ["^build"],
       "outputs": ["dist/**"]
     },
+    // apps/web は依存していない apps/cli/package.json からスキーマの版を読む（D-2）。
+    // 既定の入力に含まれないので、版を上げただけのコミットではキャッシュが当たり、
+    // 古い版の schema/<version>/ を再生した成果物がそのまま Pages に出てしまう。
+    "@backlog-blueprint/web#build": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/apps/cli/package.json"],
+      "outputs": ["dist/**"]
+    },
     "typecheck": {
       "dependsOn": ["^typecheck"]
     },
