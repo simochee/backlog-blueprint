@@ -1,8 +1,8 @@
 # Development
 
-How to work on backlog-blueprint itself. What the tool does and how to write a manifest are in
-[README.md](README.md); the rules you have to follow when changing the code are in
-[AGENTS.md](AGENTS.md).
+How to work on backlog-blueprint itself. What the tool does is in [README.md](README.md), how to
+write a manifest is in [docs/manifest.md](docs/manifest.md), and the rules you have to follow when
+changing the code are in [AGENTS.md](AGENTS.md).
 
 ## Setup
 
@@ -124,6 +124,8 @@ model before changing anything there.
 | `fixedReadContext(responses, overrides?)` | A `ReadContext`                                                                           |
 | `fixedPlanContext(overrides?)`            | A `PlanContext`                                                                           |
 | `secretPaths(...paths)`                   | Replaces `PlanContext['isSecret']` with a set of expanded paths                           |
+| `mockBacklog(options?)`                   | A whole space behind a `fetch` that answers writes as well, and records every request     |
+| `withoutWritePacing(run)`                 | Runs `run` with the one-second pause between writes (X-1) collapsed to none               |
 
 The acceptance criteria from the requirements (AC-1 to AC-10) are covered end to end in
 `apps/cli/src/acceptance.test.ts` and `apps/cli/src/end-to-end.test.ts`. A change to the CLI's
@@ -134,7 +136,7 @@ observable behavior should show up there.
 Nothing has been released yet: `apps/cli/package.json` is still marked `private` at version `0.0.0`,
 and the repository contains no release workflow. What follows is what a release has to satisfy.
 
-A release consists of two artifacts that are produced from the same version number:
+A release consists of three artifacts that are produced from the same version number:
 
 | Artifact    | Destination                                                      |
 | ----------- | ---------------------------------------------------------------- |
@@ -152,7 +154,7 @@ hand:
 
 - **npm publish and the Pages deployment happen together.** Publish a CLI whose schema URL is not on
   Pages yet, and every editor pointed at that version silently stops offering completion. Put both
-  in one job and never let one half succeed alone (§7.1).
+  in one job and never let one half succeed alone (requirements-definition §7.1).
 - **Previously published schema versions survive the deployment.** Old manifests keep pointing at
   old URLs and must keep working (D-3). The build only emits the version being released, so the
   deployment has to add to what is already published rather than replace it.

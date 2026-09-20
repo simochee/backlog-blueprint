@@ -37,12 +37,12 @@ produced. That is what guarantees that nothing happens during `apply` which was 
 
 ## `packages/core` must not touch Node or the DOM (NFR-5)
 
-Core runs in Node and in the browser, so it may use ECMAScript and `fetch` and nothing else: no
-`node:*`, `process` or `Buffer`, and no `document`, `window` or `localStorage`.
+Core runs in Node and in the browser, so it may use ECMAScript, `fetch` and `setTimeout`, and
+nothing else: no `node:*`, `process` or `Buffer`, and no `document`, `window` or `localStorage`.
 
 This is enforced by the type checker, not by discipline. `packages/tsconfigs/base.json` sets
-`types: []` and `lib: ["ES2022"]`, and `fetch` exists only as the ambient declaration in
-`packages/core/src/fetch.d.ts`. Packages that genuinely need Node extend
+`types: []` and `lib: ["ES2022"]`, and `fetch` and `setTimeout` exist only as the ambient
+declarations in `packages/core/src/fetch.d.ts`. Packages that genuinely need Node extend
 `packages/tsconfigs/node.json` instead.
 
 **A single `/// <reference types="node" />` inside a dependency's `.d.ts` disables the guard without
@@ -59,9 +59,9 @@ rm packages/core/src/nfr5-probe.ts
 If that passes, the guard is already broken. This is also why backlog-js and its type definitions
 live in `packages/backlog-client` and not in core (B-2).
 
-The same hazard applies to new packages that have to run in a browser — `core`, `schema`,
-`backlog-client`, `web`. Keep their tests in a separate tsconfig from the source: putting both in
-one config pulls `@types/node` in through vitest and vite, and the guard dies quietly.
+The same hazard applies to every package that has to run in a browser (today `core`, `schema`,
+`backlog-client` and `web`). Keep their tests in a separate tsconfig from the source: putting both
+in one config pulls `@types/node` in through vitest and vite, and the guard dies quietly.
 
 ## Tests never reach the network
 
@@ -108,15 +108,18 @@ depends on core — and turbo then refuses to build any task at all.
 
 ## Disabled lint rules have reasons
 
-Each entry in `.oxlintrc.json` is there for a specific problem. Check before removing one.
+Each override in `.oxlintrc.json` is there for a specific problem. Check before removing one.
 
 - `unicorn/no-thenable` (`packages/core/src/manifest.ts` only) — the JSON Schema `then` keyword
   reads as a `Promise` to the rule.
-- `unicorn/no-empty-file` and `unicorn/require-module-specifiers` (scaffolding only) — they allow
-  the `export {}` placeholder in files that have no implementation yet. **Once a file has an
-  implementation, delete its path from `.oxlintrc.json`.**
 - `no-template-curly-in-string` — `${ENV}` appears in string literals all over the specification
   (E-1).
+- `typescript/consistent-type-definitions` (`**/*.d.ts` only) — `packages/core/src/fetch.d.ts`
+  declares the runtime surface core may use as ambient `interface`s, which merge with a platform
+  declaration of the same name. The `type` form the rest of the code uses does not merge.
+- `import/no-default-export` and `import/no-anonymous-default-export` (`vite.config.*` and
+  `vitest.config.*` only) — Vite reads a configuration file's default export, and there is no other
+  way to hand it one.
 - `import/no-unassigned-import` (`apps/web/src/test-setup.ts` only) — jest-dom matchers can only be
   registered by a side-effecting import.
 - `import/no-nodejs-modules` (`apps/cli/src/` only) — the CLI is a Node application and needs

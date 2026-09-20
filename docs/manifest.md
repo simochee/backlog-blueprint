@@ -37,10 +37,10 @@ from the file are removed.
 
 **Leaving a key out entirely is the same as writing an empty list.** There is no way to say "I am
 not managing this part". If `categories` is missing, every category is deleted; if `access` is
-missing, every member is removed from the project. That includes you: on an existing project, a
-manifest with no `access.administrators` plans to revoke your own project administrator role, and
-validation stops the run rather than letting you lock yourself out. In practice this makes `access`
-mandatory for a project that already exists.
+missing, every member is removed from the project. That includes you: if you administer the
+project, a manifest with no `access.administrators` plans to revoke your own project administrator
+role, and validation stops the run rather than letting you lock yourself out. In practice this
+makes `access.administrators` mandatory there.
 
 The same rule applies one level down. `access: { teams: [開発チーム] }` leaves `members` and
 `administrators` empty, with the same consequence.
@@ -107,8 +107,9 @@ A custom status must have a `color`, chosen from a fixed palette that your edito
 completions. This holds even for a custom status that already exists in Backlog, so that a manifest
 that worked on an existing project does not fail the day it is applied to a new one.
 
-The tool identifies the default statuses by ID rather than by name, so a space whose display
-language is not Japanese still works; write the names as that space shows them.
+On a project that already exists, the tool identifies the default statuses by ID, so a space whose
+display language is not Japanese still works; write the names as that space shows them. For a
+project that does not exist yet, the Japanese and the English names are accepted.
 
 Issue types have no such protection. The four that Backlog creates — タスク, バグ, 要望, その他 —
 are deleted if the manifest does not mention them, subject to one floor: a project must always keep

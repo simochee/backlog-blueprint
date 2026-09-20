@@ -10,7 +10,7 @@ projects/PROJ_A.yaml  ──[ validate ]──[ plan ]──[ apply ]──▶  
 ```
 
 It manages the project's basic settings, issue types, statuses, categories, milestones, custom
-fields, teams and members, and webhooks.
+fields, teams, members and administrators, and webhooks.
 
 ## What it is not
 
@@ -19,8 +19,8 @@ that keeps Backlog in step with a file over time. Two consequences are worth kno
 adopt it:
 
 - **It only touches projects that have no issues.** If the project already exists and holds even one
-  issue, every command stops before changing anything. A project that is already in use is out of
-  scope, and there is no way to opt out of that check.
+  issue, `plan` and `apply` stop before changing anything. A project that is already in use is out
+  of scope, and there is no way to opt out of that check.
 - **It keeps no state.** There is no state file and no drift detection. Each run reads the space as
   it is now and computes what to do from the manifest alone.
 
@@ -171,8 +171,8 @@ The difference between `validate` and `plan` is one thing only: whether Backlog 
 key nor your other secrets. It cannot see your space, so it cannot tell you about default statuses,
 existing members, or issue counts.
 
-Every command stops before the first write if validation fails, and reports every problem it found
-rather than the first one.
+If validation fails, every command stops before the first write and reports every problem it found,
+not only the first.
 
 ### Options
 
