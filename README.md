@@ -69,9 +69,6 @@ npx @simochee/backlog-blueprint --help
 There is nothing to install globally; the CLI is meant to be run through `npx`, both locally and
 from CI.
 
-> The package has not been published yet. Until it is, build it from a clone and run
-> `node apps/cli/dist/main.js` instead — see [DEVELOPMENT.md](DEVELOPMENT.md).
-
 ## Quick start
 
 Write a manifest. The comment on the first line is what gives your editor completion and validation

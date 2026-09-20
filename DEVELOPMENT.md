@@ -148,10 +148,6 @@ release-please's default. The schema URL carries the same version as the npm pac
 documentation already points at `schema/0.1.0/project.json`, so the first published version has to
 be that one.
 
-Nothing has been published yet. `.github/workflows/release.yml` and the release-please
-configuration next to it are in place and run on every push to `main`, but no release pull request
-has been merged, so the npm package and the Pages site do not exist.
-
 A release consists of three artifacts that are produced from the same version number:
 
 | Artifact    | Destination                                                      |
