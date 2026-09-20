@@ -165,6 +165,69 @@ describe("既定ステータス（V-A6 / V-A6a）", () => {
   });
 });
 
+describe("カスタムステータスの色（V-A26）", () => {
+  const withCustom = (custom: { name: string; color?: string }) => [
+    ...defaultStatuses.slice(0, 3),
+    custom,
+    ...defaultStatuses.slice(3),
+  ];
+
+  it("カスタムステータスに色を書かないと V-A26 で中断する", () => {
+    expect(idsOf({ statuses: withCustom({ name: "レビュー中" }) })).toEqual(["V-A26"]);
+  });
+
+  it("色を書いたカスタムステータスは通す", () => {
+    expect(idsOf({ statuses: withCustom({ name: "レビュー中", color: "#3b9dbd" }) })).toEqual([]);
+  });
+
+  it("色が要るのはカスタムステータスだけで、既定ステータスには書かせない", () => {
+    expect(
+      idsOf({
+        statuses: [{ name: "未対応", color: "#3b9dbd" }, ...defaultStatuses.slice(1)],
+      }),
+    ).toEqual(["V-A6a"]);
+    expect(idsOf({ statuses: defaultStatuses })).toEqual([]);
+  });
+
+  it("色を書いていないカスタムステータスは1件目で止めずにすべて挙げる", () => {
+    expect(
+      idsOf({
+        statuses: [
+          ...defaultStatuses.slice(0, 3),
+          { name: "レビュー中" },
+          { name: "検証中" },
+          ...defaultStatuses.slice(3),
+        ],
+      }),
+    ).toEqual(["V-A26", "V-A26"]);
+  });
+
+  it("どのステータスに何を足すのかを名前で伝える", () => {
+    const [diagnostic] = validate({ statuses: withCustom({ name: "レビュー中" }) });
+
+    expect(diagnostic).toMatchObject({
+      id: "V-A26",
+      severity: "error",
+      stage: "snapshot",
+      path: "statuses/3/color",
+    });
+    expect(diagnostic?.message).toContain("レビュー中");
+    expect(diagnostic?.hint).toContain("レビュー中");
+  });
+
+  it("未作成のプロジェクトでもカスタムステータスには色が要る", () => {
+    expect(
+      idsOf(
+        { statuses: withCustom({ name: "レビュー中" }) },
+        {
+          snapshot: { project: { exists: false } },
+          snapshots: { project: { exists: false }, statuses: { source: "defaults" } },
+        },
+      ),
+    ).toEqual(["V-A26"]);
+  });
+});
+
 describe("ステータスの並び（V-A14）", () => {
   it("未対応が先頭でないと中断する", () => {
     expect(
@@ -183,13 +246,19 @@ describe("ステータスの並び（V-A14）", () => {
   });
 
   it("完了が末尾でないと中断する", () => {
-    expect(idsOf({ statuses: [...defaultStatuses, { name: "レビュー中" }] })).toEqual(["V-A14"]);
+    expect(
+      idsOf({ statuses: [...defaultStatuses, { name: "レビュー中", color: "#3b9dbd" }] }),
+    ).toEqual(["V-A14"]);
   });
 
   it("制約を満たす並びは通す", () => {
     expect(
       idsOf({
-        statuses: [...defaultStatuses.slice(0, 3), { name: "レビュー中" }, { name: "完了" }],
+        statuses: [
+          ...defaultStatuses.slice(0, 3),
+          { name: "レビュー中", color: "#3b9dbd" },
+          { name: "完了" },
+        ],
       }),
     ).toEqual([]);
   });

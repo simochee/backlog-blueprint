@@ -98,6 +98,23 @@ const defaultStatusFields = (declared: Status, index: number): Diagnostic[] => [
       ]),
 ];
 
+/**
+ * `POST /projects/:key/statuses` は `color` を必須パラメータに取る（API 制約「ステータス」）。
+ * スキーマの `required` に入れられないのは、既定に `color` を書くことを V-A6a が禁じており、
+ * どれが既定かを ID でしか判定できない（K-5）ためである。
+ */
+const customStatusFields = (declared: Status, index: number): Diagnostic[] =>
+  declared.color === undefined
+    ? [
+        snapshotDiagnostic(
+          "V-A26",
+          `statuses/${index}/color`,
+          `the status "${declared.name}" is not a default status, so it needs a color`,
+          `add a color from the 10-color palette to "${declared.name}"`,
+        ),
+      ]
+    : [];
+
 type DeclaredDefault = { name: string; position: number };
 
 const declaredDefaults = (
@@ -169,7 +186,7 @@ const statusDiagnostics = (manifest: Manifest, snapshot: StatusesSnapshot): Diag
 
   /**
    * どれが既定か決まらないときは V-A6 だけを出す。既定と自作の区別が付かないまま
-   * V-A6a / V-A14 を走らせると、既定を指すべき指摘が利用者の自作ステータスに
+   * V-A6a / V-A26 / V-A14 を走らせると、既定を指すべき指摘が利用者の自作ステータスに
    * 付き、直しようのないエラーになる。
    */
   if (defaults === undefined) {
@@ -182,7 +199,9 @@ const statusDiagnostics = (manifest: Manifest, snapshot: StatusesSnapshot): Diag
   return [
     ...missing,
     ...manifest.statuses.flatMap((declared, index) =>
-      defaultNames.has(declared.name) ? defaultStatusFields(declared, index) : [],
+      defaultNames.has(declared.name)
+        ? defaultStatusFields(declared, index)
+        : customStatusFields(declared, index),
     ),
     ...(missing.length > 0
       ? []
