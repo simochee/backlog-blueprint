@@ -113,7 +113,7 @@ export const runCli = async (argv: string[], deps: Deps): Promise<number> => {
   const program = new Command()
     .name("backlog-blueprint")
     .description(
-      `Declare Backlog project settings in Yaml and apply them (${API_KEY_VARIABLE} is required for plan and apply)`,
+      `Declare Backlog project settings in YAML and apply them (${API_KEY_VARIABLE} is required for plan and apply)`,
     )
     .version(TOOL.version, "-V, --version")
     .exitOverride()
