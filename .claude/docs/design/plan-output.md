@@ -12,17 +12,14 @@
 
 記号ベース（Terraform 風）を採る。
 
-以下は**本文書を通して使う例**。存在しない `PROJ_A` に対し、
+以下は**本文書を通して使う例**。**課題0件の既存プロジェクト** `PROJ_A`（UC-2）に対し、
 課題種別に タスク（既定のまま）/ バグ（テンプレート追加）/ 調査（`oldname: その他`）を、
 ステータスに既定4つ + レビュー中を、`access` に 開発チーム と suzuki を、
 Webhook に Slack 通知を宣言したマニフェストを適用する。
 
 ```
 Blueprint: PROJ_A (example.backlog.com)
-Project does not exist and will be created.
 
-  + project        PROJ_A "プロジェクトA"
-  ↻ refresh        reading back default issue types and statuses
   ~ issueType      "バグ"
       templateSummary: (none) -> "【不具合】"
   ~ issueType      "調査"         renamed from "その他"
@@ -36,9 +33,30 @@ Project does not exist and will be created.
 Warnings:
   ! [V-A16] access.members: "suzuki" already belongs to team "開発チーム"
 
-Plan: 5 to add, 3 to change, 1 to destroy, 5 unchanged.
-Write requests: 9 (estimated 9s)
+Plan: 4 to add, 3 to change, 1 to destroy, 5 unchanged.
+Write requests: 8 (estimated 8s)
 ```
+
+**既存プロジェクトを例にしているのは、`oldname` の効果（PO-1）と削除を同時に見せられるため。**
+新規プロジェクトでは既定課題種別の名前が分からないので、同じマニフェストでも描かれ方が変わる
+（[core のデータモデル §4.1](core-reconciler.md#41-フェーズと-read)）。
+
+```
+Blueprint: PROJ_A (example.backlog.com)
+Project does not exist and will be created.
+
+  + project        PROJ_A "プロジェクトA"
+  ↻ refresh        reading back default issue types and statuses
+  + issueType      "タスク"
+  + issueType      "バグ"
+  + issueType      "調査"
+  - issueType      (unused default)
+  ...
+```
+
+**既定の枠を引き継ぐ3件は `+` で描かれ、`renamed from` は付かない。** 利用者は何も無いところに
+宣言しただけで、引き継ぎはツールが勝手に行う最適化だからである（PO-1 の適用範囲）。
+余った4つ目の枠は名前が分からないので `(unused default)` と描く。
 
 **例の空白は読みやすさのために手で揃えたもので、桁揃えの仕様ではない。**
 実装は記号とリソース種別の幅だけを揃え、その右は2スペース区切りとする。
