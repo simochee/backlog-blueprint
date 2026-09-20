@@ -113,6 +113,9 @@ language is not Japanese still works; write the names as that space shows them.
 Issue types have no such protection. The four that Backlog creates — タスク, バグ, 要望, その他 —
 are deleted if the manifest does not mention them, subject to one floor: a project must always keep
 at least one issue type, so a manifest with an empty `issueTypes` is rejected before anything runs.
+On a project that does not exist yet those four names are not known in advance, so the first four
+entries in `issueTypes` take over the four default slots whatever they are called, and a slot left
+over is deleted.
 
 ## Display order
 
@@ -138,11 +141,13 @@ why `plan` ends with a count of them and an estimate in seconds.
 Six things change that number, roughly in order of how much they are worth:
 
 **Match what already exists.** A resource whose name and attributes are identical to the one in
-Backlog produces no request at all. A template built on Backlog's four default issue types starts
-from eight requests fewer than one that replaces them — four deletions and four creations that never
-happen. Cleaning the defaults away is a real choice with a real price, and when you design an
-organization-wide template it is worth asking which parts can be made to agree with the defaults
-instead.
+Backlog produces no request at all. A template built on Backlog's four default issue types needs
+eight fewer requests than one that replaces them — four deletions and four creations that never
+happen — when it is applied to a project that already exists. On a new project the first four
+entries cost one request each whatever they are called, so the saving there comes from staying
+within those four and from the other points below. Cleaning the defaults away is a real choice with
+a real price, and when you design an organization-wide template it is worth asking which parts can
+be made to agree with the defaults instead.
 
 **Rename with `oldname` instead of replacing.** Two requests become one. Where a default cannot be
 kept as it is, renaming it is the next cheapest thing.
