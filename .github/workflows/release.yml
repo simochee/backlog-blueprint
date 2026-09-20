@@ -2,13 +2,10 @@ name: Release
 
 on:
   push:
-    tags:
-      - "v*"
+    branches:
+      - main
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
+permissions: {}
 
 # One release at a time: two overlapping runs would race for the same Pages deployment and the
 # later one could publish a site assembled from a stale list of schema versions.
@@ -21,18 +18,54 @@ env:
   PAGES_URL: "https://simochee.github.io/backlog-blueprint"
 
 jobs:
+  # release-please keeps a pull request open that carries the next version number, derived from the
+  # Conventional Commit types on main. Merging that pull request is what decides a release: on the
+  # merge the same action tags the commit and creates the GitHub Release.
+  release-please:
+    name: Maintain the release pull request
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      # The release pull request is labelled, and that is how the next run recognizes it as its own
+      # and knows the release still has to be tagged. Labelling a pull request goes through the
+      # issues API, so `pull-requests: write` alone is not enough.
+      issues: write
+      pull-requests: write
+    outputs:
+      released: ${{ steps.release.outputs.releases_created }}
+      tag: ${{ steps.release.outputs['apps/cli--tag_name'] }}
+    steps:
+      - id: release
+        uses: googleapis/release-please-action@v5
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
   # The CLI on npm, the Web UI and the JSON Schema on Pages are one release produced from one
   # version number. Publishing the CLI without the matching schema URL on Pages makes editor
   # completion fail silently for everyone on that version, so both halves live in a single job
   # and a failure in either one stops the rest (requirements-definition 7.1).
-  release:
+  #
+  # This job cannot be a separate workflow waiting on the tag. A tag created with GITHUB_TOKEN
+  # starts no workflow, so `on: push: tags` would never fire for a release-please tag.
+  publish:
     name: Publish the CLI and deploy Pages
+    needs: release-please
+    if: needs.release-please.outputs.released == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
+      # The tag release-please just created, not the branch: a push landing on main while this job
+      # runs must not become part of the release that was already tagged and announced.
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.release-please.outputs.tag }}
 
       - name: Enable Corepack
         run: corepack enable
@@ -45,19 +78,6 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
-      # The schema URL carries the CLI's version (D-2), and the site is built from
-      # apps/cli/package.json rather than from the tag. A tag that disagrees with it would
-      # publish a CLI whose $schema path was never built.
-      - name: Verify the tag matches the CLI version
-        run: |
-          set -euo pipefail
-          tag_version="${GITHUB_REF_NAME#v}"
-          package_version="$(jq -r .version apps/cli/package.json)"
-          if [ "$tag_version" != "$package_version" ]; then
-            echo "tag ${GITHUB_REF_NAME} does not match apps/cli/package.json version ${package_version}" >&2
-            exit 1
-          fi
 
       - name: Build
         run: pnpm run build
@@ -103,7 +123,8 @@ jobs:
       # Pages goes before npm on purpose. A schema URL that no published CLI mentions yet is
       # harmless, whereas a published CLI whose schema URL is not on Pages breaks completion
       # for its users with no error to see (requirements-definition 7.1). If npm publish fails
-      # after this step, re-running the release rebuilds the same site and publishes again.
+      # after this step, re-running the failed jobs of this run rebuilds the same site from the
+      # same tag and publishes again.
       - name: Deploy to GitHub Pages
         id: deploy
         uses: actions/deploy-pages@v5
