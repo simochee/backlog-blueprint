@@ -142,9 +142,11 @@ not change is not rebuilt.
 ## Releasing
 
 The first release is `0.1.0`. `.release-please-manifest.json` starts at `0.0.0`, because nothing has
-been published yet, and the `feat` commits already in the history carry it to `0.1.0` on their own.
-The schema URL carries the same version as the npm package (D-2), and the documentation already
-points at `schema/0.1.0/project.json`, so the first published version has to be that one.
+been published yet, and `initial-version` in `release-please-config.json` names the version that a
+repository in that state is released at — without it the first release would be `1.0.0`, which is
+release-please's default. The schema URL carries the same version as the npm package (D-2), and the
+documentation already points at `schema/0.1.0/project.json`, so the first published version has to
+be that one.
 
 Nothing has been published yet. `.github/workflows/release.yml` and the release-please
 configuration next to it are in place and run on every push to `main`, but no release pull request

@@ -4,6 +4,7 @@
     "apps/cli": {
       "release-type": "node",
       "package-name": "@simochee/backlog-blueprint",
+      "initial-version": "0.1.0",
       "changelog-path": "/CHANGELOG.md",
       "include-component-in-tag": false,
       "changelog-sections": [
