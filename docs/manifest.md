@@ -37,10 +37,10 @@ from the file are removed.
 
 **Leaving a key out entirely is the same as writing an empty list.** There is no way to say "I am
 not managing this part". If `categories` is missing, every category is deleted; if `access` is
-missing, every member is removed from the project. That includes you: if you administer the
-project, a manifest with no `access.administrators` plans to revoke your own project administrator
-role, and validation stops the run rather than letting you lock yourself out. In practice this
-makes `access.administrators` mandatory there.
+missing, every member is removed from the project and every project administrator loses the role.
+That does not lock you out. You run as a space administrator, and a space administrator can
+administer a project without belonging to it — which is also why you must not write yourself into
+`administrators`; [`access`](#access) below says what to write instead.
 
 The same rule applies one level down. `access: { teams: [開発チーム] }` leaves `members` and
 `administrators` empty, with the same consequence.
@@ -219,6 +219,13 @@ way to write "this whole team administers the project".
 Anyone in `administrators` is added to the project automatically if they are not in it already.
 Backlog refuses to grant the role to a non-member, so this is not a convenience — it is the only way
 the grant can succeed.
+
+**You cannot be one of them.** The tool only runs with the API key of a space administrator, and
+Backlog refuses to make a space administrator a project administrator: the grant comes back as
+`Only normal-user role can be a project administrator.` Validation reports this before anything is
+applied, so it costs you a run rather than a project left half-configured. If you want to appear in
+the project, write yourself under `members`. Leaving yourself out of the file altogether is fine
+too: being a space administrator is already enough to operate the project.
 
 `members` is for people who are not covered by a team, and not covered by `administrators` either.
 Listing someone who is already covered is not wrong, but it joins them a second time as an
