@@ -360,6 +360,7 @@ FR-2 の具体。**すべて適用開始前に判定する。**
 | V-A23 | Yaml として妥当である | エラー |
 | V-A24 | `webhooks[].events` の数値が既知の activityTypeId である | 警告 |
 | V-A25 | 同定名（`key` / 各リソースの `name` / `oldname` / `access` の各要素 / `applicableIssueTypes[]`）に `${ENV}` を使っていない。**プロジェクト名は対象外** | 警告 |
+| V-A26 | カスタムステータス（既定の ID 1〜4 以外）に `color` が指定されている | エラー |
 
 **V-A6 と V-A9 が依頼者要求 R-2 の中核。** いずれも実 API で裏を取った。
 
@@ -504,6 +505,9 @@ Go CLI + TypeScript Web という案は、検証ロジックを2回実装する�
 データモデルの詳細は [core のデータモデルと reconciler](../design/core-reconciler.md)。
 
 ### 7.1 配布
+
+ライセンスは **MIT**。依存している [backlog-js](https://github.com/nulab/backlog-js) と、
+構成を借りた [bee](https://github.com/nulab/bee) がどちらも MIT であることに揃える。
 
 | 対象 | 配布先 |
 | --- | --- |
