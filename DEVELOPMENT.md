@@ -141,8 +141,8 @@ not change is not rebuilt.
 
 ## Releasing
 
-Nothing has been published yet. `apps/cli/package.json` carries `0.1.0`, the version the first
-release will bear, and `.github/workflows/release.yml` is in place but has never run.
+Nothing has been published yet. `.github/workflows/release.yml` and the release-please
+configuration next to it are in place but have never run.
 
 A release consists of three artifacts that are produced from the same version number:
 
@@ -157,18 +157,70 @@ A release consists of three artifacts that are produced from the same version nu
 because the schema version and the CLI version are deliberately the same number (D-2) — the root
 `package.json` is private and its version means nothing.
 
+### Where the version comes from
+
+Nobody edits it by hand. release-please derives the next version from the Conventional Commit types
+that landed on `main` since the last release, and writes it into `apps/cli/package.json` and
+`.release-please-manifest.json` in the very commit it then tags — so the tag, the published package
+and the schema URL cannot disagree with each other.
+
+| Commits since the last release          | `0.4.2` becomes |
+| --------------------------------------- | --------------- |
+| `feat:`                                 | `0.5.0`         |
+| anything else                           | `0.4.3`         |
+| `feat!:` or a `BREAKING CHANGE:` footer | `1.0.0`         |
+
+A version those rules do not produce — a first release, or a round number a rewrite of the manifest
+format deserves — is forced by putting `Release-As: 1.0.0` in the body of a commit on `main`.
+
+`release-please-config.json` points all of this at `apps/cli`, the only package that is published,
+and `.release-please-manifest.json` records the version the repository is currently at.
+
 ### Cutting one
 
-1. Bump `version` in `apps/cli/package.json` and merge that to `main`. Nothing derives the number
-   for you; it is the one place a release version is decided.
-2. Push the tag `v<version>`. The tag is the only trigger, and pushing one for a version that
-   `apps/cli/package.json` does not carry fails the run before anything is published.
+1. Merge work into `main` as usual. Every push to `main` runs the release workflow, whose first job
+   opens — or updates — a pull request titled `chore(main): release <version>` holding the version
+   bump and the CHANGELOG entry for everything merged since the last release.
+2. Merge that pull request when the release should go out. Nothing reaches npm or Pages until it is
+   merged, so leaving it open to collect further commits is the normal way to batch a release.
+3. Its merge runs the workflow again. This time release-please tags the merge commit `v<version>`
+   and creates the GitHub Release, and the second job of the same run builds the site, restores the
+   schema versions already on Pages into it, deploys Pages, and publishes the CLI to npm — in that
+   order, stopping at the first failure.
+4. **Write the GitHub Release body, in English. That part is a person's job.** release-please fills
+   the Release with the generated CHANGELOG entry, which is Japanese and addressed to whoever works
+   on this repository. The Release is what users of the CLI read, so replace that body with English
+   prose: what changed for them and what they have to do about it (NFR-9).
 
-The workflow then builds the site, restores the schema versions already on Pages into it, deploys
-Pages, and publishes the CLI to npm — in that order, in one job, stopping at the first failure.
+The release pull request carries no CI run, because a pull request opened with `GITHUB_TOKEN` does
+not start workflows. Everything in it has already been checked on `main`; the only thing CI would
+see for the first time is the version bump and the CHANGELOG.
+
+If the publish job fails once the tag exists, use **Re-run failed jobs** on that workflow run: the
+tag comes from the first job's outputs, which a re-run keeps, so the same commit is built and
+published again. Re-running the workflow from the start does not work — release-please has already
+released that version and the second job would be skipped.
+
+### CHANGELOG.md
+
+`CHANGELOG.md` at the repository root is generated from commit subjects, which are Japanese
+(AGENTS.md). It is **a record for whoever works on this repository**, not documentation for users;
+what users read is the GitHub Release body. Editing it by hand is pointless, as the next release
+rewrites it from the commits.
+
+Which types reach it is `changelog-sections` in `release-please-config.json`. Listed are `feat`,
+`fix`, `perf`, `revert`, `refactor` and `build` — the types that can change how the published CLI
+behaves or what it is built from. Hidden are `docs`, `test`, `ci`, `chore` and `style`: an entry of
+one of those says nothing about what a version does differently from the one before it.
 
 ### What the workflow has to guarantee
 
+- **Tagging and publishing stay inside one workflow run.** A tag or a Release created with
+  `GITHUB_TOKEN` starts no further workflow, so a separate workflow listening for `v*` tags would
+  wait forever. Publishing is therefore a second job of the release workflow, gated on
+  release-please's `releases_created` output. The other way out — a personal access token, whose
+  tags do trigger workflows — was rejected: a long-lived secret to store and rotate, for nothing
+  that two jobs do not already give.
 - **npm publish and the Pages deployment happen together.** Publish a CLI whose schema URL is not on
   Pages yet, and every editor pointed at that version silently stops offering completion. Both are
   steps of one job (requirements-definition §7.1), and Pages is deployed first: a schema URL that no
@@ -191,8 +243,9 @@ Pages, and publishes the CLI to npm — in that order, in one job, stopping at t
 
 The workflow cannot create any of these itself.
 
-| What                       | Value                                                              |
-| -------------------------- | ------------------------------------------------------------------ |
-| Pages source               | Settings, Pages, Build and deployment, Source: **GitHub Actions**  |
-| `NPM_TOKEN` secret         | An npm granular or automation token allowed to publish the package |
-| `github-pages` environment | Created by GitHub with the Pages source; must allow the `v*` tags  |
+| What                       | Value                                                                       |
+| -------------------------- | --------------------------------------------------------------------------- |
+| Pages source               | Settings, Pages, Build and deployment, Source: **GitHub Actions**           |
+| `NPM_TOKEN` secret         | An npm granular or automation token allowed to publish the package          |
+| `github-pages` environment | Created by GitHub with the Pages source; must allow `main`                  |
+| Pull requests from Actions | Settings, Actions, General: **Allow GitHub Actions to create and approve pull requests** |

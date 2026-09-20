@@ -82,7 +82,11 @@ depends on core — and turbo then refuses to build any task at all.
 - **What — the tests.** A test name states behavior: "a date custom field's range is written as a
   date string", not "validate returns false".
 - **Why — the commit message.** The body explains why the change was needed and cites the decision
-  ID. The diff already shows what changed.
+  ID. The diff already shows what changed. The subject line is published as it stands:
+  release-please copies the subjects of `feat`, `fix`, `perf`, `revert`, `refactor` and `build`
+  commits into `CHANGELOG.md`, and the type picks the next version number (see
+  [DEVELOPMENT.md](DEVELOPMENT.md#releasing)). Write a subject that still reads sensibly beside ten
+  others, with no context around it.
 - **Why not — code comments.** Only where the code departs from the obvious implementation, to stop
   a later reader from "simplifying" it back into a bug. Never a description of what the code does.
 
