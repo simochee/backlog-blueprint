@@ -249,3 +249,7 @@ still be rejected.
   measured behavior of the Backlog API that constrains the design, and the decision records every
   error message's `[V-A6]`-style identifier points back to. Written in Japanese, and the only
   authority when this README and those documents disagree.
+
+## License
+
+backlog-blueprint is released under the MIT License. See [LICENSE](LICENSE) for the full text.

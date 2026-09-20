@@ -2,6 +2,7 @@
   "name": "@simochee/backlog-blueprint",
   "version": "0.0.0",
   "private": true,
+  "license": "MIT",
   "bin": {
     "backlog-blueprint": "./dist/main.js"
   },
