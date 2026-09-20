@@ -180,15 +180,15 @@ PO-3 の利点（そのまま監査・不具合報告に使える）ごと損な
 | V-A14 | ステータスの並びが API の順序制約を満たす | 同上 | エラー |
 | V-A12 | `grandchildIssueEnabled` が真なら `subtaskingEnabled` も真。省略時は現状の値で判定し、**プロジェクトが未作成なら現状が無いのでエラー** | `GET /projects/:key` | エラー |
 
-**V-B11 は実 API でしか分からなかった制約である。**スペース管理者はプロジェクト管理者になれない**
-（`Only normal-user role can be a project administrator.`）。実行者は必ずスペース管理者なので
-（FR-5.4）、**実行者を `administrators` に書くと必ず失敗する**。
+**V-B11 は実 API でしか分からなかった制約である。** スペース管理者はプロジェクト管理者に
+なれない（`Only normal-user role can be a project administrator.`）。実行者は必ず
+スペース管理者なので（FR-5.4）、**実行者を `administrators` に書くと必ず失敗する**。
 判定に要るのは `GET /users` が返す `roleType` だけなので S6 に置く。
 
 `hint` では `members` に書く道を案内する。スペース管理者はプロジェクトに個人参加でき、
 参加していなくてもスペース管理者としてそのプロジェクトを操作できる。
 
-V-B10 は撤回した。** `applicableIssueTypes` の絞りは
+**V-B10 は撤回した。** `applicableIssueTypes` の絞りは
 `applicableIssueTypes[]=`（空の値を1つ）を送れば解除できることを実測で確認したため
 （[リクエストの形式](../research/backlog-api-constraints.md#空配列を送る方法)）。
 送信できないものを計画させないためのゲートとして新設したが、送信できるので要らない。
