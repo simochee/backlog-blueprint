@@ -161,6 +161,12 @@ A release consists of three artifacts that are produced from the same version nu
 because the schema version and the CLI version are deliberately the same number (D-2) — the root
 `package.json` is private and its version means nothing.
 
+Only the CLI waits for a release. **Pages is deployed on every push to `main`**, so a correction to
+the Web UI is live without the CLI having to find a reason to be published. What that costs is
+explained in [What the workflow has to guarantee](#what-the-workflow-has-to-guarantee): a site
+built from `main` carries a schema for a version that is already on npm, and the deployment has to
+put the published one back.
+
 ### Where the version comes from
 
 Nobody edits it by hand. release-please derives the next version from the Conventional Commit types
@@ -188,12 +194,13 @@ and `.release-please-manifest.json` records the last version that was released �
 1. Merge work into `main` as usual. Every push to `main` runs the release workflow, whose first job
    opens — or updates — a pull request titled `chore(main): release <version>` holding the version
    bump and the CHANGELOG entry for everything merged since the last release.
-2. Merge that pull request when the release should go out. Nothing reaches npm or Pages until it is
-   merged, so leaving it open to collect further commits is the normal way to batch a release.
+2. Merge that pull request when the release should go out. Nothing reaches npm until it is merged,
+   so leaving it open to collect further commits is the normal way to batch a release. Pages is not
+   waiting for it: the site has been redeployed on every one of those pushes already.
 3. Its merge runs the workflow again. This time release-please tags the merge commit `v<version>`
-   and creates the GitHub Release, and the second job of the same run builds the site, restores the
-   schema versions already on Pages into it, deploys Pages, and publishes the CLI to npm — in that
-   order, stopping at the first failure.
+   and creates the GitHub Release, the Pages job deploys the site built from that tag, and the
+   publish job — which runs only for a release, and only after the deployment succeeded — publishes
+   the CLI to npm.
 4. Read the GitHub Release that release-please created. Its body is the generated CHANGELOG entry,
    which needs no rewriting so long as the commit subjects were written for the people who read it.
    Add prose above it only when a version asks something of its users — a manifest that has to be
@@ -227,22 +234,28 @@ one of those says nothing about what a version does differently from the one bef
 
 - **Tagging and publishing stay inside one workflow run.** A tag or a Release created with
   `GITHUB_TOKEN` starts no further workflow, so a separate workflow listening for `v*` tags would
-  wait forever. Publishing is therefore a second job of the release workflow, gated on
+  wait forever. Publishing is therefore another job of the release workflow, gated on
   release-please's `releases_created` output. The other way out — a personal access token, whose
   tags do trigger workflows — was rejected: a long-lived secret to store and rotate, for nothing
   that two jobs do not already give.
-- **npm publish and the Pages deployment happen together.** Publish a CLI whose schema URL is not on
-  Pages yet, and every editor pointed at that version silently stops offering completion. Both are
-  steps of one job (requirements-definition §7.1), and Pages is deployed first: a schema URL that no
-  published CLI mentions yet harms nobody, whereas the reverse breaks completion with nothing to
-  see.
-- **Previously published schema versions survive the deployment.** Old manifests keep pointing at
-  old URLs and must keep working (D-3). The build emits only the version being released, and
-  `actions/deploy-pages` replaces the site wholesale, so the workflow asks npm which versions exist
-  — the same number as the schema version, by D-2 — downloads each `schema/<version>/project.json`
-  from the live site, and adds them to the artifact before uploading it. A package that npm does not
-  know yet is the first release and has nothing to preserve; any other failure to reach npm or Pages
-  aborts the release rather than quietly dropping a version.
+- **A release's schema is on Pages before its CLI is on npm.** Publish a CLI whose schema URL is not
+  deployed yet, and every editor pointed at that version silently stops offering completion. The
+  publish job therefore `needs` the Pages job and is skipped with it when the deployment fails
+  (requirements-definition §7.1). The reverse order costs nothing: a schema URL that no published
+  CLI mentions yet bothers nobody.
+- **A published version's schema is never replaced by a newer build of it.** Old manifests keep
+  pointing at old URLs and must keep working (D-3), and `actions/deploy-pages` replaces the site
+  wholesale, so before uploading, the workflow asks npm which versions exist — the same number as
+  the schema version, by D-2 — and fetches each `schema/<version>/project.json` back from the live
+  site.
+
+  Those fetched files overwrite what was just built, and the single rule covers both kinds of
+  deployment. A site built from `main` carries a schema for the version that is already on npm,
+  built from source that has moved on since it was published; the published one has to win. During
+  a release the version being released is not on the registry yet, because Pages is deployed first,
+  so nothing overwrites it. A package npm does not know at all is the first release and has nothing
+  to restore; any other failure to reach npm or Pages aborts the deployment rather than quietly
+  dropping a version.
 - **A breaking change to the manifest format bumps the major version** and ships as a new schema
   URL, leaving the old one in place. The CLI is then expected to recognize the superseded syntax and
   say how to rewrite it, rather than interpreting it in a way the author did not intend. The
@@ -256,13 +269,14 @@ The workflow cannot create any of these itself.
 | What                       | Value                                                                       |
 | -------------------------- | --------------------------------------------------------------------------- |
 | Pages source               | Settings, Pages, Build and deployment, Source: **GitHub Actions**           |
-| npm trusted publisher      | On the package's npm settings: this repository, workflow `release.yml`, environment `github-pages` |
+| npm trusted publisher      | On the package's npm settings: this repository, workflow `release.yml`, **no environment** |
 | `github-pages` environment | Created by GitHub with the Pages source; must allow `main`                  |
 | Pull requests from Actions | Settings, Actions, General: **Allow GitHub Actions to create and approve pull requests** |
 
-The repository holds no npm token. npm accepts the release job's OIDC token instead, which is why
+The repository holds no npm token. npm accepts the publish job's OIDC token instead, which is why
 `id-token: write` appears in its permissions and why `actions/setup-node` is not given
-`registry-url`.
+`registry-url`. The environment field of the trusted publisher is left empty because that job runs
+in no environment; `github-pages` belongs to the Pages job, which does not talk to npm.
 
 Trusted publishing cannot cover a package's first release, though. A trusted publisher is
 configured on a package's settings page, and a package nobody has published yet has no settings

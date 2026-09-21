@@ -7,7 +7,7 @@ on:
 
 permissions: {}
 
-# One release at a time: two overlapping runs would race for the same Pages deployment and the
+# One deployment at a time. Two overlapping runs would race for the same Pages deployment, and the
 # later one could publish a site assembled from a stale list of schema versions.
 concurrency:
   group: release
@@ -41,17 +41,11 @@ jobs:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
-  # The CLI on npm, the Web UI and the JSON Schema on Pages are one release produced from one
-  # version number. Publishing the CLI without the matching schema URL on Pages makes editor
-  # completion fail silently for everyone on that version, so both halves live in a single job
-  # and a failure in either one stops the rest (requirements-definition 7.1).
-  #
-  # This job cannot be a separate workflow waiting on the tag. A tag created with GITHUB_TOKEN
-  # starts no workflow, so `on: push: tags` would never fire for a release-please tag.
-  publish:
-    name: Publish the CLI and deploy Pages
+  # The site is deployed on every push to main, not only on a release, so a change to the Web UI
+  # reaches people without waiting for the CLI to have a reason to be published.
+  pages:
+    name: Deploy the Web UI and the JSON Schema
     needs: release-please
-    if: needs.release-please.outputs.released == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -61,8 +55,92 @@ jobs:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
-      # The tag release-please just created, not the branch: a push landing on main while this job
-      # runs must not become part of the release that was already tagged and announced.
+      # A pinned commit, never the branch: a push landing on main while this job runs must not
+      # become part of what was already announced. When release-please has just tagged this push,
+      # the tag is used instead — a queued run can find main ahead of the commit that triggered it,
+      # and the site has to match the release, not whatever arrived afterwards.
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.release-please.outputs.tag || github.sha }}
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .tool-versions
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm run build
+
+      # D-3: a manifest written years ago must keep resolving its $schema URL. The build emits one
+      # schema, for the version in apps/cli/package.json, and actions/deploy-pages replaces the
+      # whole site, so every schema already published is fetched back into the artifact first. The
+      # npm registry is the list of released versions, because the schema version and the CLI
+      # version are the same number (D-2).
+      #
+      # A published version always wins over what was just built. Outside a release the version in
+      # package.json is the one already on npm, and the source it is built from has moved on since
+      # that version was published; keeping the build would replace a released schema with an
+      # unreleased one. During a release the opposite is true and falls out of the same rule: Pages
+      # is deployed before npm, so the version being released is not on the registry yet and the
+      # freshly built schema survives.
+      - name: Restore the schema of every published version
+        run: |
+          set -euo pipefail
+
+          error_log="$(mktemp)"
+          if ! published="$(npm view "${PACKAGE_NAME}" versions --json 2>"${error_log}")"; then
+            # Only "the package does not exist yet" is tolerated, which is the first release.
+            # Any other failure is fatal: carrying on with an empty list would silently drop
+            # every schema version already on Pages.
+            if grep -q "E404" "${error_log}"; then
+              echo "${PACKAGE_NAME} has no published version yet; nothing to restore"
+              exit 0
+            fi
+            cat "${error_log}" >&2
+            exit 1
+          fi
+
+          echo "${published}" | jq -r 'if type == "array" then .[] else . end' | while read -r version; do
+            curl --fail --silent --show-error --retry 3 --retry-delay 5 --create-dirs \
+              --output "apps/web/dist/schema/${version}/project.json" \
+              "${PAGES_URL}/schema/${version}/project.json"
+            echo "restored schema ${version}"
+          done
+
+      - uses: actions/configure-pages@v6
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: apps/web/dist
+
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v5
+
+  # Publishing the CLI without the matching schema URL on Pages makes editor completion fail
+  # silently for everyone on that version, so this job waits for the deployment and is skipped
+  # with it if it failed (requirements-definition 7.1). The reverse order is harmless: a schema
+  # URL that no published CLI mentions yet bothers nobody.
+  #
+  # This cannot be a separate workflow waiting on the tag. A tag created with GITHUB_TOKEN starts
+  # no workflow, so `on: push: tags` would never fire for a release-please tag.
+  publish:
+    name: Publish the CLI to npm
+    needs: [release-please, pages]
+    if: needs.release-please.outputs.released == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # npm accepts this job's OIDC token in place of a long-lived publish token, so the
+      # repository holds no npm secret at all. This permission is what mints that token.
+      id-token: write
+    steps:
       - uses: actions/checkout@v7
         with:
           ref: ${{ needs.release-please.outputs.tag }}
@@ -83,58 +161,5 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build
-        run: pnpm run build
-
-      # D-3: a manifest written years ago must keep resolving its $schema URL. The build emits
-      # only the version being released and actions/deploy-pages replaces the whole site, so
-      # every schema already published is copied back into the artifact before it is uploaded.
-      # The npm registry is the list of released versions because the schema version and the
-      # CLI version are the same number (D-2).
-      - name: Merge previously published schema versions into the site
-        run: |
-          set -euo pipefail
-
-          error_log="$(mktemp)"
-          if ! published="$(npm view "${PACKAGE_NAME}" versions --json 2>"${error_log}")"; then
-            # Only "the package does not exist yet" is tolerated, which is the first release.
-            # Any other failure is fatal: carrying on with an empty list would silently drop
-            # every schema version already on Pages.
-            if grep -q "E404" "${error_log}"; then
-              echo "${PACKAGE_NAME} has no published version yet; nothing to preserve"
-              exit 0
-            fi
-            cat "${error_log}" >&2
-            exit 1
-          fi
-
-          echo "${published}" | jq -r 'if type == "array" then .[] else . end' | while read -r version; do
-            destination="apps/web/dist/schema/${version}/project.json"
-            if [ -e "${destination}" ]; then
-              continue
-            fi
-            curl --fail --silent --show-error --retry 3 --retry-delay 5 --create-dirs \
-              --output "${destination}" "${PAGES_URL}/schema/${version}/project.json"
-            echo "preserved schema ${version}"
-          done
-
-      - uses: actions/configure-pages@v6
-
-      - uses: actions/upload-pages-artifact@v5
-        with:
-          path: apps/web/dist
-
-      # Pages goes before npm on purpose. A schema URL that no published CLI mentions yet is
-      # harmless, whereas a published CLI whose schema URL is not on Pages breaks completion
-      # for its users with no error to see (requirements-definition 7.1). If npm publish fails
-      # after this step, re-running the failed jobs of this run rebuilds the same site from the
-      # same tag and publishes again.
-      - name: Deploy to GitHub Pages
-        id: deploy
-        uses: actions/deploy-pages@v5
-
-      # npm accepts this job's OIDC token in place of a long-lived publish token, so the
-      # repository holds no npm secret at all. `id-token: write` is what mints that token; Pages
-      # needs it too, so the job already had it.
-      - name: Publish the CLI to npm
+      - name: Publish
         run: pnpm --filter "${PACKAGE_NAME}" publish --access public --no-git-checks
