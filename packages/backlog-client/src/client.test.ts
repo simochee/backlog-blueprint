@@ -62,6 +62,21 @@ const rejecting = (error: unknown) =>
     fetch: (() => Promise.reject(error)) as never,
   });
 
+/** ブラウザの fetch と同じく、Window 以外のレシーバで呼ばれたら投げる。 */
+const brandChecked = function (this: unknown, url: string) {
+  if (this !== undefined && this !== globalThis) {
+    throw new TypeError("Failed to execute 'fetch' on 'Window': Illegal invocation");
+  }
+
+  return Promise.resolve({
+    url,
+    status: 200,
+    statusText: "",
+    headers: { get: () => null },
+    json: () => Promise.resolve({ id: 1 }),
+  });
+};
+
 const aRequest = (overrides: Partial<ResolvedHttpRequest> = {}): ResolvedHttpRequest => ({
   method: "POST",
   path: "/api/v2/projects/PROJ_A/webhooks",
@@ -110,6 +125,16 @@ describe("送信", () => {
     await client.send(aRequest({ params: { applicableIssueTypes: [] } }));
 
     expect(calls[0]?.body).toBe("applicableIssueTypes%5B%5D=");
+  });
+
+  it("ブラウザの fetch が拒むレシーバ付きの呼び出しをしない", async () => {
+    const client = createBacklogClient({
+      space: "example.backlog.com",
+      apiKey: API_KEY,
+      fetch: brandChecked as never,
+    });
+
+    await expect(client.get("/api/v2/users/myself")).resolves.toStrictEqual({ id: 1 });
   });
 
   it("計画が選んだメソッドとパスをそのまま使う", async () => {

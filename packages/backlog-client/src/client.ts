@@ -49,7 +49,19 @@ export const createBacklogClient = ({
   apiKey,
   fetch,
 }: BacklogClientOptions): BacklogClient => {
-  const backlog = new Backlog({ host: space, apiKey, fetch });
+  /**
+   * backlog-js は渡した関数を `this.fetch = ...` に置き、`this.fetch(url, init)` と
+   * 呼ぶ（0.20.1)。ブラウザの `fetch` はレシーバが Window でないと
+   * `Illegal invocation` を投げるので、そのままでは Web UI からの通信が全て失敗する。
+   * Node の fetch は `this` を見ないため CLI では露見しない。
+   * この包みはレシーバを捨てるためだけにあり、外すと Web UI が壊れる。
+   */
+  const transport = fetch ?? globalThis.fetch;
+  const backlog = new Backlog({
+    host: space,
+    apiKey,
+    fetch: (input, init) => transport(input, init),
+  });
 
   const call = async (
     method: string,
