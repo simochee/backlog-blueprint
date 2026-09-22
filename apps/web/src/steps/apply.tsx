@@ -3,6 +3,7 @@ import {
   renderHttpFailure,
   type ResolutionTable,
 } from "@backlog-blueprint/core";
+import { Callout, Card, Flex, Link, Progress, Text } from "@radix-ui/themes";
 
 import { CopyButton } from "../components/copy-button";
 import { projectUrl } from "../plan";
@@ -25,6 +26,9 @@ const resultText = ({ progress, resolutions }: ApplyRun): string => {
   return outcome === undefined ? "" : renderApplyResult(outcome, { color: false, resolutions });
 };
 
+const percent = ({ completed, total }: ApplyProgress): number =>
+  total === 0 ? 0 : Math.round((completed / total) * 100);
+
 export const ApplyStep = ({ run }: ApplyStepProps) => {
   const { progress, running, failure } = run;
   const text = resultText(run);
@@ -32,33 +36,50 @@ export const ApplyStep = ({ run }: ApplyStepProps) => {
   const aborted = progress.outcome?.result === "aborted";
 
   return (
-    <div className="step-body">
-      <div className="progress">
-        <progress max={progress.total} value={progress.completed} />
-        <span className="progress-counter">
+    <Flex direction="column" gap="4">
+      <Flex align="center" gap="3">
+        <Progress
+          color={aborted ? "red" : "blue"}
+          size="3"
+          style={{ flex: 1 }}
+          value={percent(progress)}
+        />
+        <Text size="2" weight="medium">
           {progress.completed} / {progress.total}
-        </span>
-      </div>
+        </Text>
+      </Flex>
       {progress.lines.length === 0 ? null : (
-        <pre className="progress-lines">{progress.lines.join("\n")}</pre>
+        <Card size="2" variant="surface">
+          <pre className="mono">{progress.lines.join("\n")}</pre>
+        </Card>
       )}
-      {text === "" ? null : <pre className="apply-result">{text}</pre>}
+      {text === "" ? null : (
+        <Card size="2" variant="surface">
+          <pre className="mono">{text}</pre>
+        </Card>
+      )}
       {succeeded ? (
-        <p>
-          <a href={projectUrl(run.space, run.projectKey)} rel="noreferrer" target="_blank">
-            Open {run.projectKey} in Backlog
-          </a>
-        </p>
+        <Callout.Root color="green" size="1" variant="surface">
+          <Callout.Text>
+            <Link href={projectUrl(run.space, run.projectKey)} rel="noreferrer" target="_blank">
+              Open {run.projectKey} in Backlog
+            </Link>
+          </Callout.Text>
+        </Callout.Root>
       ) : null}
       {aborted ? (
-        <div className="actions">
+        <Flex justify="end">
           <CopyButton label="Copy report" text={() => text} />
-        </div>
+        </Flex>
       ) : null}
       {failure === undefined ? null : (
-        <pre className="failure">{renderHttpFailure(failure, { color: false })}</pre>
+        <pre className="mono">{renderHttpFailure(failure, { color: false })}</pre>
       )}
-      {running ? <p className="panel-hint">Applying. Do not close this tab.</p> : null}
-    </div>
+      {running ? (
+        <Text color="gray" size="2">
+          Applying. Do not close this tab.
+        </Text>
+      ) : null}
+    </Flex>
   );
 };

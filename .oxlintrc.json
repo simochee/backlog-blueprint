@@ -113,7 +113,7 @@
       }
     },
     {
-      "files": ["apps/web/src/test-setup.ts"],
+      "files": ["apps/web/src/test-setup.ts", "apps/web/src/main.tsx"],
       "rules": {
         "import/no-unassigned-import": "off"
       }

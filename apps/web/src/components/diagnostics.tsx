@@ -1,4 +1,5 @@
 import { type Diagnostic } from "@backlog-blueprint/core";
+import { Callout, Flex, Text } from "@radix-ui/themes";
 
 import { diagnosticView } from "../view";
 
@@ -15,20 +16,27 @@ export const DiagnosticList = ({ diagnostics }: DiagnosticListProps) => {
   }
 
   return (
-    <div className="diagnostics">
-      {summary === undefined ? null : <p className="diagnostics-summary">{summary}</p>}
-      <ul className="diagnostic-list">
-        {blocks.map(({ diagnostic, text }, index) => (
-          <li
-            className="diagnostic"
-            data-severity={diagnostic.severity}
-            key={`${diagnostic.id}:${diagnostic.path}:${index}`}
-          >
-            <span className="diagnostic-position">{position(diagnostic)}</span>
-            <pre className="diagnostic-text">{text}</pre>
-          </li>
-        ))}
-      </ul>
-    </div>
+    <Flex direction="column" gap="2">
+      {summary === undefined ? null : (
+        <Text size="2" weight="bold">
+          {summary}
+        </Text>
+      )}
+      {blocks.map(({ diagnostic, text }, index) => (
+        <Callout.Root
+          color={diagnostic.severity === "error" ? "red" : "amber"}
+          key={`${diagnostic.id}:${diagnostic.path}:${index}`}
+          size="1"
+          variant="surface"
+        >
+          <Callout.Text>
+            <Flex align="start" gap="2">
+              <span className="diagnostic-position">{position(diagnostic)}</span>
+              <pre className="mono">{text}</pre>
+            </Flex>
+          </Callout.Text>
+        </Callout.Root>
+      ))}
+    </Flex>
   );
 };

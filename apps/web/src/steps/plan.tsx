@@ -8,6 +8,7 @@ import {
   type Action,
   type Diagnostic,
 } from "@backlog-blueprint/core";
+import { Box, Button, Card, Flex, Grid, Switch, Text } from "@radix-ui/themes";
 
 import { CopyButton } from "../components/copy-button";
 import { DiagnosticList } from "../components/diagnostics";
@@ -28,21 +29,32 @@ const ActionRow = ({ action }: { action: Action }) => {
   const { symbol, style, text, changes } = badgedAction(action);
 
   return (
-    <li className="action">
-      <span className="badge" data-style={style}>
+    <Flex align="start" className="action-row" gap="2" py="1">
+      <span className="action-symbol" data-style={style}>
         {symbol}
       </span>
-      <div className="action-body">
-        <pre className="action-line">{text}</pre>
+      <Box>
+        <pre className="mono">{text}</pre>
         {changes.map((change) => (
-          <pre className="action-change" key={change}>
+          <pre className="mono" key={change}>
             {change}
           </pre>
         ))}
-      </div>
-    </li>
+      </Box>
+    </Flex>
   );
 };
+
+const Stat = ({ label, value }: { label: string; value: string | number }) => (
+  <Card size="1" variant="surface">
+    <Text as="div" color="gray" size="1">
+      {label}
+    </Text>
+    <Text as="div" size="5" weight="bold">
+      {value}
+    </Text>
+  </Card>
+);
 
 export const PlanStep = ({
   prepared,
@@ -54,15 +66,11 @@ export const PlanStep = ({
   onApply,
 }: PlanStepProps) => {
   if (failure !== undefined) {
-    return <pre className="failure">{renderHttpFailure(failure, { color: false })}</pre>;
+    return <pre className="mono">{renderHttpFailure(failure, { color: false })}</pre>;
   }
 
   if (prepared === undefined) {
-    return (
-      <div className="step-body">
-        <DiagnosticList diagnostics={diagnostics} />
-      </div>
-    );
+    return <DiagnosticList diagnostics={diagnostics} />;
   }
 
   const { actions } = prepared.plan;
@@ -71,59 +79,48 @@ export const PlanStep = ({
   const warnings = renderWarnings(prepared.report.diagnostics, { paint: PLAIN });
 
   return (
-    <div className="step-body">
-      {summary.hasChanges ? null : <p className="panel-hint">{NO_CHANGES}</p>}
-      <ul className="action-list">
-        {shown.map((action) => (
-          <ActionRow action={action} key={action.id} />
-        ))}
-      </ul>
-      <label className="toggle">
-        <input
-          checked={showUnchanged}
-          onChange={(event) => onShowUnchangedChange(event.target.checked)}
-          type="checkbox"
-        />
-        Show unchanged ({summary.noop})
-      </label>
-      {warnings === "" ? null : <pre className="warnings">{warnings}</pre>}
-      <dl className="summary">
-        <div className="summary-item">
-          <dt>To add</dt>
-          <dd>{summary.create}</dd>
-        </div>
-        <div className="summary-item">
-          <dt>To change</dt>
-          <dd>{summary.update + summary.reorder}</dd>
-        </div>
-        <div className="summary-item">
-          <dt>To destroy</dt>
-          <dd>{summary.delete}</dd>
-        </div>
-        <div className="summary-item">
-          <dt>Unchanged</dt>
-          <dd>{summary.noop}</dd>
-        </div>
-        <div className="summary-item">
-          <dt>Write requests</dt>
-          <dd>{summary.writeRequests}</dd>
-        </div>
-        <div className="summary-item">
-          <dt>Estimated</dt>
-          <dd>{formatDuration(summary.estimatedSeconds)}</dd>
-        </div>
-      </dl>
-      <div className="actions">
+    <Flex direction="column" gap="4">
+      {summary.hasChanges ? null : (
+        <Text color="gray" size="2">
+          {NO_CHANGES}
+        </Text>
+      )}
+      <Card size="2" variant="surface">
+        <Flex direction="column">
+          {shown.map((action) => (
+            <ActionRow action={action} key={action.id} />
+          ))}
+        </Flex>
+      </Card>
+      <Text as="label" size="2">
+        <Flex align="center" gap="2">
+          <Switch
+            checked={showUnchanged}
+            onCheckedChange={(checked) => onShowUnchangedChange(checked)}
+          />
+          Show unchanged ({summary.noop})
+        </Flex>
+      </Text>
+      {warnings === "" ? null : <pre className="mono">{warnings}</pre>}
+      <Grid columns={{ initial: "2", sm: "3", md: "6" }} gap="2">
+        <Stat label="To add" value={summary.create} />
+        <Stat label="To change" value={summary.update + summary.reorder} />
+        <Stat label="To destroy" value={summary.delete} />
+        <Stat label="Unchanged" value={summary.noop} />
+        <Stat label="Write requests" value={summary.writeRequests} />
+        <Stat label="Estimated" value={formatDuration(summary.estimatedSeconds)} />
+      </Grid>
+      <Flex gap="3" justify="end">
         <CopyButton label="Copy JSON" text={() => renderPlanJson(prepared.report)} />
-        <button
-          className="button primary"
+        <Button
           disabled={applying || !summary.hasChanges}
+          loading={applying}
           onClick={onApply}
-          type="button"
+          size="3"
         >
           Apply
-        </button>
-      </div>
-    </div>
+        </Button>
+      </Flex>
+    </Flex>
   );
 };

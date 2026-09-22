@@ -1,3 +1,4 @@
+import { Box, Button, Flex, Grid, Text, TextArea, TextField } from "@radix-ui/themes";
 import { type DragEvent } from "react";
 
 import { DiagnosticList } from "../components/diagnostics";
@@ -40,12 +41,15 @@ export const ManifestStep = ({
   planning,
   onPlan,
 }: ManifestStepProps) => (
-  <div className="step-body">
-    <div className="manifest-columns">
-      <label className="field manifest-field">
-        <span className="field-label">Manifest (paste, or drop a file here)</span>
-        <textarea
-          className="textarea"
+  <Flex direction="column" gap="4">
+    <Grid columns={{ initial: "1", md: "minmax(0, 2fr) minmax(0, 1fr)" }} gap="4">
+      <Flex direction="column" gap="1">
+        <Text as="label" htmlFor="manifest" size="2" weight="medium">
+          Manifest (paste, or drop a file here)
+        </Text>
+        <TextArea
+          className="manifest-input"
+          id="manifest"
           onChange={(event) => onTextChange(event.target.value)}
           onDragOver={(event) => event.preventDefault()}
           onDrop={(event) => {
@@ -55,41 +59,46 @@ export const ManifestStep = ({
           spellCheck={false}
           value={text}
         />
-      </label>
-      <div className="environment">
-        <span className="field-label">Environment values</span>
+      </Flex>
+      <Flex direction="column" gap="3">
+        <Text size="2" weight="medium">
+          Environment values
+        </Text>
         {names.length === 0 ? (
-          <p className="panel-hint">No ${"{NAME}"} references in the manifest.</p>
+          <Text color="gray" size="2">
+            No ${"{NAME}"} references in the manifest.
+          </Text>
         ) : (
           names.map((name) => (
-            <label className="field" key={name}>
-              <span className="field-label">{name}</span>
-              <input
+            <Flex direction="column" gap="1" key={name}>
+              <Text as="label" htmlFor={`env-${name}`} size="1" weight="medium">
+                {name}
+              </Text>
+              <TextField.Root
                 autoComplete="off"
-                className="input"
                 defaultValue={environmentValue(name)}
+                id={`env-${name}`}
                 onChange={(event) => setEnvironmentValue(name, event.target.value)}
                 type="password"
               />
-            </label>
+            </Flex>
           ))
         )}
-      </div>
-    </div>
-    {validation === undefined ? (
-      <p className="panel-hint">Validating...</p>
-    ) : (
-      <DiagnosticList diagnostics={validation.diagnostics} />
-    )}
-    <div className="actions">
-      <button
-        className="button primary"
-        disabled={!canPlan || planning}
-        onClick={onPlan}
-        type="button"
-      >
-        {planning ? "Reading Backlog" : "Plan"}
-      </button>
-    </div>
-  </div>
+      </Flex>
+    </Grid>
+    <Box>
+      {validation === undefined ? (
+        <Text color="gray" size="2">
+          Validating...
+        </Text>
+      ) : (
+        <DiagnosticList diagnostics={validation.diagnostics} />
+      )}
+    </Box>
+    <Flex justify="end">
+      <Button disabled={!canPlan || planning} loading={planning} onClick={onPlan} size="3">
+        Plan
+      </Button>
+    </Flex>
+  </Flex>
 );

@@ -1,388 +1,158 @@
-:root {
-  --surface: #ffffff;
-  --page: #f4f5f7;
-  --border: #d8dbe0;
-  --text: #1a1d21;
-  --muted: #5d646d;
-  --accent: #2779ca;
-  --create: #1f8a4c;
-  --update: #a06a00;
-  --delete: #c0392b;
-  --noop: #7a828c;
-  --refresh: #1f7f92;
-  --warning: #a06a00;
-  --error: #c0392b;
-
-  color-scheme: light;
-  font-family: system-ui, sans-serif;
-  color: var(--text);
-}
+/**
+ * Radix Themes が覆う範囲（色・間隔・角丸・フォーム部品・カード）はここに書かない。
+ * 残しているのは、計画の等幅表示と、部品として用意されていないステッパーだけである。
+ * 二重に持つと、テーマを切り替えたときに片方だけ追従しないところができる。
+ */
 
 body {
   margin: 0;
-  background: var(--page);
 }
 
-.app {
-  max-width: 62rem;
-  margin: 0 auto;
-  padding: 2rem 1rem 4rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.app-header h1 {
+/* plan の出力はこのツールの主役なので、等幅と行間を自前で決める。 */
+.mono {
   margin: 0;
-  font-size: 1.5rem;
+  font-family: var(--code-font-family);
+  font-size: var(--font-size-1);
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
-.app-header p {
-  margin: 0.25rem 0 0;
-  color: var(--muted);
+.action-symbol {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  flex: none;
+  font-family: var(--code-font-family);
+  font-weight: 700;
 }
 
-.panel {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 0.5rem;
-  padding: 1rem 1.25rem 1.25rem;
+.action-symbol[data-style="create"] {
+  color: var(--green-11);
 }
 
-.panel[data-enabled="false"] {
-  opacity: 0.6;
+.action-symbol[data-style="update"] {
+  color: var(--amber-11);
 }
 
-.panel-title {
+.action-symbol[data-style="delete"] {
+  color: var(--red-11);
+}
+
+.action-symbol[data-style="refresh"] {
+  color: var(--cyan-11);
+}
+
+.action-symbol[data-style="noop"] {
+  color: var(--gray-9);
+}
+
+.action-row + .action-row {
+  border-top: 1px solid var(--gray-a3);
+}
+
+/**
+ * 行番号の桁を揃える。揃っていないと、診断が複数出たときに本文の開始位置が
+ * 行ごとにずれ、等幅で書いてある意味が消える。
+ */
+.diagnostic-position {
+  flex: none;
+  width: 4rem;
+  font-family: var(--code-font-family);
+  font-size: var(--font-size-1);
+  text-align: right;
+  color: var(--gray-10);
+}
+
+.manifest-input {
+  min-height: 24rem;
+  font-family: var(--code-font-family);
+  font-size: var(--font-size-1);
+}
+
+/* ステッパーは Radix に相当する部品が無いので自前で持つ。 */
+.stepper {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  margin: 0 0 0.75rem;
-  font-size: 1rem;
+  gap: var(--space-2);
+  overflow-x: auto;
+  padding-bottom: var(--space-1);
 }
 
-.panel-step {
+.stepper-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+}
+
+.stepper-bullet {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 1.5rem;
   height: 1.5rem;
-  border-radius: 50%;
-  background: var(--accent);
-  color: #ffffff;
-  font-size: 0.8rem;
+  border-radius: 100%;
+  font-size: var(--font-size-1);
+  font-weight: 700;
+  background: var(--gray-a3);
+  color: var(--gray-11);
 }
 
-.panel-hint {
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.875rem;
+.stepper-item[data-state="active"] .stepper-bullet {
+  background: var(--accent-9);
+  color: var(--accent-contrast);
 }
 
-.step-body {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
+.stepper-item[data-state="done"] .stepper-bullet {
+  background: var(--accent-a4);
+  color: var(--accent-11);
 }
 
-.field-row {
-  display: flex;
-  gap: 1rem;
-  flex-wrap: wrap;
+.stepper-rule {
+  width: var(--space-6);
+  height: 1px;
+  flex: none;
+  background: var(--gray-a5);
 }
 
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-/**
- * 伸び方は横並びの器の都合なので、器の側に置く。.field 自身に
- * `flex: 1 1 16rem` を持たせると、縦並びの .environment の中では
- * flex-basis が高さに効き、入力欄ひとつが 16rem の高さを占める。
- */
-.field-row > .field {
-  flex: 1 1 16rem;
-}
-
-.field-hint {
-  font-size: 0.8rem;
-  color: var(--accent);
-}
-
-.field-label {
-  font-size: 0.8rem;
-  color: var(--muted);
-}
-
-.input,
-.textarea {
-  font: inherit;
-  padding: 0.5rem;
-  border: 1px solid var(--border);
-  border-radius: 0.25rem;
-  background: var(--surface);
-  color: inherit;
-}
-
-.textarea {
-  font-family: ui-monospace, monospace;
-  font-size: 0.85rem;
-  min-height: 20rem;
-  resize: vertical;
-}
-
-.manifest-columns {
-  display: flex;
-  gap: 1rem;
-  align-items: flex-start;
-  flex-wrap: wrap;
-}
-
-.manifest-field {
-  flex: 2 1 28rem;
-}
-
-.environment {
-  flex: 1 1 16rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.actions {
-  display: flex;
-  gap: 0.5rem;
-  justify-content: flex-end;
-}
-
-.button {
-  font: inherit;
-  padding: 0.45rem 1rem;
-  border: 1px solid var(--border);
-  border-radius: 0.25rem;
-  background: var(--surface);
-  color: inherit;
-  cursor: pointer;
-}
-
-.button.primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #ffffff;
-}
-
-.button:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
-}
-
-.connected {
-  border-left: 3px solid var(--create);
-  padding-left: 0.75rem;
-}
-
-.connected p {
-  margin: 0.125rem 0;
-}
-
-.diagnostics {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.diagnostics-summary {
-  margin: 0;
-  font-weight: 600;
-}
-
-.diagnostic-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.diagnostic {
-  display: flex;
-  gap: 0.75rem;
-  padding: 0.375rem 0.5rem;
-  border-radius: 0.25rem;
-  background: var(--page);
-  border-left: 3px solid var(--muted);
-}
-
-.diagnostic[data-severity="error"] {
-  border-left-color: var(--error);
-}
-
-.diagnostic[data-severity="warning"] {
-  border-left-color: var(--warning);
-}
-
-.diagnostic-position {
-  flex: 0 0 4rem;
-  font-family: ui-monospace, monospace;
-  font-size: 0.8rem;
-  color: var(--muted);
-}
-
-pre {
-  margin: 0;
-  font-family: ui-monospace, monospace;
-  font-size: 0.85rem;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
-.action-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.125rem;
-}
-
-.action {
-  display: flex;
-  gap: 0.75rem;
-  align-items: baseline;
-}
-
-.badge {
-  flex: 0 0 auto;
+.panel-number {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 1.5rem;
-  padding: 0 0.25rem;
-  border-radius: 0.25rem;
-  font-family: ui-monospace, monospace;
-  color: #ffffff;
-  background: var(--noop);
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 100%;
+  flex: none;
+  font-size: var(--font-size-2);
+  font-weight: 700;
+  background: var(--accent-a4);
+  color: var(--accent-11);
 }
 
-.badge[data-style="create"] {
-  background: var(--create);
+.panel[data-enabled="false"] .panel-number {
+  background: var(--gray-a3);
+  color: var(--gray-10);
 }
 
-.badge[data-style="update"] {
-  background: var(--update);
-}
-
-.badge[data-style="delete"] {
-  background: var(--delete);
-}
-
-.badge[data-style="refresh"] {
-  background: var(--refresh);
-}
-
-.action-change {
-  color: var(--muted);
-  padding-left: 1.5rem;
-}
-
-.warnings {
-  color: var(--warning);
-}
-
-.failure {
-  color: var(--error);
-}
-
-.toggle {
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  font-size: 0.85rem;
-  color: var(--muted);
-}
-
-.summary {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  margin: 0;
-}
-
-.summary-item {
-  border: 1px solid var(--border);
-  border-radius: 0.25rem;
-  padding: 0.375rem 0.75rem;
-  min-width: 7rem;
-}
-
-.summary-item dt {
-  font-size: 0.75rem;
-  color: var(--muted);
-}
-
-.summary-item dd {
-  margin: 0;
-  font-size: 1.25rem;
-}
-
-.progress {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.progress progress {
-  flex: 1 1 auto;
-}
-
-.progress-counter {
-  font-family: ui-monospace, monospace;
-  font-size: 0.85rem;
-}
-
-.progress-lines,
-.apply-result {
-  background: var(--page);
-  border-radius: 0.25rem;
-  padding: 0.5rem 0.75rem;
-  max-height: 24rem;
-  overflow: auto;
-}
-
+/**
+ * 覆いは見た目だけで、クリックは通す（confirm.tsx）。`pointer-events: none` を
+ * 覆いに置き、ダイアログ本体だけで受け直す。背面が生きていないと WU-3 が効かない。
+ */
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgb(0 0 0 / 40%);
+  z-index: 10;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: var(--space-4);
+  pointer-events: none;
+  background: var(--color-overlay);
 }
 
 .dialog {
-  background: var(--surface);
-  border-radius: 0.5rem;
-  padding: 1.25rem;
-  max-width: 28rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.dialog-question {
-  margin: 0;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --surface: #1c1f24;
-    --page: #121417;
-    --border: #333941;
-    --text: #e7e9ec;
-    --muted: #9aa3ad;
-
-    color-scheme: dark;
-  }
+  width: min(28rem, 100%);
+  pointer-events: auto;
 }

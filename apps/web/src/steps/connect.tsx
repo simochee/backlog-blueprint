@@ -1,4 +1,5 @@
 import { renderHttpFailure, type Diagnostic } from "@backlog-blueprint/core";
+import { Badge, Button, Flex, Grid, Link, Text, TextField } from "@radix-ui/themes";
 
 import { DiagnosticList } from "../components/diagnostics";
 import { type Connection } from "../connection";
@@ -25,62 +26,73 @@ export const ConnectStep = ({
   connection,
   diagnostics,
   failure,
-}: ConnectStepProps) => (
-  <div className="step-body">
-    <div className="field-row">
-      <div className="field">
-        <label className="field-label" htmlFor="space-domain">
-          Space domain
-        </label>
-        <input
-          className="input"
-          id="space-domain"
-          onChange={(event) => onSpaceChange(event.target.value)}
-          placeholder="example.backlog.com"
-          spellCheck={false}
-          type="text"
-          value={space}
-        />
-        {apiKeyPageUrl(space) === undefined ? null : (
-          <a className="field-hint" href={apiKeyPageUrl(space)} rel="noreferrer" target="_blank">
-            Get an API key on {space.trim()}
-          </a>
-        )}
-      </div>
-      <label className="field">
-        <span className="field-label">API key</span>
-        <input
-          autoComplete="off"
-          className="input"
-          onChange={(event) => setApiKey(event.target.value)}
-          type="password"
-        />
-      </label>
-    </div>
-    <div className="actions">
-      <button
-        className="button primary"
-        disabled={!canConnect || connecting}
-        onClick={onConnect}
-        type="button"
-      >
-        {connecting ? "Connecting" : "Connect"}
-      </button>
-    </div>
-    {connection === undefined ? null : (
-      <div className="connected">
-        <p className="connected-user">
-          Signed in as {connection.user} at {connection.space} (Space Administrator)
-        </p>
-        <p className="connected-rate">
-          Update rate limit: {connection.updateRateLimit.remaining} /{" "}
-          {connection.updateRateLimit.limit} remaining
-        </p>
-      </div>
-    )}
-    <DiagnosticList diagnostics={diagnostics} />
-    {failure === undefined ? null : (
-      <pre className="failure">{renderHttpFailure(failure, { color: false })}</pre>
-    )}
-  </div>
-);
+}: ConnectStepProps) => {
+  const apiKeyPage = apiKeyPageUrl(space);
+
+  return (
+    <Flex direction="column" gap="4">
+      <Grid columns={{ initial: "1", sm: "2" }} gap="4">
+        <Flex direction="column" gap="1">
+          <Text as="label" htmlFor="space-domain" size="2" weight="medium">
+            Space domain
+          </Text>
+          <TextField.Root
+            id="space-domain"
+            onChange={(event) => onSpaceChange(event.target.value)}
+            placeholder="example.backlog.com"
+            size="3"
+            spellCheck={false}
+            value={space}
+          />
+          {apiKeyPage === undefined ? null : (
+            <Text size="1">
+              <Link href={apiKeyPage} rel="noreferrer" target="_blank">
+                Get an API key on {space.trim()}
+              </Link>
+            </Text>
+          )}
+        </Flex>
+        <Flex direction="column" gap="1">
+          <Text as="label" htmlFor="api-key" size="2" weight="medium">
+            API key
+          </Text>
+          <TextField.Root
+            autoComplete="off"
+            id="api-key"
+            onChange={(event) => setApiKey(event.target.value)}
+            size="3"
+            type="password"
+          />
+        </Flex>
+      </Grid>
+      <Flex justify="end">
+        <Button
+          disabled={!canConnect || connecting}
+          loading={connecting}
+          onClick={onConnect}
+          size="3"
+        >
+          Connect
+        </Button>
+      </Flex>
+      {connection === undefined ? null : (
+        <Flex align="center" gap="3" wrap="wrap">
+          <Badge color="green" size="2" variant="soft">
+            Connected
+          </Badge>
+          <Text size="2">
+            Signed in as {connection.user} at {connection.space} (Space Administrator)
+          </Text>
+          <Text color="gray" size="2">
+            Update rate limit: {connection.updateRateLimit.remaining} /{" "}
+            {connection.updateRateLimit.limit} remaining
+          </Text>
+        </Flex>
+      )}
+      <DiagnosticList diagnostics={diagnostics} />
+      {failure === undefined ? null : (
+        <pre className="mono">{renderHttpFailure(failure, { color: false })}</pre>
+      )}
+    </Flex>
+  );
+};

@@ -6,6 +6,7 @@ allowBuilds:
   esbuild: true
 
 catalog:
+  "@radix-ui/themes": ^3.3.0
   "@sinclair/typebox": ^0.34.52
   "@testing-library/jest-dom": ^7.0.1
   "@testing-library/react": ^16.3.3

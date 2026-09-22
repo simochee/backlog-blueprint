@@ -1,8 +1,11 @@
 import { execute, type Diagnostic } from "@backlog-blueprint/core";
+import { Container, Flex, Heading, Text, Theme } from "@radix-ui/themes";
 import { useEffect, useState, useSyncExternalStore } from "react";
 
+import { useAppearance } from "./appearance";
 import { ConfirmDialog } from "./components/confirm";
 import { Panel } from "./components/panel";
+import { Stepper } from "./components/stepper";
 import { connect, type Connection } from "./connection";
 import {
   connectionStamp,
@@ -24,6 +27,8 @@ import { PlanStep } from "./steps/plan";
 import { openTransport, transport } from "./transport";
 import { validateInBrowser, type ManifestValidation } from "./validation";
 
+const STEPS = ["Connect", "Manifest", "Plan", "Apply"];
+
 const VALIDATION_DELAY_MS = 300;
 
 const EMPTY_VALIDATION: ManifestValidation = {
@@ -35,6 +40,7 @@ const EMPTY_VALIDATION: ManifestValidation = {
 type ConnectAttempt = { diagnostics: Diagnostic[]; failure?: unknown; connection?: Connection };
 
 export const App = () => {
+  const appearance = useAppearance();
   const revisions = useSyncExternalStore(subscribeSecrets, secretRevisions);
   const [space, setSpace] = useState("");
   const [manifestText, setManifestText] = useState("");
@@ -191,78 +197,91 @@ export const App = () => {
     });
   };
 
+  const reached = [connection !== undefined, plan !== undefined, run !== undefined].filter(
+    Boolean,
+  ).length;
+
   return (
-    <main className="app">
-      <header className="app-header">
-        <h1>backlog-blueprint</h1>
-        <p>Declare a Backlog project in YAML, review the plan, then apply it.</p>
-      </header>
-      <Panel enabled step={1} title="Connect">
-        <ConnectStep
-          canConnect={space !== "" && hasApiKey()}
-          connecting={connecting}
-          diagnostics={attempt?.diagnostics ?? []}
-          failure={attempt?.failure}
-          onConnect={() => void runConnect()}
-          onSpaceChange={setSpace}
-          connection={attempt?.connection}
-          space={space}
-        />
-      </Panel>
-      <Panel
-        enabled={connection !== undefined}
-        hint="Connect to a space first."
-        step={2}
-        title="Manifest"
-      >
-        <ManifestStep
-          canPlan={validation?.manifest !== undefined}
-          names={validated?.value.names ?? []}
-          onFileDropped={(name, text) => {
-            setManifestSource(name);
-            setManifestText(text);
-          }}
-          onPlan={() => {
-            if (validation?.manifest !== undefined) {
-              void runPlan(validation.manifest);
-            }
-          }}
-          onTextChange={(text) => {
-            setManifestSource(PASTED);
-            setManifestText(text);
-          }}
-          planning={planning}
-          text={manifestText}
-          validation={validation}
-        />
-      </Panel>
-      <Panel
-        enabled={plan !== undefined}
-        hint="Run Plan to see what apply would do. The plan is discarded whenever an input changes, and once it has been applied."
-        step={3}
-        title="Plan"
-      >
-        <PlanStep
-          applying={run?.running === true}
-          diagnostics={plan?.diagnostics ?? []}
-          failure={plan?.failure}
-          onApply={() => setConfirmingPlan(planKey)}
-          onShowUnchangedChange={setShowUnchanged}
-          prepared={plan?.prepared}
-          showUnchanged={showUnchanged}
-        />
-      </Panel>
-      <Panel
-        enabled={run !== undefined}
-        hint="Nothing has been applied yet."
-        step={4}
-        title="Apply"
-      >
-        {run === undefined ? null : <ApplyStep run={run} />}
-      </Panel>
-      {confirming && plan?.prepared !== undefined ? (
-        <ConfirmDialog onCancel={cancelApply} onConfirm={applyPlan} />
-      ) : null}
-    </main>
+    <Theme accentColor="blue" appearance={appearance} grayColor="slate" radius="medium">
+      <Container maxWidth="1200px" px={{ initial: "4", sm: "6" }} py={{ initial: "5", sm: "8" }}>
+        <Flex direction="column" gap="5">
+          <Flex direction="column" gap="1">
+            <Heading as="h1" size="7">
+              backlog-blueprint
+            </Heading>
+            <Text color="gray" size="3">
+              Declare a Backlog project in YAML, review the plan, then apply it.
+            </Text>
+          </Flex>
+          <Stepper reached={reached} titles={STEPS} />
+          <Panel enabled step={1} title="Connect">
+            <ConnectStep
+              canConnect={space !== "" && hasApiKey()}
+              connecting={connecting}
+              diagnostics={attempt?.diagnostics ?? []}
+              failure={attempt?.failure}
+              onConnect={() => void runConnect()}
+              onSpaceChange={setSpace}
+              connection={attempt?.connection}
+              space={space}
+            />
+          </Panel>
+          <Panel
+            enabled={connection !== undefined}
+            hint="Connect to a space first."
+            step={2}
+            title="Manifest"
+          >
+            <ManifestStep
+              canPlan={validation?.manifest !== undefined}
+              names={validated?.value.names ?? []}
+              onFileDropped={(name, text) => {
+                setManifestSource(name);
+                setManifestText(text);
+              }}
+              onPlan={() => {
+                if (validation?.manifest !== undefined) {
+                  void runPlan(validation.manifest);
+                }
+              }}
+              onTextChange={(text) => {
+                setManifestSource(PASTED);
+                setManifestText(text);
+              }}
+              planning={planning}
+              text={manifestText}
+              validation={validation}
+            />
+          </Panel>
+          <Panel
+            enabled={plan !== undefined}
+            hint="Run Plan to see what apply would do. The plan is discarded whenever an input changes, and once it has been applied."
+            step={3}
+            title="Plan"
+          >
+            <PlanStep
+              applying={run?.running === true}
+              diagnostics={plan?.diagnostics ?? []}
+              failure={plan?.failure}
+              onApply={() => setConfirmingPlan(planKey)}
+              onShowUnchangedChange={setShowUnchanged}
+              prepared={plan?.prepared}
+              showUnchanged={showUnchanged}
+            />
+          </Panel>
+          <Panel
+            enabled={run !== undefined}
+            hint="Nothing has been applied yet."
+            step={4}
+            title="Apply"
+          >
+            {run === undefined ? null : <ApplyStep run={run} />}
+          </Panel>
+          {confirming && plan?.prepared !== undefined ? (
+            <ConfirmDialog onCancel={cancelApply} onConfirm={applyPlan} />
+          ) : null}
+        </Flex>
+      </Container>
+    </Theme>
   );
 };

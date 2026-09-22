@@ -1,3 +1,4 @@
+import { Card, Flex, Heading, Text } from "@radix-ui/themes";
 import { type ReactNode } from "react";
 
 export type PanelProps = {
@@ -9,11 +10,23 @@ export type PanelProps = {
 };
 
 export const Panel = ({ step, title, enabled, hint, children }: PanelProps) => (
-  <section className="panel" aria-disabled={!enabled} data-enabled={enabled}>
-    <h2 className="panel-title">
-      <span className="panel-step">{step}</span>
-      {title}
-    </h2>
-    {enabled ? children : <p className="panel-hint">{hint}</p>}
-  </section>
+  <Card asChild size="3">
+    <section aria-disabled={!enabled} className="panel" data-enabled={enabled}>
+      <Flex direction="column" gap="4">
+        <Flex align="center" asChild gap="3">
+          <Heading as="h2" size="4">
+            <span className="panel-number">{step}</span>
+            {title}
+          </Heading>
+        </Flex>
+        {enabled ? (
+          children
+        ) : (
+          <Text color="gray" size="2">
+            {hint}
+          </Text>
+        )}
+      </Flex>
+    </section>
+  </Card>
 );

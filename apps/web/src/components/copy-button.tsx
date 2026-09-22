@@ -1,3 +1,4 @@
+import { Button } from "@radix-ui/themes";
 import { useState } from "react";
 
 export type CopyButtonProps = { label: string; text: () => string };
@@ -16,8 +17,8 @@ export const CopyButton = ({ label, text }: CopyButtonProps) => {
   };
 
   return (
-    <button className="button" onClick={() => void copy()} type="button">
+    <Button color="gray" onClick={() => void copy()} type="button" variant="soft">
       {copied ? "Copied" : label}
-    </button>
+    </Button>
   );
 };
