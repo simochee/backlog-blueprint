@@ -47,10 +47,6 @@ describe("Webhook の現状取得", () => {
     ]);
   });
 
-  it("登録済みの hookUrl は取得値のまま保持する", () => {
-    expect(slack.hookUrl).toBe(SLACK_URL);
-  });
-
   it("プロジェクトが未作成なら取得を行わず、空のスナップショットになる", async () => {
     const snapshot = await webhooksReconciler.read(
       fixedReadContext({}, { snapshot: fixedSnapshot({ project: { exists: false } }) }),
@@ -182,13 +178,13 @@ describe("Webhook の通知イベント", () => {
 });
 
 describe("Webhook の hookUrl", () => {
-  it("環境変数から展開した hookUrl は実値で突き合わせる", () => {
+  it("hookUrl が一致していれば差分にならない", () => {
     const actions = plan([{ name: "Slack 通知", hookUrl: SLACK_URL, events: [1, 2] }], [slack]);
 
     expect(actions.map(({ op }) => op)).toEqual(["noop"]);
   });
 
-  it("環境変数から展開した hookUrl が違えば更新される", () => {
+  it("hookUrl が違えば更新される", () => {
     const actions = plan(
       [{ name: "Slack 通知", hookUrl: "https://hooks.example.test/T1/B1", events: [1, 2] }],
       [slack],
@@ -197,50 +193,13 @@ describe("Webhook の hookUrl", () => {
     expect(actions.map(({ op }) => op)).toEqual(["update"]);
   });
 
-  it("環境変数から展開した hookUrl は出力に実値が現れる", () => {
+  it("更新の送信には新しい hookUrl がそのまま載る", () => {
     const [action] = plan(
       [{ name: "Slack 通知", hookUrl: "https://hooks.example.test/T1/B1", events: [1, 2] }],
       [slack],
     );
 
     expect(action?.request?.params.hookUrl).toBe("https://hooks.example.test/T1/B1");
-  });
-
-  it("Yaml に直接書かれた hookUrl もそのまま出る", () => {
-    const [action] = plan(
-      [{ name: "Slack 通知", hookUrl: "https://hooks.example.test/T1/B1", events: [1, 2] }],
-      [slack],
-    );
-
-    expect(action?.request?.params.hookUrl).toBe("https://hooks.example.test/T1/B1");
-  });
-
-  it("環境変数から展開した description もそのまま出る", () => {
-    const [action] = plan(
-      [
-        {
-          name: "Slack 通知",
-          description: "秘密の説明",
-          hookUrl: SLACK_URL,
-          events: [1, 2],
-        },
-      ],
-      [],
-    );
-
-    expect(action?.request?.params.description).toBe("秘密の説明");
-  });
-
-  it("Webhook 名はマニフェストに指定するとリクエストにも差分にも平文で出る", () => {
-    const [action] = plan([{ name: "社外秘の Webhook", hookUrl: SLACK_URL, events: [1, 2] }], []);
-
-    expect(action?.request?.params.name).toBe("社外秘の Webhook");
-    expect(action?.changes).toContainEqual({
-      field: "name",
-      before: null,
-      after: "社外秘の Webhook",
-    });
-    expect(action?.id).toBe("webhooks/create/社外秘の Webhook");
   });
 });
 

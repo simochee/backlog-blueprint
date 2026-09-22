@@ -197,7 +197,7 @@ describe("検証済みのマニフェストからの組み立て", () => {
     expect(created?.actions.map(({ id }) => id)).toContain("issueTypes/create/タスク");
   });
 
-  it("文字列値は計画に平文で載る", async () => {
+  it("マニフェストの hookUrl は計画のリクエストにそのまま載る", async () => {
     const { plan: created } = await buildPlan({
       manifest: fixedManifest({ ...declared, webhooks: [webhook] }),
       get: fixedGet(fixedSpaceResponses()),

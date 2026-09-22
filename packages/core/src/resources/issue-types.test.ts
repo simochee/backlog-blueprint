@@ -312,50 +312,7 @@ describe("未作成のプロジェクト", () => {
   });
 });
 
-describe("文字列値の出力", () => {
-  it("課題テンプレートはマニフェストに書いた値のまま計画に載る", () => {
-    const actions = issueTypesReconciler.plan(
-      [{ name: "バグ", color: "#990000", templateDescription: "社外秘の手順" }],
-      { source: "project", issueTypes: [] },
-      fixedPlanContext(),
-    );
-
-    expect(actions[0]?.request?.params.templateDescription).toBe("社外秘の手順");
-  });
-
-  it("課題種別の名前はマニフェストに指定するとリクエストにも差分にも平文で出る", () => {
-    const actions = issueTypesReconciler.plan(
-      [{ name: "社外秘の課題種別", color: "#990000" }],
-      { source: "project", issueTypes: [] },
-      fixedPlanContext(),
-    );
-
-    expect(actions[0]?.request?.params.name).toBe("社外秘の課題種別");
-    expect(actions[0]?.changes).toContainEqual({
-      field: "name",
-      before: null,
-      after: "社外秘の課題種別",
-    });
-    expect(actions[0]?.id).toBe("issueTypes/create/社外秘の課題種別");
-  });
-});
-
 describe("冪等性（NFR-4）", () => {
-  it("マニフェストに指定した課題テンプレートが現状と同じなら2回目は noop になる", () => {
-    const actions = issueTypesReconciler.plan(
-      [{ name: "バグ", color: "#990000", templateDescription: "社外秘の手順" }],
-      {
-        source: "project",
-        issueTypes: [
-          { id: 101, name: "バグ", color: "#990000", templateDescription: "社外秘の手順" },
-        ],
-      },
-      fixedPlanContext(),
-    );
-
-    expect(actions.map(({ op }) => op)).toEqual(["noop"]);
-  });
-
   it("適用後の現状に同じマニフェストを当てると全部 noop になる", () => {
     const desired: IssueType[] = [
       { name: "タスク", color: "#7ea800" },

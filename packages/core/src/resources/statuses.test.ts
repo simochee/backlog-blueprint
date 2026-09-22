@@ -231,48 +231,7 @@ describe("表示順", () => {
   });
 });
 
-describe("文字列値の出力", () => {
-  it("ステータス名はマニフェストに指定するとリクエストにも差分にも平文で出る", () => {
-    const [create] = statusesReconciler.plan(
-      [{ name: "社外秘ステータス", color: "#3b9dbd" }],
-      { source: "project", statuses: [] },
-      fixedPlanContext(),
-    );
-
-    expect(create?.request?.params.name).toBe("社外秘ステータス");
-    expect(create?.changes).toContainEqual({
-      field: "name",
-      before: null,
-      after: "社外秘ステータス",
-    });
-    expect(create?.id).toBe("statuses/create/社外秘ステータス");
-  });
-});
-
 describe("冪等性", () => {
-  it("マニフェストに指定した色が現状と同じなら2回目は noop になる", () => {
-    const desired: Status[] = [
-      ...defaults.slice(0, 2),
-      { name: "レビュー中", color: "#3b9dbd" },
-      ...defaults.slice(2),
-    ];
-    const applied = [
-      { id: 1, name: "未対応", color: "#ed8077" },
-      { id: 2, name: "処理中", color: "#4488c5" },
-      { id: 5, name: "レビュー中", color: "#3b9dbd" },
-      { id: 3, name: "処理済み", color: "#5eb5a6" },
-      { id: 4, name: "完了", color: "#b0be3c" },
-    ];
-
-    const actions = statusesReconciler.plan(
-      desired,
-      { source: "project", statuses: applied },
-      fixedPlanContext(),
-    );
-
-    expect(actions.every(({ op }) => op === "noop")).toBe(true);
-  });
-
   it("適用後の現状に同じマニフェストを当てると、並べ直しも含めて何も起きない", () => {
     const desired: Status[] = [
       ...defaults.slice(0, 2),

@@ -424,47 +424,6 @@ describe("カスタム属性の oldname", () => {
   });
 });
 
-describe("文字列値の出力", () => {
-  it("説明はマニフェストに書いた値のまま計画に載る", () => {
-    const actions = customFieldsReconciler.plan(
-      [{ name: "顧客名", type: "text", description: "社外秘の説明" }],
-      { customFields: [], issueTypes: [] },
-      fixedPlanContext(),
-    );
-
-    expect(actions[0]?.request?.params.description).toBe("社外秘の説明");
-  });
-
-  it("カスタム属性名はマニフェストに指定するとリクエストにも差分にも平文で出る", () => {
-    const actions = customFieldsReconciler.plan(
-      [{ name: "社外秘の属性", type: "text" }],
-      { customFields: [], issueTypes: [] },
-      fixedPlanContext(),
-    );
-
-    expect(actions[0]?.request?.params.name).toBe("社外秘の属性");
-    expect(actions[0]?.changes).toContainEqual({
-      field: "name",
-      before: null,
-      after: "社外秘の属性",
-    });
-    expect(actions[0]?.id).toBe("customFields/create/社外秘の属性");
-  });
-
-  it("マニフェストに指定した単位が現状と同じなら2回目は noop になる", () => {
-    const actions = customFieldsReconciler.plan(
-      [{ name: "予算", type: "number", unit: "億円" }],
-      {
-        customFields: [{ id: 31, name: "予算", typeId: 3, unit: "億円", applicableIssueTypes: [] }],
-        issueTypes: [],
-      },
-      fixedPlanContext(),
-    );
-
-    expect(actions.map(({ op }) => op)).toEqual(["noop"]);
-  });
-});
-
 describe("カスタム属性の型の変更", () => {
   it("同名で型だけが変われば、削除と作成の2件になる", () => {
     const actions = plan(

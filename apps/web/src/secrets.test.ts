@@ -10,7 +10,7 @@ import {
   subscribeSecrets,
 } from "./secrets";
 
-describe("秘匿値の保持", () => {
+describe("API キーと環境変数の値の保持", () => {
   it("API キーは入力されるまで無い", () => {
     expect(secretRevisions().hasApiKey).toBe(false);
   });
@@ -50,7 +50,7 @@ describe("秘匿値の保持", () => {
   });
 });
 
-describe("秘匿値の書き換えを知らせる", () => {
+describe("入力値の書き換えを知らせる", () => {
   it("API キーを書き換えると接続の版が進む", () => {
     const before = secretRevisions().credentials;
 

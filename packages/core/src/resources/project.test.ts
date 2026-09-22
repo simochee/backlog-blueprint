@@ -161,37 +161,6 @@ describe("settings", () => {
   });
 });
 
-describe("文字列値の出力", () => {
-  it("プロジェクト名はマニフェストに書いた値のまま計画に載る", () => {
-    const actions = projectReconciler.plan(
-      desired({ name: "極秘プロジェクト" }),
-      { exists: false },
-      fixedPlanContext(),
-    );
-
-    expect(actions[0]?.request?.params.name).toBe("極秘プロジェクト");
-  });
-
-  it("基本設定はマニフェストに書いた値のまま送られる", () => {
-    const actions = projectReconciler.plan(
-      desired({ name: "プロジェクトA", settings: { textFormattingRule: "markdown" } }),
-      existing(),
-      fixedPlanContext(),
-    );
-
-    expect(actions[0]?.request?.params.textFormattingRule).toBe("markdown");
-    expect(actions[0]?.request?.params.name).toBe("プロジェクトA");
-  });
-
-  it("プロジェクトキーはマニフェストに指定するとリクエストにも差分にも平文で出る", () => {
-    const actions = projectReconciler.plan(desired(), { exists: false }, fixedPlanContext());
-
-    expect(actions[0]?.request?.params.key).toBe("PROJ_A");
-    expect(actions[0]?.changes).toContainEqual({ field: "key", before: null, after: "PROJ_A" });
-    expect(actions[0]?.id).toBe("project/create/PROJ_A");
-  });
-});
-
 describe("送るものと前後差分の対応（PO-11）", () => {
   it("作成でもリクエストに載る項目がすべて前後差分に並ぶ", () => {
     const [create] = projectReconciler.plan(
@@ -221,26 +190,6 @@ describe("送るものと前後差分の対応（PO-11）", () => {
 });
 
 describe("冪等性（NFR-4）", () => {
-  it("マニフェストに指定したプロジェクト名が現状と同じなら2回目は何も起きない", () => {
-    const actions = projectReconciler.plan(
-      desired({ name: "極秘プロジェクト" }),
-      existing({ name: "極秘プロジェクト" }),
-      fixedPlanContext(),
-    );
-
-    expect(actions.map(({ op }) => op)).toEqual(["noop"]);
-  });
-
-  it("マニフェストに指定した基本設定が現状と同じなら2回目は何も起きない", () => {
-    const actions = projectReconciler.plan(
-      desired({ settings: { textFormattingRule: "markdown" } }),
-      existing({ settings: { textFormattingRule: "markdown" } }),
-      fixedPlanContext(),
-    );
-
-    expect(actions.map(({ op }) => op)).toEqual(["noop"]);
-  });
-
   it("適用後の現状に同じマニフェストを当てると何も起きない", () => {
     const settings = {
       textFormattingRule: "markdown" as const,

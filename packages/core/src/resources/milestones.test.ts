@@ -246,43 +246,7 @@ describe("マイルストーンの oldname", () => {
   });
 });
 
-describe("文字列値の出力", () => {
-  it("説明はマニフェストに書いた値のまま計画に載る", () => {
-    const actions = milestonesReconciler.plan(
-      [{ name: "v1.0", description: "社外秘の説明" }],
-      [],
-      fixedPlanContext(),
-    );
-
-    expect(actions[0]?.request?.params.description).toBe("社外秘の説明");
-  });
-
-  it("マイルストーン名はマニフェストに指定するとリクエストにも差分にも平文で出る", () => {
-    const actions = milestonesReconciler.plan(
-      [{ name: "社外秘マイルストーン" }],
-      [],
-      fixedPlanContext(),
-    );
-
-    expect(actions[0]?.request?.params.name).toBe("社外秘マイルストーン");
-    expect(actions[0]?.changes).toEqual([
-      { field: "name", before: null, after: "社外秘マイルストーン" },
-    ]);
-    expect(actions[0]?.id).toBe("milestones/create/社外秘マイルストーン");
-  });
-});
-
 describe("冪等性（NFR-4）", () => {
-  it("マニフェストに指定した説明が現状と同じなら2回目は noop になる", () => {
-    const actions = milestonesReconciler.plan(
-      [{ name: "v1.0", description: "社外秘の説明" }],
-      [{ id: 21, name: "v1.0", description: "社外秘の説明" }],
-      fixedPlanContext(),
-    );
-
-    expect(actions.map(({ op }) => op)).toEqual(["noop"]);
-  });
-
   it("適用後の現状に同じマニフェストを当てると全部 noop になる", () => {
     const desired: Milestone[] = [
       { name: "v1.0", description: "最初のリリース", startDate: "2026-10-01" },

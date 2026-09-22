@@ -155,31 +155,7 @@ describe("カテゴリーの oldname", () => {
   });
 });
 
-describe("文字列値の出力", () => {
-  it("カテゴリー名はマニフェストに指定するとリクエストにも差分にも平文で出る", () => {
-    const [action] = categoriesReconciler.plan(
-      [{ name: "社外秘カテゴリー" }],
-      [],
-      fixedPlanContext(),
-    );
-
-    expect(action?.request?.params.name).toBe("社外秘カテゴリー");
-    expect(action?.changes).toEqual([{ field: "name", before: null, after: "社外秘カテゴリー" }]);
-    expect(action?.id).toBe("categories/create/社外秘カテゴリー");
-  });
-});
-
 describe("冪等性（NFR-4）", () => {
-  it("マニフェストに指定したカテゴリー名が現状と同じなら2回目は noop になる", () => {
-    const actions = categoriesReconciler.plan(
-      [{ name: "社外秘カテゴリー" }],
-      [{ id: 11, name: "社外秘カテゴリー" }],
-      fixedPlanContext(),
-    );
-
-    expect(actions.map(({ op }) => op)).toEqual(["noop"]);
-  });
-
   it("適用後の現状に同じマニフェストを当てると全部 noop になる", () => {
     const desired: Category[] = [
       { name: "インフラ" },

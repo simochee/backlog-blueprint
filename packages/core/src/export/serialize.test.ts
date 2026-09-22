@@ -49,7 +49,7 @@ describe("書き出したマニフェストの体裁", () => {
     const yaml = serialize(
       manifestOf({
         categories: [{ name: "フロントエンド" }],
-        webhooks: [{ name: "Slack", hookUrl: "${WEBHOOK_URL_1}", events: "all" }],
+        webhooks: [{ name: "Slack", hookUrl: "${SLACK_WEBHOOK_URL}", events: "all" }],
       }),
     );
 
@@ -244,7 +244,7 @@ describe("書き出した Yaml をこのツールのパーサが読み戻す", (
   it("${...} を含む値は展開も解釈もされずそのまま読み戻る", () => {
     const manifest = manifestOf({
       webhooks: [
-        { name: "Slack", hookUrl: "${WEBHOOK_URL_1}", events: ["issueCreated"] },
+        { name: "Slack", hookUrl: "${SLACK_WEBHOOK_URL}", events: ["issueCreated"] },
         { name: "監査", hookUrl: "$${NAME}", events: "all" },
       ],
     });
@@ -318,7 +318,7 @@ describe("書き出した Yaml をこのツールのパーサが読み戻す", (
       webhooks: [
         {
           name: "Slack 通知",
-          hookUrl: "${WEBHOOK_URL_1}",
+          hookUrl: "${SLACK_WEBHOOK_URL}",
           events: ["issueCreated", "issueUpdated"],
         },
       ],
