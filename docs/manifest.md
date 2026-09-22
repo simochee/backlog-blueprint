@@ -175,6 +175,19 @@ webhooks:
     hookUrl: ${SLACK_WEBHOOK_URL}
 ```
 
+A value that is nothing but a single `${NAME}` takes the type the key expects: where a key accepts
+`true`/`false` or a number, an expanded `true`, `false` or JSON number such as `31` or `-1.5` becomes
+that type. Anything else stays a string and is checked like one. A reference inside other text, such
+as `PROJ_${ENV}`, always stays a string.
+
+```yaml
+settings:
+  chartEnabled: ${CHART_ENABLED} # CHART_ENABLED=true
+access:
+  teams:
+    - ${QA_TEAM_ID} # QA_TEAM_ID=31
+```
+
 An undefined variable is an error — except under `validate`, where it is only a warning, so that a
 CI job can check the manifest without those values. To write the characters literally, escape the
 expansion as `$${NAME}`.
