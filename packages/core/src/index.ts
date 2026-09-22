@@ -1,5 +1,8 @@
 export { asRecord, requiredNumber, requiredString } from "./api-response";
 export { execute } from "./executor";
+export { createExport } from "./export/create-export";
+export { serializeManifest } from "./export/serialize";
+export { toManifest } from "./export/to-manifest";
 export {
   CUSTOM_FIELD_TYPE_IDS,
   DATE_PATTERN,
@@ -30,6 +33,7 @@ export {
   renderApplyJson,
   renderApplyResult,
   renderDiagnostics,
+  renderExportNotes,
   renderHttpFailure,
   renderPlanJson,
   renderPlanText,
@@ -64,6 +68,7 @@ export {
 } from "./resources/statuses";
 export { webhooksReconciler } from "./resources/webhooks";
 export { declaredOrder, FIXED_ORDER_SECTIONS, resultingOrder } from "./resulting-order";
+export { projectSchemaPath, projectSchemaUrl, SCHEMA_DISTRIBUTION_ORIGIN } from "./schema-url";
 export { Secret, sealChanges, sealFields, sealer } from "./secret";
 export { authenticateExecutor } from "./validation/auth-stage";
 export { expandEnvironment, hasEnvSentinel, UNRESOLVED_ENV_ID } from "./validation/expand-stage";
@@ -94,6 +99,13 @@ export type {
 } from "./action";
 export type { HttpFailure } from "./api-response";
 export type { Diagnostic } from "./diagnostic";
+export type {
+  CreateExportOptions,
+  CreateExportResult,
+  ProjectExport,
+} from "./export/create-export";
+export type { SerializeOptions } from "./export/serialize";
+export type { ToManifestResult, WebhookVariable } from "./export/to-manifest";
 export type { ExecuteContext, ExecutionEvent } from "./execution";
 export type {
   Access,
@@ -116,6 +128,7 @@ export type {
   ApplyOptions,
   ApplyOutcome,
   DiagnosticOptions,
+  ExportNotesInput,
   FailedJson,
   LineVariant,
   Paint,

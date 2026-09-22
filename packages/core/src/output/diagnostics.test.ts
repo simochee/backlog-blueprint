@@ -105,6 +105,12 @@ describe("検証エラーの集計行", () => {
     );
   });
 
+  it("書き出しが絡むときは、エラーを export のものとして数え、何も書かれていないことを添える", () => {
+    expect(firstLine(renderDiagnostics([missingStatus, hasIssues], { nothingWritten: true }))).toBe(
+      "2 export errors. Nothing has been written.",
+    );
+  });
+
   it("警告しか無いときは集計行を出さない", () => {
     const warning: Diagnostic = { ...missingStatus, severity: "warning" };
 

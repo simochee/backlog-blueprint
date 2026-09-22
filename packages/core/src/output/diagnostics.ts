@@ -30,19 +30,34 @@ const indent = (width: number, lines: string[]): string[] =>
 /**
  * `Nothing has been applied.` を添えるかは呼び出し側が決める（要件定義 §5.3）。
  * `validate` と `plan` はもともと何も適用しないので、そこで言うと意味をなさない。
+ * `export` は適用しないが書き出しはしないので、そこだけ差し替える（CL-9）。
  */
-export type DiagnosticOptions = { paint?: Paint; nothingApplied?: boolean };
+export type DiagnosticOptions = {
+  paint?: Paint;
+  nothingApplied?: boolean;
+  nothingWritten?: boolean;
+};
 
-const errorSummary = (diagnostics: Diagnostic[], nothingApplied: boolean): string[] => {
+type ErrorSummaryOptions = Required<Pick<DiagnosticOptions, "nothingApplied" | "nothingWritten">>;
+
+const errorSummary = (
+  diagnostics: Diagnostic[],
+  { nothingApplied, nothingWritten }: ErrorSummaryOptions,
+): string[] => {
   const count = diagnostics.filter(({ severity }) => severity === "error").length;
 
   if (count === 0) {
     return [];
   }
 
-  const errors = count === 1 ? "1 validation error." : `${count} validation errors.`;
+  const noun = nothingWritten ? "export" : "validation";
+  const errors = count === 1 ? `1 ${noun} error.` : `${count} ${noun} errors.`;
 
-  return [nothingApplied ? `${errors} Nothing has been applied.` : errors];
+  if (nothingApplied) {
+    return [`${errors} Nothing has been applied.`];
+  }
+
+  return [nothingWritten ? `${errors} Nothing has been written.` : errors];
 };
 
 /**
@@ -51,10 +66,10 @@ const errorSummary = (diagnostics: Diagnostic[], nothingApplied: boolean): strin
  */
 export const renderDiagnostics = (
   diagnostics: Diagnostic[],
-  { paint = plain, nothingApplied = false }: DiagnosticOptions = {},
+  { paint = plain, nothingApplied = false, nothingWritten = false }: DiagnosticOptions = {},
 ): string =>
   [
-    ...errorSummary(diagnostics, nothingApplied),
+    ...errorSummary(diagnostics, { nothingApplied, nothingWritten }),
     ...orderDiagnostics(diagnostics).map((diagnostic) =>
       [
         paint(

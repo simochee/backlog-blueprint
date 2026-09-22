@@ -10,16 +10,12 @@ import {
   type Status,
   type Webhook,
 } from "../manifest";
+import { projectSchemaUrl } from "../schema-url";
 
 export type SerializeOptions = {
   /** 実行中のツールの版。`$schema` の URL に入る（EX-15 / D-2） */
   version: string;
 };
-
-const DISTRIBUTION_ORIGIN = "https://simochee.github.io/backlog-blueprint";
-
-export const projectSchemaUrl = (version: string): string =>
-  `${DISTRIBUTION_ORIGIN}/schema/${version}/project.json`;
 
 /**
  * `version` / `schema` / `resolveKnownTags` は S1 の `PARSE_OPTIONS` と同じ値でなければ

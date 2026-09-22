@@ -1,7 +1,7 @@
-import { ManifestSchema } from "@backlog-blueprint/core";
+import { ManifestSchema, projectSchemaPath, projectSchemaUrl } from "@backlog-blueprint/core";
 import { describe, expect, it } from "vitest";
 
-import { projectSchema, projectSchemaArtifact, projectSchemaPath, projectSchemaUrl } from "./index";
+import { projectSchema, projectSchemaArtifact } from "./index";
 
 describe("配布する JSON Schema", () => {
   it("本体は手書きされず、コード側のスキーマ定義そのものである", () => {

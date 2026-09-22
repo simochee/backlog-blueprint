@@ -30,6 +30,13 @@ const projectPath = (projectKey: string): string => `/api/v2/projects/${projectK
 const issueCountPath = (projectId: number): string =>
   `/api/v2/issues/count?projectId[]=${projectId}`;
 
+/**
+ * 失敗をここで捕まえない。VP-5 のゲートを持つ `readSpaceSnapshot` だけが V-B3 の診断に
+ * 変え、ゲートを持たない `export` はその文言を借りずに素の失敗として扱う（EX-3）。
+ */
+export const readIssueCount = async (get: ReadContext["get"], projectId: number): Promise<number> =>
+  requiredNumber(asRecord(await get(issueCountPath(projectId))), "count");
+
 export const readUpdateRateLimit = async (get: ReadContext["get"]): Promise<RateLimit> => {
   const body = asRecord(await get(RATE_LIMIT_PATH));
   const update = asRecord(asRecord(body["rateLimit"])["update"]);
@@ -46,7 +53,7 @@ export const readUpdateRateLimit = async (get: ReadContext["get"]): Promise<Rate
  * この1箇所だけで、他のすべての GET では 404 は本物の失敗である。送信層に
  * 「どの 404 が情報か」を判断させると、その知識が core と送信層に分かれる。
  */
-const readProjectId = async (
+export const readProjectId = async (
   get: ReadContext["get"],
   projectKey: string,
 ): Promise<number | undefined> => {
@@ -82,7 +89,7 @@ export const readSpaceSnapshot = async ({
   }
 
   try {
-    const issueCount = requiredNumber(asRecord(await get(issueCountPath(projectId))), "count");
+    const issueCount = await readIssueCount(get, projectId);
 
     return {
       diagnostics: [],
@@ -97,7 +104,7 @@ export const readSpaceSnapshot = async ({
   }
 };
 
-const readResourceSnapshots = async (ctx: ReadContext): Promise<ResourceSnapshots> => ({
+export const readResourceSnapshots = async (ctx: ReadContext): Promise<ResourceSnapshots> => ({
   projectKey: ctx.projectKey,
   project: await projectReconciler.read(ctx),
   issueTypes: await issueTypesReconciler.read(ctx),
@@ -113,7 +120,7 @@ const readResourceSnapshots = async (ctx: ReadContext): Promise<ResourceSnapshot
  * 依存グラフを作らず、要件定義 §6 のフェーズ順に並べたフラットな全順序にする（C-3）。
  * 順序を宣言から計算させると、§6 の表とコードの対応が失われる。
  */
-const planActions = (
+export const planActions = (
   manifest: Manifest,
   snapshots: ResourceSnapshots,
   ctx: PlanContext,
