@@ -115,6 +115,11 @@ const writeManifest = async (user: UserEvent, text: string): Promise<void> => {
   await user.paste(text);
 };
 
+/** 環境変数の欄はボタンの中に畳まれている（manifest.tsx）。開いてから掴む。 */
+const openEnvironment = async (user: UserEvent): Promise<void> => {
+  await user.click(await screen.findByRole("button", { name: /Environment values/ }));
+};
+
 const plan = async (user: UserEvent): Promise<void> => {
   await waitFor(() => {
     expect(button("Plan")).toBeEnabled();
@@ -191,14 +196,35 @@ describe("接続", () => {
 });
 
 describe("環境変数の入力欄", () => {
-  it("${NAME} を書くとその名前の入力欄が現れる", async () => {
+  it("${NAME} を書くと、未入力の件数を示すボタンが現れる", async () => {
     const user = await startApp();
 
     await connect(user);
     await screen.findByText(/Signed in as yamada/);
     await writeManifest(user, withCategory("${CATEGORY_NAME}"));
 
+    expect(await screen.findByRole("button", { name: /Environment values 1/ })).toBeInTheDocument();
+  });
+
+  it("そのボタンを開くと ${NAME} の名前で入力欄が並ぶ", async () => {
+    const user = await startApp();
+
+    await connect(user);
+    await screen.findByText(/Signed in as yamada/);
+    await writeManifest(user, withCategory("${CATEGORY_NAME}"));
+    await openEnvironment(user);
+
     expect(await screen.findByLabelText("CATEGORY_NAME")).toBeInTheDocument();
+  });
+
+  it("${NAME} を書いていなければボタンごと出さない", async () => {
+    const user = await startApp();
+
+    await connect(user);
+    await screen.findByText(/Signed in as yamada/);
+    await writeManifest(user, MANIFEST);
+
+    expect(screen.queryByRole("button", { name: /Environment values/ })).toBeNull();
   });
 
   it("値を打っていない ${NAME} は計画に進めない", async () => {
@@ -238,14 +264,20 @@ describe("秘匿値の置き場所", () => {
     await connect(user);
     await screen.findByText(/Signed in as yamada/);
     await writeManifest(user, withWebhook("${WEBHOOK_URL}"));
+    await openEnvironment(user);
     await user.type(await screen.findByLabelText("WEBHOOK_URL"), hookUrl);
+
+    expect(carrying(hookUrl)).toStrictEqual(["INPUT:password"]);
+
+    await user.click(screen.getByRole("button", { name: "Done" }));
     await plan(user);
 
     expect(screen.getByText(/webhook .+ hookUrl \*\*\*/)).toBeInTheDocument();
     expect(document.body.textContent).not.toContain(API_KEY);
     expect(document.body.textContent).not.toContain(hookUrl);
     expect(carrying(API_KEY)).toStrictEqual(["INPUT:password"]);
-    expect(carrying(hookUrl)).toStrictEqual(["INPUT:password"]);
+    /** 畳めば入力欄ごと消えるので、秘匿値は DOM のどこにも残らない。 */
+    expect(carrying(hookUrl)).toStrictEqual([]);
   });
 });
 

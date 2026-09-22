@@ -1,8 +1,8 @@
-import { Box, Button, Flex, Grid, Text, TextField } from "@radix-ui/themes";
+import { Box, Button, Flex, Text } from "@radix-ui/themes";
 import { lazy, Suspense } from "react";
 
 import { DiagnosticList } from "../components/diagnostics";
-import { environmentValue, setEnvironmentValue } from "../secrets";
+import { EnvironmentDialog } from "../components/environment-dialog";
 import { type ManifestValidation } from "../validation";
 
 /**
@@ -41,46 +41,22 @@ export const ManifestStep = ({
   onPlan,
 }: ManifestStepProps) => (
   <Flex direction="column" gap="4">
-    <Grid columns={{ initial: "1", md: "minmax(0, 2fr) minmax(0, 1fr)" }} gap="4">
-      <Flex direction="column" gap="1">
+    <Flex direction="column" gap="1">
+      <Flex align="center" gap="3" justify="between">
         <Text as="label" htmlFor="manifest" size="2" weight="medium">
           Manifest (paste, or drop a file here)
         </Text>
-        <Suspense fallback={<div className="manifest-editor" />}>
-          <ManifestEditor
-            id="manifest"
-            onChange={onTextChange}
-            onFileDropped={onFileDropped}
-            value={text}
-          />
-        </Suspense>
+        {names.length === 0 ? null : <EnvironmentDialog names={names} />}
       </Flex>
-      <Flex direction="column" gap="3">
-        <Text size="2" weight="medium">
-          Environment values
-        </Text>
-        {names.length === 0 ? (
-          <Text color="gray" size="2">
-            No ${"{NAME}"} references in the manifest.
-          </Text>
-        ) : (
-          names.map((name) => (
-            <Flex direction="column" gap="1" key={name}>
-              <Text as="label" htmlFor={`env-${name}`} size="1" weight="medium">
-                {name}
-              </Text>
-              <TextField.Root
-                autoComplete="off"
-                defaultValue={environmentValue(name)}
-                id={`env-${name}`}
-                onChange={(event) => setEnvironmentValue(name, event.target.value)}
-                type="password"
-              />
-            </Flex>
-          ))
-        )}
-      </Flex>
-    </Grid>
+      <Suspense fallback={<div className="manifest-editor" />}>
+        <ManifestEditor
+          id="manifest"
+          onChange={onTextChange}
+          onFileDropped={onFileDropped}
+          value={text}
+        />
+      </Suspense>
+    </Flex>
     <Box>
       {validation === undefined ? (
         <Text color="gray" size="2">
