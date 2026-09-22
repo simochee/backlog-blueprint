@@ -192,7 +192,7 @@ body {
   z-index: 2;
   display: flex;
   flex-direction: column;
-  width: min(22rem, 100vw);
+  width: min(26rem, 100vw);
   background: var(--color-panel-solid);
   border-left: 1px solid var(--gray-a5);
   box-shadow: var(--shadow-4);
@@ -203,18 +203,18 @@ body {
   display: none;
 }
 
+/**
+ * 表のセルは中身の幅まで広がるので、`truncate` だけでは省略されずにペインからはみ出す。
+ * 幅を 0 に固定して残りを全部渡すと、セルが列の幅に収まり、長いメールアドレスが省略される。
+ */
 .side-pane-entry {
-  flex: 1;
-  min-width: 0;
+  width: 100%;
+  max-width: 0;
 }
 
 .side-pane-list {
   flex: 1;
   min-height: 0;
-  margin: 0;
-  padding: 0;
-  overflow-y: auto;
-  list-style: none;
 }
 
 /**
@@ -223,7 +223,7 @@ body {
  */
 @media (min-width: 1024px) {
   .page[data-pane-open="true"] {
-    padding-right: min(22rem, 100vw);
+    padding-right: min(26rem, 100vw);
   }
 }
 

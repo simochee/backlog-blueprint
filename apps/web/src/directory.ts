@@ -11,9 +11,15 @@ export type DirectoryKind = "users" | "teams";
 
 /**
  * `value` はマニフェストに写す値（ログイン ID かチーム ID）、`label` は人が探すときに
- * 読む値で、写すときには行末のコメントになる（WU-23 / A-6）。
+ * 読む値で、写すときには行末のコメントになる（WU-23 / A-6）。`details` は見分けるための
+ * 手掛かりで、表示と絞り込みにだけ使い、写さない（WU-26）。
  */
-export type DirectoryEntry = { value: string | number; label: string; note?: string };
+export type DirectoryEntry = {
+  value: string | number;
+  label: string;
+  badge?: string;
+  details: string[];
+};
 
 const SPACE_ADMINISTRATOR = 1;
 
@@ -21,10 +27,13 @@ const toUser = (item: unknown): DirectoryEntry => {
   const user = asRecord(item);
   const userId = requiredString(user, "userId");
 
+  const mailAddress = optionalString(user, "mailAddress");
+
   return {
     value: userId,
     label: optionalString(user, "name") || userId,
-    ...(requiredNumber(user, "roleType") === SPACE_ADMINISTRATOR ? { note: "Space admin" } : {}),
+    ...(requiredNumber(user, "roleType") === SPACE_ADMINISTRATOR ? { badge: "Space admin" } : {}),
+    details: mailAddress === undefined || mailAddress === "" ? [] : [mailAddress],
   };
 };
 
@@ -38,7 +47,7 @@ const toTeam = (item: unknown): DirectoryEntry => {
   return {
     value: requiredNumber(team, "id"),
     label: requiredString(team, "name"),
-    note: `${members} ${members === 1 ? "member" : "members"}`,
+    details: [`${members} ${members === 1 ? "member" : "members"}`],
   };
 };
 
@@ -57,12 +66,14 @@ export const readDirectory = async (
   return asArray(await get(path)).map((item) => toEntry(item));
 };
 
-export const matchesFilter = ({ value, label }: DirectoryEntry, filter: string): boolean => {
+export const matchesFilter = (
+  { value, label, details }: DirectoryEntry,
+  filter: string,
+): boolean => {
   const needle = filter.trim().toLowerCase();
 
   return (
     needle === "" ||
-    String(value).toLowerCase().includes(needle) ||
-    label.toLowerCase().includes(needle)
+    [String(value), label, ...details].some((text) => text.toLowerCase().includes(needle))
   );
 };

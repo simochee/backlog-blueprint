@@ -8,9 +8,12 @@ import {
   Flex,
   Heading,
   IconButton,
+  ScrollArea,
   Spinner,
+  Table,
   Text,
   TextField,
+  VisuallyHidden,
 } from "@radix-ui/themes";
 import { type ReactNode, useState } from "react";
 
@@ -36,7 +39,7 @@ export const TeamIcon = () => (
 
 export const DIRECTORY_PANES: Record<
   DirectoryKind,
-  { title: string; icon: ReactNode; description: string; noun: string }
+  { title: string; icon: ReactNode; description: string; noun: string; singular: string }
 > = {
   users: {
     title: "Users",
@@ -44,12 +47,14 @@ export const DIRECTORY_PANES: Record<
     description:
       "Login IDs for access.members and access.administrators, with each display name as a comment.",
     noun: "users",
+    singular: "User",
   },
   teams: {
     title: "Teams",
     icon: <TeamIcon />,
     description: "Team IDs for access.teams, with each team's name as a comment.",
     noun: "teams",
+    singular: "Team",
   },
 };
 
@@ -58,53 +63,104 @@ type EntryValue = DirectoryEntry["value"];
 const yamlOf = (entries: DirectoryEntry[]): string =>
   serializeAccessEntries(entries.map(({ value, label }) => ({ value, label })));
 
-type EntryListProps = {
-  entries: DirectoryEntry[];
-  selected: ReadonlySet<EntryValue>;
-  onToggle: (value: EntryValue, checked: boolean) => void;
-};
-
-const EntryList = ({ entries, selected, onToggle }: EntryListProps) => (
-  <Flex asChild direction="column">
-    <ul className="side-pane-list">
-      {entries.map((entry) => (
-        <Flex align="center" asChild gap="2" key={entry.value}>
-          <li>
-            <Text as="label" className="side-pane-entry" size="2">
-              <Flex align="center" gap="2" py="1">
-                <Checkbox
-                  checked={selected.has(entry.value)}
-                  onCheckedChange={(checked) => onToggle(entry.value, checked === true)}
-                />
-                <Flex direction="column" flexGrow="1" minWidth="0">
-                  <Text truncate>{entry.label}</Text>
-                  {entry.label === String(entry.value) ? null : (
-                    <Code size="1" variant="ghost">
-                      {entry.value}
-                    </Code>
-                  )}
-                </Flex>
-                {entry.note === undefined ? null : (
-                  <Badge color="gray" variant="soft">
-                    {entry.note}
-                  </Badge>
-                )}
-              </Flex>
-            </Text>
-            <CopyIconButton label={`Copy ${entry.label}`} text={() => yamlOf([entry])} />
-          </li>
-        </Flex>
-      ))}
-    </ul>
-  </Flex>
-);
-
 const selectAllState = (chosen: number, shown: number): boolean | "indeterminate" => {
   if (chosen === 0) {
     return false;
   }
 
   return chosen === shown ? true : "indeterminate";
+};
+
+type EntryTableProps = {
+  heading: string;
+  entries: DirectoryEntry[];
+  selected: ReadonlySet<EntryValue>;
+  onToggle: (value: EntryValue, checked: boolean) => void;
+  onToggleAll: (checked: boolean) => void;
+};
+
+const EntryRow = ({
+  entry,
+  checked,
+  onToggle,
+}: {
+  entry: DirectoryEntry;
+  checked: boolean;
+  onToggle: (value: EntryValue, checked: boolean) => void;
+}) => (
+  <Table.Row align="center">
+    <Table.Cell>
+      <Checkbox
+        aria-label={entry.label}
+        checked={checked}
+        onCheckedChange={(state) => onToggle(entry.value, state === true)}
+      />
+    </Table.Cell>
+    <Table.RowHeaderCell className="side-pane-entry">
+      <Flex align="center" gap="2">
+        <Text size="2" truncate weight="medium">
+          {entry.label}
+        </Text>
+        {entry.badge === undefined ? null : (
+          <Badge color="gray" size="1" variant="soft">
+            {entry.badge}
+          </Badge>
+        )}
+      </Flex>
+      <Flex align="center" gap="1" wrap="wrap">
+        {entry.label === String(entry.value) ? null : (
+          <Code size="1" variant="ghost">
+            {entry.value}
+          </Code>
+        )}
+        {entry.details.map((detail) => (
+          <Text color="gray" key={detail} size="1" truncate>
+            {detail}
+          </Text>
+        ))}
+      </Flex>
+    </Table.RowHeaderCell>
+    <Table.Cell justify="end">
+      <CopyIconButton label={`Copy ${entry.label}`} text={() => yamlOf([entry])} />
+    </Table.Cell>
+  </Table.Row>
+);
+
+const EntryTable = ({ heading, entries, selected, onToggle, onToggleAll }: EntryTableProps) => {
+  const chosen = entries.filter(({ value }) => selected.has(value)).length;
+
+  return (
+    <ScrollArea className="side-pane-list" scrollbars="vertical" type="auto">
+      <Table.Root size="1" variant="ghost">
+        <Table.Header>
+          <Table.Row align="center">
+            <Table.ColumnHeaderCell width="2rem">
+              <Checkbox
+                aria-label="Select all"
+                checked={selectAllState(chosen, entries.length)}
+                disabled={entries.length === 0}
+                onCheckedChange={(state) => onToggleAll(state === true)}
+              />
+            </Table.ColumnHeaderCell>
+            <Table.ColumnHeaderCell>{heading}</Table.ColumnHeaderCell>
+            <Table.ColumnHeaderCell width="2.5rem">
+              <VisuallyHidden>Copy</VisuallyHidden>
+            </Table.ColumnHeaderCell>
+          </Table.Row>
+        </Table.Header>
+        <Table.Body>
+          {entries.map((entry) => (
+            <EntryRow
+              checked={selected.has(entry.value)}
+              entry={entry}
+              key={entry.value}
+              onToggle={onToggle}
+            />
+          ))}
+        </Table.Body>
+      </Table.Root>
+    </ScrollArea>
+  );
 };
 
 export type DirectoryPaneProps = {
@@ -116,13 +172,12 @@ export type DirectoryPaneProps = {
 };
 
 export const DirectoryPane = ({ kind, open, directory, onClose, onReload }: DirectoryPaneProps) => {
-  const { title, icon, description, noun } = DIRECTORY_PANES[kind];
+  const { title, icon, description, noun, singular } = DIRECTORY_PANES[kind];
   const [filter, setFilter] = useState("");
   const [selected, setSelected] = useState<ReadonlySet<EntryValue>>(new Set());
   const entries = directory.entries ?? [];
   const shown = entries.filter((entry) => matchesFilter(entry, filter));
   const chosen = entries.filter(({ value }) => selected.has(value));
-  const shownChosen = shown.filter(({ value }) => selected.has(value)).length;
 
   const toggle = (value: EntryValue, checked: boolean): void => {
     setSelected((previous) => {
@@ -210,26 +265,20 @@ export const DirectoryPane = ({ kind, open, directory, onClose, onReload }: Dire
             <pre className="mono">{renderHttpFailure(directory.failure, { color: false })}</pre>
           ) : null}
           {!directory.loading && directory.entries !== undefined ? (
-            <>
-              <Flex align="center" justify="between">
-                <Text as="label" size="2">
-                  <Flex align="center" gap="2">
-                    <Checkbox
-                      checked={selectAllState(shownChosen, shown.length)}
-                      disabled={shown.length === 0}
-                      onCheckedChange={(checked) => toggleShown(checked === true)}
-                    />
-                    Select all
-                  </Flex>
-                </Text>
-                <Text color="gray" size="1">
-                  {shown.length} of {entries.length} {noun}
-                </Text>
-              </Flex>
-              <EntryList entries={shown} onToggle={toggle} selected={selected} />
-            </>
+            <EntryTable
+              entries={shown}
+              heading={singular}
+              onToggle={toggle}
+              onToggleAll={toggleShown}
+              selected={selected}
+            />
           ) : null}
-          <Flex justify="end" mt="auto">
+          <Flex align="center" gap="3" justify="between" mt="auto">
+            <Text color="gray" size="1">
+              {directory.entries === undefined
+                ? null
+                : `${shown.length} of ${entries.length} ${noun}`}
+            </Text>
             <CopyButton
               disabled={chosen.length === 0}
               label={`Copy ${chosen.length} as YAML`}

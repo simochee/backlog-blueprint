@@ -512,7 +512,13 @@ describe("スペースのユーザーとチームの一覧", () => {
   const DIRECTORY = {
     "/api/v2/users": [
       { id: 1, userId: "yamada", name: "山田 太郎", roleType: 1 },
-      { id: 2, userId: "suzuki", name: "鈴木 花子", roleType: 2 },
+      {
+        id: 2,
+        userId: "suzuki",
+        name: "鈴木 花子",
+        mailAddress: "hanako@example.com",
+        roleType: 2,
+      },
       { id: 3, userId: "true", name: "真", roleType: 2 },
     ],
     "/api/v2/teams": [
@@ -564,7 +570,7 @@ describe("スペースのユーザーとチームの一覧", () => {
     expect(paths).not.toContain("/api/v2/teams");
   });
 
-  it("ユーザーの一覧には表示名とログイン ID が並び、スペース管理者には印が付く", async () => {
+  it("ユーザーの一覧には表示名とログイン ID とメールアドレスが並び、スペース管理者には印が付く", async () => {
     const user = await connected();
 
     await user.click(button("Users"));
@@ -574,6 +580,7 @@ describe("スペースのユーザーとチームの一覧", () => {
     expect(await users.findByText("山田 太郎")).toBeInTheDocument();
     expect(users.getByText("yamada")).toBeInTheDocument();
     expect(users.getByText("Space admin")).toBeInTheDocument();
+    expect(users.getByText("hanako@example.com")).toBeInTheDocument();
     expect(users.getByText("3 of 3 users")).toBeInTheDocument();
   });
 
@@ -677,6 +684,23 @@ describe("スペースのユーザーとチームの一覧", () => {
     await user.click(users.getByLabelText("Select all"));
 
     expect(users.getByRole("button", { name: "Copy 1 as YAML" })).toBeEnabled();
+  });
+
+  it("メールアドレスでも絞り込めるが、コピーする行にメールアドレスは入らない", async () => {
+    const user = await connected();
+
+    await user.click(button("Users"));
+
+    const users = within(pane("Users"));
+
+    await users.findByText("山田 太郎");
+    await user.type(users.getByLabelText("Filter users"), "hanako@");
+
+    expect(users.getByText("1 of 3 users")).toBeInTheDocument();
+
+    await user.click(users.getByRole("button", { name: "Copy 鈴木 花子" }));
+
+    expect(await navigator.clipboard.readText()).toBe("    - suzuki # 鈴木 花子\n");
   });
 
   it("閉じて開き直しても一覧を取り直さず、絞り込みと選択が残っている", async () => {
