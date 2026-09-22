@@ -93,6 +93,13 @@ export const App = () => {
 
     const warn = (event: BeforeUnloadEvent): void => {
       event.preventDefault();
+
+      /**
+       * `returnValue` は非推奨だが消さない。`preventDefault()` だけを見るのは
+       * Chrome 119 以降で、Safari と Firefox は今もこちらを見る。片方だけだと
+       * 適用の最中に閉じても何も聞かれないブラウザが出る。
+       */
+      event.returnValue = "";
     };
 
     window.addEventListener("beforeunload", warn);

@@ -321,6 +321,37 @@ describe("適用し終えた計画", () => {
 });
 
 describe("離脱の警告", () => {
+  it("登録した警告は離脱を引き止める", async () => {
+    const added = vi.spyOn(globalThis, "addEventListener");
+
+    let release!: () => void;
+    const applied = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+
+    deliver = () => applied.then(() => ({ id: 900 }));
+
+    const user = await startApp();
+
+    await reach(user);
+    await confirmApply(user);
+
+    await waitFor(() => {
+      expect(beforeUnloadCalls(added)).toBe(1);
+    });
+
+    const [, warn] = added.mock.calls.find(([type]) => type === "beforeunload") ?? [];
+    const event = new Event("beforeunload", { cancelable: true }) as BeforeUnloadEvent;
+
+    (warn as EventListener)(event);
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(event.returnValue).toBe("");
+
+    release();
+    added.mockRestore();
+  });
+
   it("apply の実行中だけ beforeunload を登録する", async () => {
     const added = vi.spyOn(globalThis, "addEventListener");
     const removed = vi.spyOn(globalThis, "removeEventListener");
