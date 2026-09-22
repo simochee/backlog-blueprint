@@ -22,7 +22,7 @@ import {
   marked,
   planStamp,
   type Derived,
-  type Inputs,
+  type ManifestInputs,
   type Mark,
 } from "./freshness";
 import { PASTED, preparePlan, type PlanAttempt } from "./plan";
@@ -69,24 +69,25 @@ export const App = () => {
   const [confirmingPlan, setConfirmingPlan] = useState<Mark>();
   const [applied, setApplied] = useState<Derived<ApplyRun>>();
 
+  const connectionKey = connectionStamp({ space, credentials: revisions.credentials });
+
   /**
-   * 入力の束を描画のたびに作り直さない。`useDeferredValue` は同一性で新旧を見分けるので、
-   * 毎回別の object を渡すと後回しの描画がいつまでも追いつかない。
+   * 束ね直さない。`useDeferredValue` は同一性で新旧を見分けるので、描画のたびに別の
+   * object を渡すと後回しの描画がいつまでも追いつかない。
    */
-  const inputs: Inputs = useMemo(
-    () => ({ space, manifestText, revisions }),
-    [space, manifestText, revisions],
+  const manifestInputs: ManifestInputs = useMemo(
+    () => ({ manifestText, environment: revisions.environment }),
+    [manifestText, revisions.environment],
   );
-  const connectionKey = connectionStamp(inputs);
-  const manifestKey = manifestStamp(inputs);
-  const planKey = planStamp(inputs);
+  const manifestKey = manifestStamp(manifestInputs);
+  const planKey = planStamp(connectionKey, manifestKey);
 
   /**
    * 検証は後回しの描画として走らせる（WU-16）。打鍵のほうが優先されるので入力は詰まらず、
    * 追い越された分は React が捨てる。結果は落ち着いた入力の派生そのものなので、
    * 印が合わないあいだ `fresh` が古い検証結果を弾き、Plan は押せないままになる。
    */
-  const settled = useDeferredValue(inputs);
+  const settled = useDeferredValue(manifestInputs);
   const validated = useMemo<Derived<ManifestValidation>>(
     () => ({
       stamp: manifestStamp(settled),
