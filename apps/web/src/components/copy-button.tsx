@@ -1,11 +1,12 @@
-import { Button } from "@radix-ui/themes";
+import { CheckIcon, CopyIcon } from "@radix-ui/react-icons";
+import { Button, IconButton, Tooltip } from "@radix-ui/themes";
 import { useEffect, useState } from "react";
 
-export type CopyButtonProps = { label: string; text: () => string };
+export type CopyButtonProps = { label: string; text: () => string; disabled?: boolean };
 
 const FEEDBACK_MS = 2000;
 
-export const CopyButton = ({ label, text }: CopyButtonProps) => {
+const useCopy = (text: () => string): { copied: boolean; copy: () => void } => {
   const [copied, setCopied] = useState(false);
 
   /**
@@ -26,14 +27,38 @@ export const CopyButton = ({ label, text }: CopyButtonProps) => {
     };
   }, [copied]);
 
-  const copy = async (): Promise<void> => {
-    await navigator.clipboard.writeText(text());
-    setCopied(true);
+  const copy = (): void => {
+    void navigator.clipboard.writeText(text()).then(() => setCopied(true));
   };
 
+  return { copied, copy };
+};
+
+export const CopyButton = ({ label, text, disabled = false }: CopyButtonProps) => {
+  const { copied, copy } = useCopy(text);
+
   return (
-    <Button color="gray" onClick={() => void copy()} size="3" type="button" variant="soft">
+    <Button color="gray" disabled={disabled} onClick={copy} size="3" type="button" variant="soft">
       {copied ? "Copied" : label}
     </Button>
+  );
+};
+
+export const CopyIconButton = ({ label, text }: Omit<CopyButtonProps, "disabled">) => {
+  const { copied, copy } = useCopy(text);
+
+  return (
+    <Tooltip content={copied ? "Copied" : label}>
+      <IconButton
+        aria-label={label}
+        color={copied ? "green" : "gray"}
+        onClick={copy}
+        size="1"
+        type="button"
+        variant="ghost"
+      >
+        {copied ? <CheckIcon /> : <CopyIcon />}
+      </IconButton>
+    </Tooltip>
   );
 };

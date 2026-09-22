@@ -1,5 +1,5 @@
 import { type Diagnostic } from "@backlog-blueprint/core";
-import { Container, Flex, Heading, Text, Theme } from "@radix-ui/themes";
+import { Box, Button, Container, Flex, Heading, Text, Theme } from "@radix-ui/themes";
 import {
   startTransition,
   useActionState,
@@ -13,9 +13,11 @@ import {
 import { runApply } from "./apply";
 import { useAppearance } from "./appearance";
 import { ConfirmDialog } from "./components/confirm";
+import { DIRECTORY_PANES, DirectoryPane } from "./components/directory-pane";
 import { Panel } from "./components/panel";
 import { Stepper } from "./components/stepper";
 import { connect, type Connection } from "./connection";
+import { type DirectoryKind } from "./directory";
 import {
   connectionStamp,
   fresh,
@@ -32,9 +34,12 @@ import { ConnectStep } from "./steps/connect";
 import { ManifestStep } from "./steps/manifest";
 import { PlanStep } from "./steps/plan";
 import { openTransport, transport } from "./transport";
+import { useDirectory } from "./use-directory";
 import { validatedFor } from "./validation";
 
 const STEPS = ["Connect", "Manifest", "Plan", "Apply"];
+
+const DIRECTORY_KINDS: DirectoryKind[] = ["users", "teams"];
 
 type ConnectAttempt = { diagnostics: Diagnostic[]; failure?: unknown; connection?: Connection };
 
@@ -50,6 +55,7 @@ export const App = () => {
   const [showUnchanged, setShowUnchanged] = useState(false);
   const [confirmingPlan, setConfirmingPlan] = useState<PreparedPlan>();
   const [applyRecord, setApplyRecord] = useState<Derived<ApplyRun>>();
+  const [paneRecord, setPaneRecord] = useState<Derived<DirectoryKind>>();
 
   const connectionKey = connectionStamp({ space, credentials: revisions.credentials });
 
@@ -88,6 +94,29 @@ export const App = () => {
 
   const attempt = fresh(connectAttempt, connectionKey);
   const connection = attempt?.connection;
+
+  const directories = {
+    users: useDirectory("users", connectionKey),
+    teams: useDirectory("teams", connectionKey),
+  };
+  /** WU-21。開いているペインも接続の印に紐づけ、接続が無効になれば閉じる。 */
+  const pane = connection === undefined ? undefined : fresh(paneRecord, connectionKey);
+
+  const togglePane = (kind: DirectoryKind): void => {
+    if (pane === kind) {
+      setPaneRecord(undefined);
+
+      return;
+    }
+
+    setPaneRecord({ stamp: connectionKey, value: kind });
+
+    const directory = directories[kind];
+
+    if (!directory.settled && !directory.loading) {
+      startTransition(directory.load);
+    }
+  };
 
   const [planAttempt, runPlan, planning] = useActionState<Derived<PlanAttempt> | undefined>(
     async (previous) => {
@@ -197,81 +226,119 @@ export const App = () => {
 
   return (
     <Theme accentColor="blue" appearance={appearance} grayColor="slate" radius="medium">
-      <Container maxWidth="1200px" px={{ initial: "4", sm: "6" }} py={{ initial: "5", sm: "8" }}>
-        <Flex direction="column" gap="5">
-          <Flex direction="column" gap="1">
-            <Heading as="h1" size="7">
-              backlog-blueprint
-            </Heading>
-            <Text color="gray" size="3">
-              Declare a Backlog project in YAML, review the plan, then apply it.
-            </Text>
+      <Box className="page" data-pane-open={pane !== undefined}>
+        <Box asChild className="app-header" position="sticky" top="0">
+          <header>
+            <Container maxWidth="1200px" px={{ initial: "4", sm: "6" }} py="3">
+              <Flex align="center" gap="4" justify="between" wrap="wrap">
+                <Flex direction="column" gap="1">
+                  <Heading as="h1" size="6">
+                    backlog-blueprint
+                  </Heading>
+                  <Text color="gray" size="2">
+                    Declare a Backlog project in YAML, review the plan, then apply it.
+                  </Text>
+                </Flex>
+                <Flex gap="2">
+                  {DIRECTORY_KINDS.map((kind) => (
+                    <Button
+                      aria-pressed={pane === kind}
+                      color="gray"
+                      disabled={connection === undefined}
+                      key={kind}
+                      onClick={() => togglePane(kind)}
+                      type="button"
+                      variant={pane === kind ? "solid" : "soft"}
+                    >
+                      {DIRECTORY_PANES[kind].icon}
+                      {DIRECTORY_PANES[kind].title}
+                    </Button>
+                  ))}
+                </Flex>
+              </Flex>
+            </Container>
+          </header>
+        </Box>
+        <Container maxWidth="1200px" px={{ initial: "4", sm: "6" }} py={{ initial: "5", sm: "6" }}>
+          <Flex direction="column" gap="5">
+            <Stepper reached={reached} titles={STEPS} />
+            <Panel enabled step={1} title="Connect">
+              <ConnectStep
+                canConnect={space !== "" && revisions.hasApiKey}
+                connecting={connecting}
+                diagnostics={attempt?.diagnostics ?? []}
+                failure={attempt?.failure}
+                onConnect={start(runConnect)}
+                onSpaceChange={setSpace}
+                connection={attempt?.connection}
+                space={space}
+              />
+            </Panel>
+            <Panel
+              enabled={connection !== undefined}
+              hint="Connect to a space first."
+              step={2}
+              title="Manifest"
+            >
+              <ManifestStep
+                canPlan={validation?.manifest !== undefined}
+                names={validated.value.names}
+                onFileDropped={(name, text) => {
+                  setManifestSource(name);
+                  setManifestText(text);
+                }}
+                onPlan={start(runPlan)}
+                onTextChange={(text) => {
+                  setManifestSource(PASTED);
+                  setManifestText(text);
+                }}
+                planning={planning}
+                text={manifestText}
+                validation={validation}
+              />
+            </Panel>
+            <Panel
+              enabled={plan !== undefined}
+              hint="Run Plan to see what apply would do. The plan is discarded whenever an input changes, and once it has been applied."
+              step={3}
+              title="Plan"
+            >
+              <PlanStep
+                applying={running}
+                diagnostics={plan?.diagnostics ?? []}
+                failure={plan?.failure}
+                onApply={() => setConfirmingPlan(plan?.prepared)}
+                onShowUnchangedChange={setShowUnchanged}
+                prepared={plan?.prepared}
+                showUnchanged={showUnchanged}
+              />
+            </Panel>
+            <Panel
+              enabled={run !== undefined}
+              hint="Nothing has been applied yet."
+              step={4}
+              title="Apply"
+            >
+              {run === undefined ? null : <ApplyStep run={run} />}
+            </Panel>
+            {confirming && plan?.prepared !== undefined ? (
+              <ConfirmDialog onCancel={cancelApply} onConfirm={applyPlan} />
+            ) : null}
           </Flex>
-          <Stepper reached={reached} titles={STEPS} />
-          <Panel enabled step={1} title="Connect">
-            <ConnectStep
-              canConnect={space !== "" && revisions.hasApiKey}
-              connecting={connecting}
-              diagnostics={attempt?.diagnostics ?? []}
-              failure={attempt?.failure}
-              onConnect={start(runConnect)}
-              onSpaceChange={setSpace}
-              connection={attempt?.connection}
-              space={space}
+        </Container>
+      </Box>
+      {connection === undefined
+        ? null
+        : DIRECTORY_KINDS.map((kind) => (
+            <DirectoryPane
+              directory={directories[kind]}
+              key={`${kind}:${connectionKey}`}
+              kind={kind}
+              onClose={() => setPaneRecord(undefined)}
+              onReload={start(directories[kind].load)}
+              open={pane === kind}
             />
-          </Panel>
-          <Panel
-            enabled={connection !== undefined}
-            hint="Connect to a space first."
-            step={2}
-            title="Manifest"
-          >
-            <ManifestStep
-              canPlan={validation?.manifest !== undefined}
-              names={validated.value.names}
-              onFileDropped={(name, text) => {
-                setManifestSource(name);
-                setManifestText(text);
-              }}
-              onPlan={start(runPlan)}
-              onTextChange={(text) => {
-                setManifestSource(PASTED);
-                setManifestText(text);
-              }}
-              planning={planning}
-              text={manifestText}
-              validation={validation}
-            />
-          </Panel>
-          <Panel
-            enabled={plan !== undefined}
-            hint="Run Plan to see what apply would do. The plan is discarded whenever an input changes, and once it has been applied."
-            step={3}
-            title="Plan"
-          >
-            <PlanStep
-              applying={running}
-              diagnostics={plan?.diagnostics ?? []}
-              failure={plan?.failure}
-              onApply={() => setConfirmingPlan(plan?.prepared)}
-              onShowUnchangedChange={setShowUnchanged}
-              prepared={plan?.prepared}
-              showUnchanged={showUnchanged}
-            />
-          </Panel>
-          <Panel
-            enabled={run !== undefined}
-            hint="Nothing has been applied yet."
-            step={4}
-            title="Apply"
-          >
-            {run === undefined ? null : <ApplyStep run={run} />}
-          </Panel>
-          {confirming && plan?.prepared !== undefined ? (
-            <ConfirmDialog onCancel={cancelApply} onConfirm={applyPlan} />
-          ) : null}
-        </Flex>
-      </Container>
+          ))}
     </Theme>
   );
 };
