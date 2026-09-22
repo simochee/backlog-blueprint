@@ -1,5 +1,10 @@
 import { type ResolvedHttpRequest } from "@backlog-blueprint/core";
-import { fixedGet, fixedSpaceResponses, recordingSend } from "@backlog-blueprint/test-utils";
+import {
+  fixedGet,
+  fixedSpaceResponses,
+  httpFailure,
+  recordingSend,
+} from "@backlog-blueprint/test-utils";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent, { type UserEvent } from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi, type MockInstance } from "vitest";
@@ -103,6 +108,8 @@ const startApp = async (responses: Record<string, unknown> = {}): Promise<UserEv
 const manifestField = async (): Promise<HTMLElement> => screen.findByLabelText(/^Manifest/);
 
 const button = (name: string): HTMLElement => screen.getByRole("button", { name });
+
+const pane = (name: string): HTMLElement => screen.getByRole("complementary", { name });
 
 const connect = async (user: UserEvent): Promise<void> => {
   await user.type(screen.getByLabelText("Space domain"), SPACE);
@@ -498,5 +505,260 @@ describe("通信しているあいだの押せなさ", () => {
 
     expect(await screen.findByRole("button", { name: "Apply" })).toBeInTheDocument();
     expect(button("Plan")).toBeEnabled();
+  });
+});
+
+describe("スペースのユーザーとチームの一覧", () => {
+  const DIRECTORY = {
+    "/api/v2/users": [
+      { id: 1, userId: "yamada", name: "山田 太郎", roleType: 1 },
+      {
+        id: 2,
+        userId: "suzuki",
+        name: "鈴木 花子",
+        mailAddress: "hanako@example.com",
+        roleType: 2,
+      },
+      { id: 3, userId: "true", name: "真", roleType: 2 },
+    ],
+    "/api/v2/teams": [
+      { id: 10, name: "開発チーム", members: [{ id: 2, userId: "suzuki" }] },
+      { id: 11, name: "QA", members: [] },
+    ],
+  };
+
+  const requested = (): string[] => {
+    const paths: string[] = [];
+    const answered = respond;
+
+    respond = (path) => {
+      paths.push(path);
+
+      return answered(path);
+    };
+
+    return paths;
+  };
+
+  const connected = async (): Promise<UserEvent> => {
+    const user = await startApp(DIRECTORY);
+
+    await connect(user);
+    await screen.findByText(/Signed in as yamada/);
+
+    return user;
+  };
+
+  it("接続する前は開けず、どのペインも出ていない", async () => {
+    await startApp(DIRECTORY);
+
+    expect(button("Users")).toBeDisabled();
+    expect(button("Teams")).toBeDisabled();
+    expect(screen.queryByRole("complementary")).toBeNull();
+  });
+
+  it("接続した直後はまだ開いておらず、一覧も取りに行かない", async () => {
+    const user = await startApp(DIRECTORY);
+    const paths = requested();
+
+    await connect(user);
+    await screen.findByText(/Signed in as yamada/);
+
+    expect(button("Users")).toBeEnabled();
+    expect(screen.queryByRole("complementary")).toBeNull();
+    expect(paths).not.toContain("/api/v2/users");
+    expect(paths).not.toContain("/api/v2/teams");
+  });
+
+  it("ユーザーの一覧には表示名とログイン ID とメールアドレスが並び、スペース管理者には印が付く", async () => {
+    const user = await connected();
+
+    await user.click(button("Users"));
+
+    const users = within(pane("Users"));
+
+    expect(await users.findByText("山田 太郎")).toBeInTheDocument();
+    expect(users.getByText("yamada")).toBeInTheDocument();
+    expect(users.getByText("Space admin")).toBeInTheDocument();
+    expect(users.getByText("hanako@example.com")).toBeInTheDocument();
+    expect(users.getByText("3 of 3 users")).toBeInTheDocument();
+  });
+
+  it("チームの一覧にはチーム名と人数が並ぶ", async () => {
+    const user = await connected();
+
+    await user.click(button("Teams"));
+
+    const teams = within(pane("Teams"));
+
+    expect(await teams.findByText("開発チーム")).toBeInTheDocument();
+    expect(teams.getByText("1 member")).toBeInTheDocument();
+    expect(teams.getByText("0 members")).toBeInTheDocument();
+  });
+
+  it("開いているのは常に1枚だけで、もう一方を開くと先のペインは閉じる", async () => {
+    const user = await connected();
+
+    await user.click(button("Users"));
+    await user.click(button("Teams"));
+
+    expect(screen.getAllByRole("complementary")).toHaveLength(1);
+    expect(pane("Teams")).toBeInTheDocument();
+  });
+
+  it("開いているペインのボタンをもう一度押すと閉じる", async () => {
+    const user = await connected();
+
+    await user.click(button("Users"));
+    await user.click(button("Users"));
+
+    expect(screen.queryByRole("complementary")).toBeNull();
+  });
+
+  it("選んだユーザーのログイン ID を、表示名のコメント付きで access の直下に貼れる段付きの Yaml としてコピーする", async () => {
+    const user = await connected();
+
+    await user.click(button("Users"));
+
+    const users = within(pane("Users"));
+
+    await user.click(await users.findByRole("checkbox", { name: /鈴木 花子/ }));
+    await user.click(users.getByRole("checkbox", { name: /真/ }));
+    await user.click(users.getByRole("button", { name: "Copy 2 as YAML" }));
+
+    expect(await navigator.clipboard.readText()).toBe(
+      '    - suzuki # 鈴木 花子\n    - "true" # 真\n',
+    );
+  });
+
+  it("チームはチーム ID を、チーム名のコメント付きでコピーする", async () => {
+    const user = await connected();
+
+    await user.click(button("Teams"));
+
+    const teams = within(pane("Teams"));
+
+    await user.click(await teams.findByRole("checkbox", { name: /開発チーム/ }));
+    await user.click(teams.getByRole("button", { name: "Copy 1 as YAML" }));
+
+    expect(await navigator.clipboard.readText()).toBe("    - 10 # 開発チーム\n");
+  });
+
+  it("行ごとのボタンは、選択に関係なくその1件だけをコピーし、選択も変えない", async () => {
+    const user = await connected();
+
+    await user.click(button("Users"));
+
+    const users = within(pane("Users"));
+
+    await user.click(await users.findByRole("checkbox", { name: /山田 太郎/ }));
+    await user.click(users.getByRole("button", { name: "Copy 鈴木 花子" }));
+
+    expect(await navigator.clipboard.readText()).toBe("    - suzuki # 鈴木 花子\n");
+    expect(users.getByRole("checkbox", { name: /山田 太郎/ })).toBeChecked();
+    expect(users.getByRole("checkbox", { name: /鈴木 花子/ })).not.toBeChecked();
+  });
+
+  it("何も選んでいなければコピーできない", async () => {
+    const user = await connected();
+
+    await user.click(button("Teams"));
+    await within(pane("Teams")).findByText("QA");
+
+    expect(within(pane("Teams")).getByRole("button", { name: "Copy 0 as YAML" })).toBeDisabled();
+  });
+
+  it("絞り込むと、表示名かログイン ID に打った文字を含むものだけが残り、Select all はそれだけを選ぶ", async () => {
+    const user = await connected();
+
+    await user.click(button("Users"));
+
+    const users = within(pane("Users"));
+
+    await users.findByText("山田 太郎");
+    await user.type(users.getByLabelText("Filter users"), "SUZU");
+
+    expect(users.queryByText("山田 太郎")).toBeNull();
+    expect(users.getByText("1 of 3 users")).toBeInTheDocument();
+
+    await user.click(users.getByLabelText("Select all"));
+
+    expect(users.getByRole("button", { name: "Copy 1 as YAML" })).toBeEnabled();
+  });
+
+  it("メールアドレスでも絞り込めるが、コピーする行にメールアドレスは入らない", async () => {
+    const user = await connected();
+
+    await user.click(button("Users"));
+
+    const users = within(pane("Users"));
+
+    await users.findByText("山田 太郎");
+    await user.type(users.getByLabelText("Filter users"), "hanako@");
+
+    expect(users.getByText("1 of 3 users")).toBeInTheDocument();
+
+    await user.click(users.getByRole("button", { name: "Copy 鈴木 花子" }));
+
+    expect(await navigator.clipboard.readText()).toBe("    - suzuki # 鈴木 花子\n");
+  });
+
+  it("閉じて開き直しても一覧を取り直さず、絞り込みと選択が残っている", async () => {
+    const user = await connected();
+    const paths = requested();
+
+    await user.click(button("Users"));
+
+    const users = within(pane("Users"));
+
+    await user.click(await users.findByRole("checkbox", { name: /鈴木 花子/ }));
+    await user.type(users.getByLabelText("Filter users"), "suzu");
+    await user.click(users.getByRole("button", { name: "Close Users" }));
+    await user.click(button("Teams"));
+    await user.click(button("Users"));
+
+    const reopened = within(pane("Users"));
+
+    expect(reopened.getByLabelText("Filter users")).toHaveValue("suzu");
+    expect(reopened.getByRole("checkbox", { name: /鈴木 花子/ })).toBeChecked();
+    expect(paths.filter((path) => path === "/api/v2/users")).toHaveLength(1);
+  });
+
+  it("Reload を押すと一覧を取り直す", async () => {
+    const user = await connected();
+    const paths = requested();
+
+    await user.click(button("Users"));
+    await within(pane("Users")).findByText("山田 太郎");
+    await user.click(within(pane("Users")).getByRole("button", { name: "Reload" }));
+
+    await waitFor(() => {
+      expect(paths.filter((path) => path === "/api/v2/users")).toHaveLength(2);
+    });
+  });
+
+  it("接続の入力を変えると開いていたペインは閉じ、接続し直すまで開けない", async () => {
+    const user = await connected();
+
+    await user.click(button("Users"));
+    await within(pane("Users")).findByText("山田 太郎");
+    await user.type(screen.getByLabelText("Space domain"), "x");
+
+    expect(screen.queryByRole("complementary")).toBeNull();
+    expect(button("Users")).toBeDisabled();
+  });
+
+  it("一覧を取れなかったときは失敗の内容をペインの中に出し、他の段は残る", async () => {
+    const user = await startApp({
+      ...DIRECTORY,
+      "/api/v2/teams": httpFailure({ status: 500, errors: [{ message: "Boom" }] }),
+    });
+
+    await connect(user);
+    await screen.findByText(/Signed in as yamada/);
+    await user.click(button("Teams"));
+
+    expect(await within(pane("Teams")).findByText(/Boom/)).toBeInTheDocument();
+    expect(screen.getByText(/Signed in as yamada/)).toBeInTheDocument();
   });
 });

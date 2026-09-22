@@ -35,12 +35,17 @@ describe("解決表の初期登録", () => {
     expect(resolutions.get("milestone:v1.0")).toBe(31);
   });
 
-  it("チームと利用者はスペース全体から登録する", () => {
+  it("利用者はスペース全体から登録する", () => {
     const resolutions = seedResolutions(snapshots());
 
-    expect(resolutions.get("projectTeam:開発チーム")).toBe(21);
     expect(resolutions.get("projectMember:suzuki")).toBe(11);
     expect(resolutions.get("projectAdministrator:suzuki")).toBe(11);
+  });
+
+  it("チームはマニフェストが ID を直に書くので登録しない", () => {
+    expect(
+      [...seedResolutions(snapshots()).keys()].some((key) => key.startsWith("projectTeam:")),
+    ).toBe(false);
   });
 
   it("未作成のプロジェクトでは何も登録されない", () => {

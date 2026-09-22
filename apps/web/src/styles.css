@@ -181,3 +181,59 @@ body {
 .manifest-editor .cm-scroller {
   overflow: auto;
 }
+
+/**
+ * サイドペインは Radix に相当する部品が無い。`Dialog` も `Popover` も背面を覆うか
+ * 外側の操作で閉じるので、一覧から写しながらエディタに貼る使い方ができない（WU-20）。
+ */
+.side-pane {
+  position: fixed;
+  inset: 0 0 0 auto;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  width: min(26rem, 100vw);
+  background: var(--color-panel-solid);
+  border-left: 1px solid var(--gray-a5);
+  box-shadow: var(--shadow-4);
+}
+
+/* `display` を指定した要素には `hidden` 属性の既定の `display: none` が効かない。 */
+.side-pane[hidden] {
+  display: none;
+}
+
+/**
+ * 表のセルは中身の幅まで広がるので、`truncate` だけでは省略されずにペインからはみ出す。
+ * 幅を 0 に固定して残りを全部渡すと、セルが列の幅に収まり、長いメールアドレスが省略される。
+ */
+.side-pane-entry {
+  width: 100%;
+  max-width: 0;
+}
+
+.side-pane-list {
+  flex: 1;
+  min-height: 0;
+}
+
+/**
+ * 広い画面では本文をペインの幅だけ寄せ、ペインの下に Plan や Apply が隠れないようにする。
+ * 狭い画面では寄せる余地が無いので上に重ねる。
+ */
+@media (min-width: 1024px) {
+  .page[data-pane-open="true"] {
+    padding-right: min(26rem, 100vw);
+  }
+}
+
+/**
+ * 留める位置は Radix の `position` / `top` で指定し、ここは下を流れる本文が透けないための
+ * 地の色と境界だけを持つ。`z-index` はサイドペインより下にする — 狭い画面ではペインが
+ * ヘッダーの上に重なり、閉じるボタンがヘッダーに隠れてはいけない。
+ */
+.app-header {
+  z-index: 1;
+  background: var(--color-background);
+  border-bottom: 1px solid var(--gray-a4);
+}

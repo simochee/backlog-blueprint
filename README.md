@@ -100,7 +100,7 @@ statuses:
 
 access:
   teams:
-    - 開発チーム
+    - 31 # 開発チーム
   members:
     - suzuki
 

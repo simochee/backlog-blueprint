@@ -227,7 +227,7 @@ describe("チーム経由の重複記述（V-A16）", () => {
   it("チーム経由で参加する人を members に書くと警告する", () => {
     const [diagnostic] = validate([], {
       ...withTeam,
-      manifest: { access: { teams: ["開発チーム"], members: ["suzuki"] } },
+      manifest: { access: { teams: [3], members: ["suzuki"] } },
     });
 
     expect(diagnostic).toMatchObject({
@@ -241,7 +241,7 @@ describe("チーム経由の重複記述（V-A16）", () => {
   it("書いても動くことを hint で伝える", () => {
     const [diagnostic] = validate([], {
       ...withTeam,
-      manifest: { access: { teams: ["開発チーム"], members: ["suzuki"] } },
+      manifest: { access: { teams: [3], members: ["suzuki"] } },
     });
 
     expect(diagnostic?.hint).toContain("also works");
@@ -255,7 +255,7 @@ describe("チーム経由の重複記述（V-A16）", () => {
     expect(
       idsOf([], {
         ...withTeam,
-        manifest: { access: { teams: ["開発チーム"], administrators: ["suzuki"] } },
+        manifest: { access: { teams: [3], administrators: ["suzuki"] } },
       }),
     ).toEqual([]);
   });

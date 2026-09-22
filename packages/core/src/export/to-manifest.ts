@@ -22,6 +22,7 @@ import {
 } from "../manifest";
 import { type ResourceSnapshots } from "../plan";
 import { type AccessSnapshot } from "../resources/access";
+import { type AccessLabels } from "./serialize";
 import { type CustomFieldsSnapshot, type ExistingCustomField } from "../resources/custom-fields";
 import { type ExistingIssueType } from "../resources/issue-types";
 import { type ExistingMilestone } from "../resources/milestones";
@@ -59,6 +60,7 @@ export type ToManifestResult = {
   diagnostics: Diagnostic[];
   /** 診断にエラーが1件でもあれば undefined（EX-9 / EX-17） */
   manifest?: ManifestInput;
+  accessLabels?: AccessLabels;
 };
 
 type Report = (diagnostic: Diagnostic) => void;
@@ -73,7 +75,7 @@ const path = (...segments: (string | number)[]): string => segments.join("/");
  * 置き換えると、読み戻しても `$` が剥がれず往復が壊れる。置換後の文字列を関数で返すのは、
  * 置換文字列では `$$` が `$` 1文字を表すエスケープで、`$` を足したつもりが消えるため。
  */
-const escaped = (value: string): string =>
+export const escaped = (value: string): string =>
   value.replace(envReferencePattern(), (match) => `$${match}`);
 
 const asDate = (value: string): string => value.slice(0, 10);
@@ -347,13 +349,24 @@ const toAccess = ({
   const administratorIds = new Set(administrators.map(({ userId }) => userId));
 
   return {
-    teams: teams.map(({ name }) => escaped(name)),
+    teams: teams.map(({ id }) => id),
     members: members
       .filter(({ userId }) => !administratorIds.has(userId))
       .map(({ userId }) => escaped(userId)),
     administrators: administrators.map(({ userId }) => escaped(userId)),
   };
 };
+
+/**
+ * 利用者の名前はプロジェクト側の応答から取らない。`AccessUser` は同定に要る2項目しか
+ * 持たないので、表示名を持っているのはスペース全体の一覧だけである。
+ */
+const toAccessLabels = ({ teams, spaceUsers }: AccessSnapshot): AccessLabels => ({
+  teams: new Map(teams.map(({ id, name }) => [id, name])),
+  users: new Map(
+    spaceUsers.flatMap(({ userId, name }) => (name === undefined ? [] : [[userId, name] as const])),
+  ),
+});
 
 const events = (activityTypeIds: number[]): WebhookEvent[] =>
   ascendingEventIds(activityTypeIds).map((id) => WEBHOOK_EVENT_NAMES_BY_ID.get(id) ?? id);
@@ -434,5 +447,7 @@ export const toManifest = (snapshots: ResourceSnapshots): ToManifestResult => {
 
   const all = [...diagnostics, ...unwritableValues(manifest, diagnostics)];
 
-  return hasError(all) ? { diagnostics: all } : { diagnostics: all, manifest };
+  return hasError(all)
+    ? { diagnostics: all }
+    : { diagnostics: all, manifest, accessLabels: toAccessLabels(snapshots.access) };
 };

@@ -42,7 +42,7 @@ That does not lock you out. You run as a space administrator, and a space admini
 administer a project without belonging to it — which is also why you must not write yourself into
 `administrators`; [`access`](#access) below says what to write instead.
 
-The same rule applies one level down. `access: { teams: [開発チーム] }` leaves `members` and
+The same rule applies one level down. `access: { teams: [31] }` leaves `members` and
 `administrators` empty, with the same consequence.
 
 Scalar keys work the other way around. A key you do not write is not sent at all, so Backlog keeps
@@ -191,14 +191,21 @@ you to fill them in.
 
 ```yaml
 access:
-  teams: # team names
-    - 開発チーム
-    - QA
+  teams: # team IDs
+    - 31 # 開発チーム
+    - 32 # QA
   members: # user IDs of people who are not in any of those teams
-    - suzuki
+    - suzuki # 鈴木 花子
   administrators: # user IDs of people to make project administrators
-    - yamada
+    - yamada # 山田 太郎
 ```
+
+Teams are written by their numeric ID, not by name. Backlog does not keep team names unique within
+a space, so a name could point at more than one team; an ID cannot. The names after `#` are
+comments for whoever reads the file. The tool ignores them: the ID decides, and `plan` shows the
+team's current name from Backlog. You rarely have to look an ID up yourself — `export` and the Web
+UI's Teams pane both write the ID with the name beside it, and the Users pane does the same with
+each person's display name.
 
 Teams and individuals are separate keys because a name alone would not say which one was meant, and
 because they are added through different APIs. `administrators` is separate again, and holds people

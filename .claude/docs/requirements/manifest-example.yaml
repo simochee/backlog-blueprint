@@ -82,14 +82,15 @@ customFields:
 # teams は 1チーム = 1リクエストで済むため、人数が増えても適用時間が伸びない。
 # members には「どのチームにも属さない個人」だけを書く。
 # administrators に書いた人がまだ参加していなければ、自動で個人参加させる。
+# teams はチーム ID で書く（A-6）。行末の名前はコメントで、検証にも適用にも使わない。
 access:
   teams:
-    - 開発チーム
-    - QA
+    - 31 # 開発チーム
+    - 32 # QA
   members:
-    - suzuki
+    - suzuki # 鈴木 花子
   administrators:
-    - yamada
+    - yamada # 山田 太郎
 
 # events はイベント名でも数値 ID でも書ける。
 # 名前は CLI が数値に解決する。CLI が知らない新しいイベントは数値で書く。

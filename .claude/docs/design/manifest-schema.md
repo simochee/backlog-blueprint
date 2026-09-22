@@ -327,16 +327,16 @@ W-1 が数値を許す理由は「Backlog が新イベントを追加しても C
 
 | キー | 型 | 制約 |
 | --- | --- | --- |
-| `teams` | string[] | `uniqueItems: true`（V-A13） |
+| `teams` | integer[] | 1 以上。`uniqueItems: true`（V-A13） |
 | `members` | string[] | 同上 |
 | `administrators` | string[] | 同上 |
 
-`teams` はチーム名、`members` / `administrators` はユーザー ID（ログイン ID）。
+`teams` はチーム ID（[A-6](../requirements/requirements-definition.md#26-access-の仕様)）、`members` / `administrators` はユーザー ID（ログイン ID）。
 V-A13 は `uniqueItems` で JSON Schema が直接表現できる数少ない検証のひとつ。
 
 **3キーはいずれも任意で、省略したキーは空配列として扱う。** `access` 全体を省略した場合
 （[K-1](#k-1-配列キーの省略は空配列であって管理対象外ではない)）と同じ規則を、キー単位にも一貫させる。
-`access: { teams: [開発チーム] }` と書けば `members` と `administrators` は空配列になり、
+`access: { teams: [31] }` と書けば `members` と `administrators` は空配列になり、
 実行者が管理者から外れるので V-B6 でエラーになる。
 
 ## 11. `webhooks[]`

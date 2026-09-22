@@ -470,10 +470,10 @@ const CustomFieldSchema = StrictObject(
 const AccessSchema = StrictObject(
   {
     teams: Type.Optional(
-      Type.Array(Type.String(), {
+      Type.Array(Type.Integer({ minimum: 1 }), {
         uniqueItems: true,
         description:
-          "Names of space teams to add to the project. A team costs one request however many people it holds.",
+          "IDs of space teams to add to the project, not their names: a space can hold two teams with the same name. A team costs one request however many people it holds.",
       }),
     ),
     members: Type.Optional(

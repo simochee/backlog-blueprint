@@ -417,7 +417,7 @@ Executor は `writeRequest: false` の Action を実行せず読み飛ばす。
 
 | 対象 | あるべき集合 | 現状 | 生成する Action |
 | --- | --- | --- | --- |
-| チーム | `access.teams` | `GET /projects/:key/teams` | 差集合で `create` / `delete` |
+| チーム | `access.teams` | `GET /projects/:key/teams` | **チーム ID で**差集合を取り `create` / `delete`（A-6）。Action の `name` にはスペースから引いたチーム名を、`id` にはチーム ID を入れる |
 | 個人参加 | `access.members` ∪ `access.administrators` | `GET /projects/:key/users?excludeGroupMembers=true` | 同上 |
 | 管理者 | `access.administrators` | `GET /projects/:key/administrators` | 同上 |
 
