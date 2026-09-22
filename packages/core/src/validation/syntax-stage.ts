@@ -149,8 +149,31 @@ export const parseManifestSyntax = (text: string): SyntaxStageResult => {
     return { diagnostics };
   }
 
-  return {
-    diagnostics,
-    parsed: { value: first.toJS(), source: buildSourceMap(first.contents, lineCounter) },
-  };
+  /**
+   * `toJS()` を裸で呼ばない。解決できないエイリアスは `errors` に載らず、ここで
+   * 初めて throw する。S1 の仕事は壊れた YAML を診断に変えることなので、例外を
+   * そのまま上へ出すと、利用者には理由の分からない白い画面だけが残る。
+   *
+   * Backlog のユーザー ID は `*` で始まることがある。引用符を付けずに書くと
+   * YAML はそれをエイリアス参照として読むので、これは実際に踏まれる経路である。
+   */
+  try {
+    return {
+      diagnostics,
+      parsed: { value: first.toJS(), source: buildSourceMap(first.contents, lineCounter) },
+    };
+  } catch (error) {
+    return {
+      diagnostics: [
+        {
+          id: SYNTAX_ID,
+          severity: "error",
+          stage: "syntax",
+          path: ROOT_PATH,
+          message: error instanceof Error ? error.message : String(error),
+          hint: 'quote any value that starts with "*" or "&": YAML reads those as an alias or an anchor, not as text',
+        },
+      ],
+    };
+  }
 };

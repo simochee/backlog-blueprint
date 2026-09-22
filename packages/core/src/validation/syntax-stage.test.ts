@@ -121,3 +121,22 @@ describe("path から引く位置", () => {
     expect(pathFromInstancePath("")).toBe("");
   });
 });
+
+describe("解決できないエイリアス", () => {
+  it("アンカーの無い * 始まりの値は、例外ではなく診断になる", () => {
+    const { diagnostics, parsed } = parseManifestSyntax(
+      "key: PROJ_A\naccess:\n  members:\n    - *oNejJk6xEn\n",
+    );
+
+    expect(parsed).toBeUndefined();
+    expect(diagnostics.map(({ id, severity }) => `${id}:${severity}`)).toEqual(["V-A23:error"]);
+  });
+
+  it("引用符で囲めば * 始まりの値もそのまま読まれる", () => {
+    const { parsed } = parseManifestSyntax(
+      'key: PROJ_A\naccess:\n  members:\n    - "*oNejJk6xEn"\n',
+    );
+
+    expect(parsed?.value).toEqual({ key: "PROJ_A", access: { members: ["*oNejJk6xEn"] } });
+  });
+});
