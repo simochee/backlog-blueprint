@@ -39,10 +39,15 @@ export const ManifestEditor = ({ id, value, onChange, onFileDropped }: ManifestE
   /**
    * 変更ハンドラを ref 越しに呼ぶ。view は一度しか作らないので、生成時の props を
    * 閉じ込めると、2回目以降の入力が古い onChange に届く。
+   *
+   * 書き込みを効果に置くのは、描画中に ref を書くのが React の規則に反するため。
+   * 読むのは CodeMirror が DOM の入力で呼ぶときだけなので、commit の後に差し替われば間に合う。
    */
   const notify = useRef(onChange);
 
-  notify.current = onChange;
+  useEffect(() => {
+    notify.current = onChange;
+  });
 
   const appearance = useAppearance();
   const startedDark = useRef(appearance === "dark");

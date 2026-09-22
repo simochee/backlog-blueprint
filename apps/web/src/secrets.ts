@@ -1,6 +1,15 @@
 import { type Environment } from "@backlog-blueprint/core";
 
-export type SecretRevisions = { credentials: number; environment: number };
+/**
+ * 画面が秘匿値そのものを見ずに済むだけの事実を載せる。React Compiler は描画中に
+ * 読んだモジュール変数を依存に数えないので、`hasApiKey()` のような関数呼び出しで
+ * 渡すと、値が変わっても結果が使い回される。購読の返り値に載っていれば依存になる。
+ */
+export type SecretRevisions = {
+  credentials: number;
+  environment: number;
+  hasApiKey: boolean;
+};
 
 /**
  * 秘匿値を React の state に載せない（§2.4 / FR-7.4）。state に置くと値が props として
@@ -11,7 +20,7 @@ let apiKey = "";
 
 const environmentValues = new Map<string, string>();
 
-let revisions: SecretRevisions = { credentials: 0, environment: 0 };
+let revisions: SecretRevisions = { credentials: 0, environment: 0, hasApiKey: false };
 
 const listeners = new Set<() => void>();
 
@@ -35,15 +44,13 @@ export const secretRevisions = (): SecretRevisions => revisions;
 
 export const setApiKey = (value: string): void => {
   apiKey = value;
-  publish({ ...revisions, credentials: revisions.credentials + 1 });
+  publish({ ...revisions, credentials: revisions.credentials + 1, hasApiKey: value !== "" });
 };
 
 export const setEnvironmentValue = (name: string, value: string): void => {
   environmentValues.set(name, value);
   publish({ ...revisions, environment: revisions.environment + 1 });
 };
-
-export const hasApiKey = (): boolean => apiKey !== "";
 
 export const revealApiKey = (): string => apiKey;
 

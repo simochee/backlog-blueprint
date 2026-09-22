@@ -148,6 +148,26 @@ const carrying = (value: string): string[] =>
     )
     .map((element) => `${element.tagName}:${element.getAttribute("type") ?? ""}`);
 
+/**
+ * 応答を握ったまま離さない。押している最中の姿を確かめるには、通信が終わらない窓が要る。
+ */
+const holding = (): (() => void) => {
+  const answered = respond;
+
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+
+  respond = async (path) => {
+    await held;
+
+    return answered(path);
+  };
+
+  return release;
+};
+
 const beforeUnloadCalls = (spy: MockInstance<typeof globalThis.addEventListener>): number =>
   spy.mock.calls.filter(([type]) => type === "beforeunload").length;
 
@@ -304,6 +324,25 @@ describe("確認ダイアログ", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
+  /**
+   * 背面は操作できる（confirm.tsx）ので、確認を開いたまま Plan を押し直せる。入力は
+   * 変わっていないので印も変わらないが、読み直した先の状態は変わりうる。
+   */
+  it("入力を変えずに計画を取り直しても閉じる", async () => {
+    const user = await startApp();
+
+    await reach(user);
+    await user.click(button("Apply"));
+
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+
+    await user.click(button("Plan"));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).toBeNull();
+    });
+  });
+
   it("計画をやり直しても自動では開き直さない", async () => {
     const user = await startApp();
 
@@ -416,5 +455,51 @@ describe("離脱の警告", () => {
 
     added.mockRestore();
     removed.mockRestore();
+  });
+});
+
+/**
+ * 保留中は Action が解決するまでで決まる（WU-15）。押しっぱなしで固まらないことと、
+ * 走っているあいだ二重に走らせられないことの両方が、ここで初めて見える。
+ */
+describe("通信しているあいだの押せなさ", () => {
+  it("繋いでいるあいだ Connect は押せない", async () => {
+    const user = await startApp();
+    const release = holding();
+
+    await connect(user);
+
+    await waitFor(() => {
+      expect(button("Connect")).toBeDisabled();
+    });
+
+    release();
+
+    expect(await screen.findByText(/Signed in as yamada/)).toBeInTheDocument();
+    expect(button("Connect")).toBeEnabled();
+  });
+
+  it("計画を組み立てているあいだ Plan は押せない", async () => {
+    const user = await startApp();
+
+    await connect(user);
+    await screen.findByText(/Signed in as yamada/);
+    await writeManifest(user, MANIFEST);
+    await waitFor(() => {
+      expect(button("Plan")).toBeEnabled();
+    });
+
+    const release = holding();
+
+    await user.click(button("Plan"));
+
+    await waitFor(() => {
+      expect(button("Plan")).toBeDisabled();
+    });
+
+    release();
+
+    expect(await screen.findByRole("button", { name: "Apply" })).toBeInTheDocument();
+    expect(button("Plan")).toBeEnabled();
   });
 });

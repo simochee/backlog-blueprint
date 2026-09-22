@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import {
   enteredEnvironment,
   environmentValue,
-  hasApiKey,
   revealApiKey,
   secretRevisions,
   setApiKey,
@@ -13,14 +12,22 @@ import {
 
 describe("秘匿値の保持", () => {
   it("API キーは入力されるまで無い", () => {
-    expect(hasApiKey()).toBe(false);
+    expect(secretRevisions().hasApiKey).toBe(false);
   });
 
   it("入力された API キーはそのまま送信に渡せる", () => {
     setApiKey("api-key");
 
     expect(revealApiKey()).toBe("api-key");
-    expect(hasApiKey()).toBe(true);
+    expect(secretRevisions().hasApiKey).toBe(true);
+  });
+
+  /** 値そのものではなく「入っているか」だけを購読の返り値に載せる（§2.4）。 */
+  it("打った API キーを消すと入力されていない扱いに戻る", () => {
+    setApiKey("api-key");
+    setApiKey("");
+
+    expect(secretRevisions().hasApiKey).toBe(false);
   });
 
   it("空欄の名前は環境に含めない", () => {
@@ -50,6 +57,26 @@ describe("秘匿値の書き換えを知らせる", () => {
     setApiKey("another");
 
     expect(secretRevisions().credentials).toBe(before + 1);
+  });
+
+  /**
+   * この版が進むことに検証のやり直しが乗っている（WU-16）。進まなければ、値を打ち直しても
+   * 印が変わらず、古い検証結果が新しい値のものとして通る。
+   */
+  it("環境変数の値を書き換えると環境の版が進む", () => {
+    const before = secretRevisions().environment;
+
+    setEnvironmentValue("TOKEN", "v");
+
+    expect(secretRevisions().environment).toBe(before + 1);
+  });
+
+  it("API キーを書き換えても環境の版は進まない", () => {
+    const before = secretRevisions().environment;
+
+    setApiKey("yet another");
+
+    expect(secretRevisions().environment).toBe(before);
   });
 
   it("環境変数の値を書き換えても接続の版は進まない", () => {

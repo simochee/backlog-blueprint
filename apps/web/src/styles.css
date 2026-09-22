@@ -52,6 +52,12 @@ body {
   border-top: 1px solid var(--gray-a3);
 }
 
+.diagnostic-line {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
 /**
  * 行番号の桁を揃える。揃っていないと、診断が複数出たときに本文の開始位置が
  * 行ごとにずれ、等幅で書いてある意味が消える。

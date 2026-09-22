@@ -33,11 +33,14 @@ export const DiagnosticList = ({ diagnostics }: DiagnosticListProps) => {
           <Callout.Icon>
             {diagnostic.severity === "error" ? <CrossCircledIcon /> : <ExclamationTriangleIcon />}
           </Callout.Icon>
-          <Callout.Text>
-            <Flex align="start" gap="2">
-              <span className="diagnostic-position">{position(diagnostic)}</span>
-              <pre className="mono">{text}</pre>
-            </Flex>
+          {/**
+           * `Callout.Text` が出すのは `<p>` で、`asChild` も受けない。器の `div` も
+           * 字下げを残す `pre` もその中には置けないので、`<p>` 自身を横並びの器にして
+           * 中は `span` で済ませる。字下げは `.mono` の `white-space` が残す。
+           */}
+          <Callout.Text className="diagnostic-line">
+            <span className="diagnostic-position">{position(diagnostic)}</span>
+            <span className="mono">{text}</span>
           </Callout.Text>
         </Callout.Root>
       ))}

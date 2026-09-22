@@ -1,5 +1,5 @@
 import { Button } from "@radix-ui/themes";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export type CopyButtonProps = { label: string; text: () => string };
 
@@ -8,12 +8,27 @@ const FEEDBACK_MS = 2000;
 export const CopyButton = ({ label, text }: CopyButtonProps) => {
   const [copied, setCopied] = useState(false);
 
+  /**
+   * 戻すまでの時間は効果に持たせる。ハンドラの中で `setTimeout` を張ると、その 2 秒の
+   * あいだに計画を取り直してこのボタンごと消えた場合に、後片付けをする場所が無い。
+   */
+  useEffect(() => {
+    if (!copied) {
+      return undefined;
+    }
+
+    const timer = setTimeout(() => {
+      setCopied(false);
+    }, FEEDBACK_MS);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [copied]);
+
   const copy = async (): Promise<void> => {
     await navigator.clipboard.writeText(text());
     setCopied(true);
-    setTimeout(() => {
-      setCopied(false);
-    }, FEEDBACK_MS);
   };
 
   return (

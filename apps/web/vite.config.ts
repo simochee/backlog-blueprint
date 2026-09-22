@@ -30,13 +30,23 @@ const schemaArtifact = (): Plugin => ({
   },
 });
 
+/**
+ * 畳めなかったことを黙って見逃さない（WU-19）。既定では畳めない部品をそのまま素通しに
+ * するので、`for await` を1つ書き足しただけで、それを抱えている部品ごと最適化から外れる。
+ * 外れたことは動かしても分からない — 遅くなるだけで壊れないからである。落とせば分かる。
+ */
+const reactCompiler: [string, { panicThreshold: string }] = [
+  "babel-plugin-react-compiler",
+  { panicThreshold: "all_errors" },
+];
+
 /** GitHub Pages のサブパス配信（要件定義 §7.1 / WU-2） */
 const BASE = "/backlog-blueprint/";
 
 export default defineConfig({
   base: BASE,
   define: { __SCHEMA_VERSION__: JSON.stringify(cliPackage.version) },
-  plugins: [react(), schemaArtifact()],
+  plugins: [react({ babel: { plugins: [reactCompiler] } }), schemaArtifact()],
   test: {
     environment: "happy-dom",
     setupFiles: ["./src/test-setup.ts"],
