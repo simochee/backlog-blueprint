@@ -16,6 +16,13 @@ export type EnvironmentDialogProps = {
  * 触れなくても失われるものは無い。
  */
 export const EnvironmentDialog = ({ names }: EnvironmentDialogProps) => {
+  /**
+   * React Compiler に畳ませない。この部品は未入力の件数も入力欄の初期値も、React が
+   * 追えないモジュールの値から読む（§2.4 がそこにしか置かせない）。畳まれると、件数は
+   * 打った直後に増減せず、閉じて開き直した入力欄が打つ前の値で描き直される。
+   */
+  "use no memo";
+
   const missing = names.filter((name) => environmentValue(name) === "").length;
 
   return (

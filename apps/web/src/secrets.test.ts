@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import {
   enteredEnvironment,
   environmentValue,
-  hasApiKey,
   revealApiKey,
   secretRevisions,
   setApiKey,
@@ -13,14 +12,22 @@ import {
 
 describe("秘匿値の保持", () => {
   it("API キーは入力されるまで無い", () => {
-    expect(hasApiKey()).toBe(false);
+    expect(secretRevisions().hasApiKey).toBe(false);
   });
 
   it("入力された API キーはそのまま送信に渡せる", () => {
     setApiKey("api-key");
 
     expect(revealApiKey()).toBe("api-key");
-    expect(hasApiKey()).toBe(true);
+    expect(secretRevisions().hasApiKey).toBe(true);
+  });
+
+  /** 値そのものではなく「入っているか」だけを購読の返り値に載せる（§2.4）。 */
+  it("打った API キーを消すと入力されていない扱いに戻る", () => {
+    setApiKey("api-key");
+    setApiKey("");
+
+    expect(secretRevisions().hasApiKey).toBe(false);
   });
 
   it("空欄の名前は環境に含めない", () => {

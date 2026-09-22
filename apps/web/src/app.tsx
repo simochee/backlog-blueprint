@@ -1,4 +1,4 @@
-import { execute, type Diagnostic } from "@backlog-blueprint/core";
+import { type Diagnostic } from "@backlog-blueprint/core";
 import { Container, Flex, Heading, Text, Theme } from "@radix-ui/themes";
 import {
   startTransition,
@@ -10,6 +10,7 @@ import {
   useSyncExternalStore,
 } from "react";
 
+import { runApply } from "./apply";
 import { useAppearance } from "./appearance";
 import { ConfirmDialog } from "./components/confirm";
 import { Panel } from "./components/panel";
@@ -24,29 +25,16 @@ import {
   type ManifestInputs,
 } from "./freshness";
 import { PASTED, preparePlan, type PlanAttempt, type PreparedPlan } from "./plan";
-import {
-  foldExecutionEvent,
-  idleProgress,
-  isRunning,
-  rejectedProgress,
-  spentPlan,
-  type ApplyRun,
-} from "./progress";
-import { environmentValue, hasApiKey, secretRevisions, subscribeSecrets } from "./secrets";
+import { isRunning, rejectedProgress, spentPlan, type ApplyRun } from "./progress";
+import { secretRevisions, subscribeSecrets } from "./secrets";
 import { ApplyStep } from "./steps/apply";
 import { ConnectStep } from "./steps/connect";
 import { ManifestStep } from "./steps/manifest";
 import { PlanStep } from "./steps/plan";
 import { openTransport, transport } from "./transport";
-import { validateInBrowser, type ManifestValidation } from "./validation";
+import { validatedFor } from "./validation";
 
 const STEPS = ["Connect", "Manifest", "Plan", "Apply"];
-
-const EMPTY_VALIDATION: ManifestValidation = {
-  diagnostics: [],
-  names: [],
-  expandedPaths: new Set(),
-};
 
 type ConnectAttempt = { diagnostics: Diagnostic[]; failure?: unknown; connection?: Connection };
 
@@ -67,7 +55,9 @@ export const App = () => {
 
   /**
    * 束ね直さない。`useDeferredValue` は同一性で新旧を見分けるので、描画のたびに別の
-   * object を渡すと後回しの描画がいつまでも追いつかない。
+   * object を渡すと後回しの描画がいつまでも追いつかない。React Compiler も同じものを
+   * 畳むが（WU-19）、それに任せて消さない。畳まれなかったときに出るのが「遅い」ではなく
+   * 「描画が止まらない」なので、落ちても遅いだけで済む形にしておく。
    */
   const manifestInputs: ManifestInputs = useMemo(
     () => ({ manifestText, environment: revisions.environment }),
@@ -78,16 +68,7 @@ export const App = () => {
 
   /** WU-16。追いついていない結果は印が合わないので `fresh` が弾き、Plan は押せないままになる。 */
   const settled = useDeferredValue(manifestInputs);
-  const validated = useMemo<Derived<ManifestValidation>>(
-    () => ({
-      stamp: manifestStamp(settled),
-      value:
-        settled.manifestText.trim() === ""
-          ? EMPTY_VALIDATION
-          : validateInBrowser({ text: settled.manifestText, valueOf: environmentValue }),
-    }),
-    [settled],
-  );
+  const validated = validatedFor(settled);
 
   const validation = fresh(validated, manifestKey);
 
@@ -195,30 +176,8 @@ export const App = () => {
     }
 
     const stamp = planKey;
-    const { actions, resolutions, manifest } = prepared.plan;
-    const base = { resolutions, projectKey: manifest.key, space };
 
-    const apply = async (): Promise<void> => {
-      let progress = idleProgress;
-
-      setApplyRecord({ stamp, value: { ...base, progress } });
-
-      try {
-        for await (const event of execute(actions, {
-          projectKey: manifest.key,
-          resolutions,
-          get: transport.get,
-          send: transport.send,
-        })) {
-          progress = foldExecutionEvent(progress, event);
-          setApplyRecord({ stamp, value: { ...base, progress } });
-        }
-      } catch (error) {
-        setApplyRecord({ stamp, value: { ...base, progress, failure: error } });
-      }
-    };
-
-    void apply();
+    void runApply({ plan: prepared.plan, space }, (value) => setApplyRecord({ stamp, value }));
   };
 
   const cancelApply = (): void => {
@@ -252,7 +211,7 @@ export const App = () => {
           <Stepper reached={reached} titles={STEPS} />
           <Panel enabled step={1} title="Connect">
             <ConnectStep
-              canConnect={space !== "" && hasApiKey()}
+              canConnect={space !== "" && revisions.hasApiKey}
               connecting={connecting}
               diagnostics={attempt?.diagnostics ?? []}
               failure={attempt?.failure}
