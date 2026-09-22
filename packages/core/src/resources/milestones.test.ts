@@ -247,7 +247,7 @@ describe("マイルストーンの oldname", () => {
 });
 
 describe("文字列値の出力", () => {
-  it("説明が マニフェストに指定すると計画に実値が現れる", () => {
+  it("説明はマニフェストに書いた値のまま計画に載る", () => {
     const actions = milestonesReconciler.plan(
       [{ name: "v1.0", description: "社外秘の説明" }],
       [],

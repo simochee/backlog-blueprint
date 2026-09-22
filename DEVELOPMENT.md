@@ -123,7 +123,6 @@ model before changing anything there.
 | `recordingSend(respond?)`                 | An `ExecuteContext['send']` that records sent requests in `sent`                          |
 | `fixedReadContext(responses, overrides?)` | A `ReadContext`                                                                           |
 | `fixedPlanContext(overrides?)`            | A `PlanContext`                                                                           |
-| `secretPaths(...paths)`                   | Replaces `PlanContext['isSecret']` with a set of expanded paths                           |
 | `mockBacklog(options?)`                   | A whole space behind a `fetch` that answers writes as well, and records every request     |
 | `withoutWritePacing(run)`                 | Runs `run` with the one-second pause between writes (X-1) collapsed to none               |
 

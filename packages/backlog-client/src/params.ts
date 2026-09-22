@@ -15,6 +15,10 @@ const prepared = (value: ResolvedValue): unknown => {
   return value;
 };
 
-/** 空配列だけ送信層が表現できる形にする（API 制約「空配列を送る方法」）。 */
+/**
+ * 値の形は変えずに渡す。boolean や `null` をここで文字列に畳むと、送信層が
+ * 「素通しのトランスポート」であることをやめ、`Action.request` が実際に飛ぶ
+ * リクエストでなくなる（PO-3）。空配列だけが例外で、理由は `EMPTY_ARRAY` に書いた。
+ */
 export const prepareParams = (params: Record<string, ResolvedValue>): Record<string, unknown> =>
   Object.fromEntries(Object.entries(params).map(([key, value]) => [key, prepared(value)]));

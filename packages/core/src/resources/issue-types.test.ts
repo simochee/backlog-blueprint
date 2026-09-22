@@ -313,7 +313,7 @@ describe("未作成のプロジェクト", () => {
 });
 
 describe("文字列値の出力", () => {
-  it("課題テンプレートが マニフェストに指定すると計画に実値が現れる", () => {
+  it("課題テンプレートはマニフェストに書いた値のまま計画に載る", () => {
     const actions = issueTypesReconciler.plan(
       [{ name: "バグ", color: "#990000", templateDescription: "社外秘の手順" }],
       { source: "project", issueTypes: [] },

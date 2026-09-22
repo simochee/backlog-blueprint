@@ -179,10 +179,10 @@ An undefined variable is an error — except under `validate`, where it is only 
 CI job can check the manifest without those values. To write the characters literally, escape the
 expansion as `$${NAME}`.
 
-Expanded values appear in `plan` and its JSON output like values written directly in YAML. The tool
-cannot determine whether a manifest value is sensitive. Keep values you do not want in output out
-of the manifest you plan or export. The API key is handled separately and does not appear in plan
-or apply output.
+Expanded values appear in `plan` and its JSON output like values written directly in YAML: the
+tool cannot tell whether a value is sensitive, so it does not mask any. A value that must not show
+up in plan output or CI logs does not belong in the manifest, whether written directly or through
+`${NAME}`. The API key is not a manifest value and never appears in plan or apply output.
 
 In the browser there is no environment, so the Web UI reads the names out of your manifest and asks
 you to fill them in.

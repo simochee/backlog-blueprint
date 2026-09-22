@@ -124,7 +124,7 @@ issues:
 ```sh
 export BACKLOG_SPACE=example.backlog.com
 export BACKLOG_API_KEY=...
-export SLACK_WEBHOOK_URL=...
+export SLACK_WEBHOOK_URL=https://hooks.example.com/T000/B000
 
 npx @simochee/backlog-blueprint plan -f projects/PROJ_A.yaml
 ```
@@ -140,7 +140,7 @@ Blueprint: PROJ_A (example.backlog.com)
   ~ statusOrder    未対応, 処理中, レビュー中, 処理済み, 完了
   + projectTeam    "開発チーム"
   + projectMember  "suzuki"
-  + webhook        "Slack 通知"  hookUrl ***
+  + webhook        "Slack 通知"  hookUrl "https://hooks.example.com/T000/B000"
 
 Warnings:
   ! [V-A16] access.members: "suzuki" already belongs to team "開発チーム"

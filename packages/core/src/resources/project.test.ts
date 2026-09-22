@@ -162,7 +162,7 @@ describe("settings", () => {
 });
 
 describe("文字列値の出力", () => {
-  it("プロジェクト名が マニフェストに指定すると計画に実値が現れる", () => {
+  it("プロジェクト名はマニフェストに書いた値のまま計画に載る", () => {
     const actions = projectReconciler.plan(
       desired({ name: "極秘プロジェクト" }),
       { exists: false },
@@ -172,7 +172,7 @@ describe("文字列値の出力", () => {
     expect(actions[0]?.request?.params.name).toBe("極秘プロジェクト");
   });
 
-  it("基本設定の値が マニフェストに指定するとその値が送られる", () => {
+  it("基本設定はマニフェストに書いた値のまま送られる", () => {
     const actions = projectReconciler.plan(
       desired({ name: "プロジェクトA", settings: { textFormattingRule: "markdown" } }),
       existing(),
