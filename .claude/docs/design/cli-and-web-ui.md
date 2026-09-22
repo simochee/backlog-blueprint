@@ -25,7 +25,7 @@ Commands:
 | `validate` | 使わない | 不要 | S1〜S4（[検証パイプライン](validation-pipeline.md)） |
 | `plan` | GET のみ | 必要 | S1〜S7 |
 | `apply` | GET + 更新系 | 必要 | S1〜S7 → 確認 → 実行 |
-| `export` | GET のみ | 必要 | S5 のみ（[EX-2](export.md#ex-2-実行者はスペース管理者であることを要求する)）。マニフェストを入力に取らないので S1〜S4 も S6〜S7 も走らない |
+| `export` | GET のみ | 必要 | S5（[EX-2](export.md#ex-2-実行者はスペース管理者であることを要求する)）と、**自分が組み上げたマニフェストに当てる S3 / S4**（[検証パイプライン §4](validation-pipeline.md#export-は自分の出力に-s3--s4-を当てる)）。マニフェストを入力に取らないので S1・S2 は走らず、S6 は `read()` だけ、S7 は走らない |
 
 ### CL-1: `validate` を追加する
 

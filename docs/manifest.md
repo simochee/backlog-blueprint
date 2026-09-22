@@ -277,13 +277,14 @@ reported none, the key is left out altogether instead of appearing as `settings:
 
 Three things are deliberately absent from the result. There is no `oldname` anywhere, because
 `oldname` is a hint about where a resource came from and a project can only tell you where it is
-now. Archived milestones and the archived flag of the project itself are not written, since the
-manifest has no way to say them; a template applied to a new project creates everything unarchived.
-And no webhook URL is written. Each one becomes `${WEBHOOK_URL_1}`, `${WEBHOOK_URL_2}` and so on,
-numbered by the webhook's position in the list, with the mapping from variable to webhook name
-printed on standard error. A URL that lives in Backlog is not in your repository, and `export` is
-not the thing that should put it there. Set those variables and the manifest is complete: `plan`
-against the project it came from reports no changes.
+now. Whether a milestone is archived is not written, and neither is the archived flag of the project
+itself, since the manifest has no key for either; an archived milestone comes out as an ordinary
+one, and a template applied to a new project creates everything unarchived. And no webhook URL is
+written. Each one becomes `${WEBHOOK_URL_1}`, `${WEBHOOK_URL_2}` and so on, numbered by the
+webhook's position in the list, with the mapping from variable to webhook name printed on standard
+error. A URL that lives in Backlog is not in your repository, and `export` is not the thing that
+should put it there. Set those variables and the manifest is complete: `plan` against the project it
+came from reports no changes.
 
 Someone who belongs to one of the project's teams **and** joined it individually is written under
 `members` as well. `plan` will point that membership out as a repetition — it costs one more
@@ -293,11 +294,11 @@ next `apply` would take their individual membership away.
 
 A project can be in a state no manifest can describe: two categories with the same name, a name
 containing `}`, a status whose color is not one of the ten, a webhook subscribed to nothing. When
-that happens `export` writes nothing at all and lists every such problem at once, so you fix them in
-Backlog and run it again rather than discovering them one at a time. Writing the file anyway would
-mean handing you something the same tool's own `validate` rejects.
+that happens, `export` writes nothing at all and lists every such problem at once, so that you can
+fix them in Backlog and run it again rather than discover them one at a time. Writing the file
+anyway would mean handing you something the same tool's own `validate` rejects.
 
-One edit is always yours to make. The `key` and `name` that come out point at the project you
-exported, so a manifest used as a template has to be given new ones before it is applied — which is
-also what stops you from applying it back onto a project that is already in use, since `plan` and
-`apply` still refuse a project that holds issues.
+One edit is always yours to make. The `key` and `name` that come out still point at the project you
+exported, so give the manifest new ones before you apply it as a template. Applying it back
+unchanged is not a shortcut either: if that project holds issues, `plan` and `apply` refuse it as
+they always do.

@@ -73,7 +73,7 @@ describe("存在しないプロジェクト", () => {
         stage: "snapshot",
         path: "key",
         message: "project not found: PROJ_A",
-        hint: expect.stringContaining("export reads a project that exists"),
+        hint: expect.stringContaining("export reads an existing project and does not create one"),
       },
     ]);
   });
@@ -538,7 +538,7 @@ describe("書き出したマニフェストが検証を通ること", () => {
         severity: "error",
         stage: "snapshot",
         path: "customFields/0/min",
-        message: expect.stringContaining("this value cannot be written as a manifest:"),
+        message: expect.stringContaining("this value cannot go into a manifest:"),
         hint: expect.stringContaining("the manifest validator rejects it (V-A11)"),
       },
     ]);

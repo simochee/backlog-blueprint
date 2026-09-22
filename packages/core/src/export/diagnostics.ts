@@ -36,7 +36,7 @@ export const projectDoesNotExist = (projectKey: string): Diagnostic =>
     "EX-3",
     "key",
     `project not found: ${projectKey}`,
-    "export reads a project that exists. check the key, and that the API key belongs to the space that holds it",
+    "export reads an existing project and does not create one. check the key, and that the API key belongs to the space that holds it",
   );
 
 export const duplicateName = (path: string, noun: string, name: string): Diagnostic =>
@@ -83,7 +83,7 @@ export const unknownCustomFieldType = (path: string, name: string, typeId: numbe
   snapshotError(
     "EX-9d",
     path,
-    `the custom field "${name}" has the type ${typeId}, which this tool has no name for`,
+    `the custom field "${name}" has type ${typeId}, which this tool has no name for`,
     "a manifest writes the type by name and accepts no numeric form. upgrade backlog-blueprint if Backlog has added a type",
   );
 
@@ -135,6 +135,6 @@ export const cannotBeWritten = (rejected: Diagnostic): Diagnostic =>
   snapshotError(
     "EX-9h",
     rejected.path,
-    `this value cannot be written as a manifest: ${rejected.message}`,
+    `this value cannot go into a manifest: ${rejected.message}`,
     `the manifest validator rejects it (${rejected.id}). change the value in Backlog, then export again`,
   );

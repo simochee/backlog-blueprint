@@ -167,12 +167,12 @@ that decides how long a run takes, and [Writing a manifest](docs/manifest.md) ex
 
 ## Commands
 
-| Command        | Reaches Backlog | API key  | Purpose                               |
-| -------------- | --------------- | -------- | ------------------------------------- |
-| `validate`     | never           | not used | Check the manifest on its own         |
-| `plan`         | reads only      | required | Show what `apply` would do            |
-| `apply`        | reads + writes  | required | Carry the plan out                    |
-| `export <key>` | reads only      | required | Write an existing project out as YAML |
+| Command        | Reaches Backlog | API key  | Purpose                                     |
+| -------------- | --------------- | -------- | ------------------------------------------- |
+| `validate`     | never           | not used | Check the manifest on its own               |
+| `plan`         | reads only      | required | Show what `apply` would do                  |
+| `apply`        | reads + writes  | required | Carry the plan out                          |
+| `export <key>` | reads only      | required | Write an existing project out as a manifest |
 
 The difference between `validate` and `plan` is one thing only: whether Backlog is consulted.
 `validate` is for the editor loop and for pull request checks in a CI job that holds neither an API
@@ -238,8 +238,8 @@ Two things are worth knowing before you use the result.
   still refuse a project that holds issues. Change `key` and `name` first, which is what you would
   do to reuse a template anyway.
 
-`export` is not a way to detect drift. It writes what a project looks like at that moment; nothing
-watches it afterwards, and the tool never compares two manifests.
+This is not drift detection, as [What it is not](#what-it-is-not) says: nothing watches the project
+after `export` returns.
 
 ### When `apply` stops partway
 
@@ -277,8 +277,8 @@ can still be rejected.
 ## Further reading
 
 - **[Writing a manifest](docs/manifest.md)** — what the editor cannot tell you: what deletion means,
-  `oldname`, default resources, display order, `${ENV}`, `access`, `webhooks`, and how the way you
-  write the file decides how long `apply` takes.
+  `oldname`, default resources, display order, `${ENV}`, `access`, `webhooks`, what `export` writes
+  and leaves out, and how the way you write the file decides how long `apply` takes.
 - **[DEVELOPMENT.md](DEVELOPMENT.md)** — working on the tool itself.
 - **`.claude/docs/`** — the specification and the reasoning behind it: the requirements, the
   measured behavior of the Backlog API that constrains the design, and the decision records that
