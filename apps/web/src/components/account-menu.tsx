@@ -18,21 +18,26 @@ export type AccountMenuProps = {
   onDisconnect: () => void;
 };
 
+/** ヘッダーでは隣のボタンの高さに収め、ポップオーバーでは見出しの大きさにする */
+type AvatarsSize = "header" | "menu";
+
 const Avatars = ({
   space,
   user,
   icons,
+  size,
 }: {
   space: string;
   user: string;
   icons: AccountMenuProps["icons"];
+  size: AvatarsSize;
 }) => (
-  <span className="account-avatars">
+  <span className="account-avatars" data-size={size}>
     <Avatar
       aria-hidden
       fallback={initialOf(space)}
       radius="medium"
-      size="2"
+      size={size === "header" ? "1" : "3"}
       src={icons.space}
       variant="solid"
     />
@@ -74,14 +79,14 @@ export const AccountMenu = ({
     <Popover.Root>
       <Popover.Trigger>
         <button aria-label={`${user} at ${space}`} className="account-trigger" type="button">
-          <Avatars icons={icons} space={space} user={user} />
+          <Avatars icons={icons} size="header" space={space} user={user} />
           <ChevronDownIcon aria-hidden className="account-chevron" />
         </button>
       </Popover.Trigger>
       <Popover.Content align="end" maxWidth="20rem" minWidth="18rem" size="2">
         <Flex direction="column" gap="3">
           <Flex align="center" gap="3">
-            <Avatars icons={icons} space={space} user={user} />
+            <Avatars icons={icons} size="menu" space={space} user={user} />
             <Box minWidth="0">
               <Text as="div" size="2" truncate weight="bold">
                 {space}

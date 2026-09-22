@@ -353,51 +353,61 @@ body {
   padding-block: var(--space-6);
 }
 
+/**
+ * 寸法と色は隣の Users / Teams（Radix の soft な Button、size 2）のトークンに揃える。
+ * 自前の値を持つと、テーマの半径や間隔を変えたときにこれだけが揃わなくなる。
+ */
 .account-trigger {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-1);
-  height: 40px;
-  padding: 0 var(--space-1);
+  gap: var(--space-2);
+  height: var(--space-6);
+  padding: 0 var(--space-2) 0 var(--space-1);
   border: 0;
-  border-radius: var(--radius-3);
-  background: transparent;
-  color: inherit;
+  border-radius: max(var(--radius-2), var(--radius-full));
+  background: var(--gray-a3);
+  color: var(--gray-a11);
   font: inherit;
-  text-align: left;
   cursor: pointer;
 }
 
 .account-trigger:hover,
 .account-trigger[data-state="open"] {
-  background: var(--gray-a3);
+  background: var(--gray-a4);
 }
 
 .account-trigger:focus-visible {
   outline: 2px solid var(--focus-8);
-  outline-offset: 1px;
+  outline-offset: -1px;
 }
 
-/* スペースのアバターの右下に利用者のアバターを重ね、「どこに・誰として」を1つの印にする。 */
+/**
+ * 利用者のアバターは角からはみ出させ、寸法に数えない。余白で場所を空けると
+ * スペースのアバターが左上に寄り、ボタンの中で中央に来なくなる。
+ */
 .account-avatars {
   position: relative;
   flex: none;
   display: inline-flex;
-  padding: 0 6px 6px 0;
 }
 
-/**
- * Radix の最小（size 1 = 24px）は下のスペースのアバター（32px）の頭文字を覆うので、
- * 大きさを自前で決める。
- */
 .account-avatar-user.rt-AvatarRoot {
   position: absolute;
-  right: 0;
-  bottom: 0;
-  width: 18px;
-  height: 18px;
+  right: -4px;
+  bottom: -4px;
+  width: 14px;
+  height: 14px;
+  font-size: 8px;
+  box-shadow: 0 0 0 1.5px var(--color-background);
+}
+
+.account-avatars[data-size="menu"] .account-avatar-user.rt-AvatarRoot {
+  right: -5px;
+  bottom: -5px;
+  width: 20px;
+  height: 20px;
   font-size: 10px;
-  box-shadow: 0 0 0 2px var(--color-background);
+  box-shadow: 0 0 0 2px var(--color-panel-solid);
 }
 
 .account-chevron {
