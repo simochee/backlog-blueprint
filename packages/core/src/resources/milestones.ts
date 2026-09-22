@@ -81,8 +81,7 @@ export const milestonesReconciler: Reconciler<Milestone[], MilestonesSnapshot> =
 
     for (const milestone of desired) {
       const existing = findExisting(snapshot, milestone);
-      const declared = changesOf(milestone, existing);
-      const changes = declared;
+      const changes = changesOf(milestone, existing);
 
       if (existing === undefined) {
         creates.push({
@@ -106,7 +105,7 @@ export const milestonesReconciler: Reconciler<Milestone[], MilestonesSnapshot> =
 
       kept.add(existing.id);
 
-      if (declared.every(({ before, after }) => before === after)) {
+      if (changes.every(({ before, after }) => before === after)) {
         updates.push({
           id: `milestones/noop/${milestone.name}`,
           phase: 5,

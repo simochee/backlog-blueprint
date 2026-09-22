@@ -59,14 +59,11 @@ const existingEvents = ({ allEvent, activityTypeIds }: ExistingWebhook) =>
   allEvent ? ALL_EVENTS : activityTypeIdsOf(activityTypeIds);
 
 const sameValue = (before: Value | null, after: Value | null) => {
-  const left = before;
-  const right = after;
-
-  if (Array.isArray(left) && Array.isArray(right)) {
-    return left.length === right.length && left.every((item, index) => item === right[index]);
+  if (Array.isArray(before) && Array.isArray(after)) {
+    return before.length === after.length && before.every((item, index) => item === after[index]);
   }
 
-  return left === right;
+  return before === after;
 };
 
 /**
@@ -135,8 +132,7 @@ export const webhooksReconciler: Reconciler<Webhook[], WebhooksSnapshot> = {
 
     for (const webhook of desired) {
       const existing = snapshot.find(({ name }) => name === webhook.name);
-      const declared = changesOf(webhook, existing);
-      const changes = declared;
+      const changes = changesOf(webhook, existing);
 
       if (existing === undefined) {
         creates.push({
@@ -160,7 +156,7 @@ export const webhooksReconciler: Reconciler<Webhook[], WebhooksSnapshot> = {
 
       kept.add(existing.id);
 
-      if (declared.every(({ before, after }) => sameValue(before, after))) {
+      if (changes.every(({ before, after }) => sameValue(before, after))) {
         updates.push({
           id: `webhooks/noop/${webhook.name}`,
           phase: 8,

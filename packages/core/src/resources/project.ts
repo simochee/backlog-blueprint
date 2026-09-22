@@ -98,12 +98,12 @@ export const projectReconciler: Reconciler<ProjectDesired, ProjectSnapshot> = {
 
   plan(desired, snapshot, ctx) {
     if (snapshot.exists) {
-      const declared = changesOf(declaredValues(desired), {
+      const changes = changesOf(declaredValues(desired), {
         ...snapshot.settings,
         name: snapshot.name,
       });
 
-      if (!differs(declared)) {
+      if (!differs(changes)) {
         return [
           {
             id: `project/noop/${desired.key}`,
@@ -116,8 +116,6 @@ export const projectReconciler: Reconciler<ProjectDesired, ProjectSnapshot> = {
           },
         ];
       }
-
-      const changes = declared;
 
       return [
         {
