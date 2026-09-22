@@ -1,5 +1,5 @@
 import { type Diagnostic } from "@backlog-blueprint/core";
-import { Box, Button, Container, Flex, Heading, Text, Theme } from "@radix-ui/themes";
+import { Box, Button, Container, Flex, Heading, TabNav, Text, Theme } from "@radix-ui/themes";
 import {
   startTransition,
   useActionState,
@@ -18,6 +18,7 @@ import { Panel } from "./components/panel";
 import { Stepper } from "./components/stepper";
 import { connect, type Connection } from "./connection";
 import { type DirectoryKind } from "./directory";
+import { prepareExport, type ExportAttempt } from "./export";
 import {
   connectionStamp,
   fresh,
@@ -26,18 +27,22 @@ import {
   type Derived,
   type ManifestInputs,
 } from "./freshness";
+import { PAGES, usePage } from "./page";
 import { PASTED, preparePlan, type PlanAttempt, type PreparedPlan } from "./plan";
 import { isRunning, rejectedProgress, spentPlan, type ApplyRun } from "./progress";
 import { secretRevisions, subscribeSecrets } from "./secrets";
 import { ApplyStep } from "./steps/apply";
 import { ConnectStep } from "./steps/connect";
+import { ExportStep } from "./steps/export";
 import { ManifestStep } from "./steps/manifest";
 import { PlanStep } from "./steps/plan";
 import { openTransport, transport } from "./transport";
 import { useDirectory } from "./use-directory";
 import { validatedFor } from "./validation";
 
-const STEPS = ["Connect", "Manifest", "Plan", "Apply"];
+const APPLY_STEPS = ["Connect", "Manifest", "Plan", "Apply"];
+
+const EXPORT_STEPS = ["Connect", "Export"];
 
 const DIRECTORY_KINDS: DirectoryKind[] = ["users", "teams"];
 
@@ -48,6 +53,7 @@ const start = (action: () => void) => () => startTransition(action);
 
 export const App = () => {
   const appearance = useAppearance();
+  const page = usePage();
   const revisions = useSyncExternalStore(subscribeSecrets, secretRevisions);
   const [space, setSpace] = useState("");
   const [manifestText, setManifestText] = useState("");
@@ -56,6 +62,7 @@ export const App = () => {
   const [confirmingPlan, setConfirmingPlan] = useState<PreparedPlan>();
   const [applyRecord, setApplyRecord] = useState<Derived<ApplyRun>>();
   const [paneRecord, setPaneRecord] = useState<Derived<DirectoryKind>>();
+  const [exportKey, setExportKey] = useState("");
 
   const connectionKey = connectionStamp({ space, credentials: revisions.credentials });
 
@@ -117,6 +124,26 @@ export const App = () => {
       startTransition(directory.load);
     }
   };
+
+  const [exportRecord, runExport, exporting] = useActionState<Derived<ExportAttempt> | undefined>(
+    async (previous) => {
+      if (connection === undefined) {
+        return previous;
+      }
+
+      const stamp = connectionKey;
+
+      try {
+        return { stamp, value: await prepareExport(exportKey, transport.get) };
+      } catch (error) {
+        return { stamp, value: { diagnostics: [], failure: error } };
+      }
+    },
+    undefined,
+  );
+
+  /** WU-32。キーの欄には紐づけない。どのキーを書き出したかは結果が持っている。 */
+  const exportAttempt = fresh(exportRecord, connectionKey);
 
   const [planAttempt, runPlan, planning] = useActionState<Derived<PlanAttempt> | undefined>(
     async (previous) => {
@@ -220,7 +247,10 @@ export const App = () => {
     });
   };
 
-  const reached = [connection !== undefined, plan !== undefined, run !== undefined].filter(
+  const applyReached = [connection !== undefined, plan !== undefined, run !== undefined].filter(
+    Boolean,
+  ).length;
+  const exportReached = [connection !== undefined, exportAttempt?.exported !== undefined].filter(
     Boolean,
   ).length;
 
@@ -239,6 +269,13 @@ export const App = () => {
                     Declare a Backlog project in YAML, review the plan, then apply it.
                   </Text>
                 </Flex>
+                <TabNav.Root aria-label="Pages">
+                  {PAGES.map((entry) => (
+                    <TabNav.Link active={page === entry.page} href={entry.hash} key={entry.page}>
+                      {entry.title}
+                    </TabNav.Link>
+                  ))}
+                </TabNav.Root>
                 <Flex gap="2">
                   {DIRECTORY_KINDS.map((kind) => (
                     <Button
@@ -261,7 +298,11 @@ export const App = () => {
         </Box>
         <Container maxWidth="1200px" px={{ initial: "4", sm: "6" }} py={{ initial: "5", sm: "6" }}>
           <Flex direction="column" gap="5">
-            <Stepper reached={reached} titles={STEPS} />
+            {page === "apply" ? (
+              <Stepper reached={applyReached} titles={APPLY_STEPS} />
+            ) : (
+              <Stepper reached={exportReached} titles={EXPORT_STEPS} />
+            )}
             <Panel enabled step={1} title="Connect">
               <ConnectStep
                 canConnect={space !== "" && revisions.hasApiKey}
@@ -274,56 +315,81 @@ export const App = () => {
                 space={space}
               />
             </Panel>
-            <Panel
-              enabled={connection !== undefined}
-              hint="Connect to a space first."
-              step={2}
-              title="Manifest"
-            >
-              <ManifestStep
-                canPlan={validation?.manifest !== undefined}
-                names={validated.value.names}
-                onFileDropped={(name, text) => {
-                  setManifestSource(name);
-                  setManifestText(text);
-                }}
-                onPlan={start(runPlan)}
-                onTextChange={(text) => {
-                  setManifestSource(PASTED);
-                  setManifestText(text);
-                }}
-                planning={planning}
-                text={manifestText}
-                validation={validation}
-              />
-            </Panel>
-            <Panel
-              enabled={plan !== undefined}
-              hint="Run Plan to see what apply would do. The plan is discarded whenever an input changes, and once it has been applied."
-              step={3}
-              title="Plan"
-            >
-              <PlanStep
-                applying={running}
-                diagnostics={plan?.diagnostics ?? []}
-                failure={plan?.failure}
-                onApply={() => setConfirmingPlan(plan?.prepared)}
-                onShowUnchangedChange={setShowUnchanged}
-                prepared={plan?.prepared}
-                showUnchanged={showUnchanged}
-              />
-            </Panel>
-            <Panel
-              enabled={run !== undefined}
-              hint="Nothing has been applied yet."
-              step={4}
-              title="Apply"
-            >
-              {run === undefined ? null : <ApplyStep run={run} />}
-            </Panel>
-            {confirming && plan?.prepared !== undefined ? (
-              <ConfirmDialog onCancel={cancelApply} onConfirm={applyPlan} />
-            ) : null}
+            {/**
+             * 見えないページもアンマウントしない（WU-28）。apply の最中に Export を開いた
+             * だけで進捗と離脱の警告が消え、書きかけのマニフェストも失われる。
+             */}
+            <Flex className="page-view" direction="column" gap="5" hidden={page !== "apply"}>
+              <Panel
+                enabled={connection !== undefined}
+                hint="Connect to a space first."
+                step={2}
+                title="Manifest"
+              >
+                <ManifestStep
+                  canPlan={validation?.manifest !== undefined}
+                  names={validated.value.names}
+                  onFileDropped={(name, text) => {
+                    setManifestSource(name);
+                    setManifestText(text);
+                  }}
+                  onPlan={start(runPlan)}
+                  onTextChange={(text) => {
+                    setManifestSource(PASTED);
+                    setManifestText(text);
+                  }}
+                  planning={planning}
+                  text={manifestText}
+                  validation={validation}
+                />
+              </Panel>
+              <Panel
+                enabled={plan !== undefined}
+                hint="Run Plan to see what apply would do. The plan is discarded whenever an input changes, and once it has been applied."
+                step={3}
+                title="Plan"
+              >
+                <PlanStep
+                  applying={running}
+                  diagnostics={plan?.diagnostics ?? []}
+                  failure={plan?.failure}
+                  onApply={() => setConfirmingPlan(plan?.prepared)}
+                  onShowUnchangedChange={setShowUnchanged}
+                  prepared={plan?.prepared}
+                  showUnchanged={showUnchanged}
+                />
+              </Panel>
+              <Panel
+                enabled={run !== undefined}
+                hint="Nothing has been applied yet."
+                step={4}
+                title="Apply"
+              >
+                {run === undefined ? null : <ApplyStep run={run} />}
+              </Panel>
+              {confirming && plan?.prepared !== undefined ? (
+                <ConfirmDialog onCancel={cancelApply} onConfirm={applyPlan} />
+              ) : null}
+            </Flex>
+            <Flex className="page-view" direction="column" gap="5" hidden={page !== "export"}>
+              <Panel
+                enabled={connection !== undefined}
+                hint="Connect to a space first."
+                step={2}
+                title="Export"
+              >
+                <ExportStep
+                  canExport={connection !== undefined && exportKey.trim() !== ""}
+                  diagnostics={exportAttempt?.diagnostics ?? []}
+                  exported={exportAttempt?.exported}
+                  exporting={exporting}
+                  failure={exportAttempt?.failure}
+                  onExport={start(runExport)}
+                  onProjectKeyChange={setExportKey}
+                  projectKey={exportKey}
+                />
+              </Panel>
+            </Flex>
           </Flex>
         </Container>
       </Box>

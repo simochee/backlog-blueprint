@@ -298,11 +298,11 @@ GitHub Action・Docker イメージ・PR コメント機能は提供しない。
 | FR-7.6 | レート制限の残量は `GET /rateLimit` で取得する | 
 
 Yaml を GUI フォームから生成する機能は初期スコープ外。
-既存プロジェクトからの書き出し（export）は FR-8 として CLI に提供する。
+既存プロジェクトからの書き出し（export）は FR-8 として CLI と Web UI の両方に提供する。
 写像とシリアライズは core が持つ（[EX-1](../design/export.md#ex-1-read--tomanifest--serializemanifest-の3段にする)）ので、
-Web UI に載せても NFR-6 は保たれる。ただし Step 2 にどう置くか
-（読み込んだ結果で入力欄を上書きすることと WU-3 の関係）は未決であり、決まるまで Web UI は貼り付け実行のみとする
-（[EX-20](../design/export.md#ex-20-web-ui-への搭載は未決)）。
+Web UI に載せても NFR-6 は保たれる。Web UI では Apply とは別のページに置き、
+書き出した結果を Apply の入力欄へ送る導線は持たない
+（[EX-20](../design/export.md#ex-20-web-ui-に載せ別のページに置く)）。
 
 ### FR-8 export
 

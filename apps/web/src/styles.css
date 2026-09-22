@@ -237,3 +237,15 @@ body {
   background: var(--color-background);
   border-bottom: 1px solid var(--gray-a4);
 }
+
+/* Radix の Flex が `display: flex` を付けるので、`hidden` 属性だけでは隠れない。 */
+.page-view[hidden] {
+  display: none;
+}
+
+/* 書き出した Yaml は長くなるので、ページではなく枠の中でスクロールさせる。 */
+.export-yaml {
+  max-height: 32rem;
+  overflow: auto;
+  white-space: pre;
+}

@@ -111,6 +111,20 @@ const button = (name: string): HTMLElement => screen.getByRole("button", { name 
 
 const pane = (name: string): HTMLElement => screen.getByRole("complementary", { name });
 
+/**
+ * 文言は段の中で引く。見えないページもアンマウントしない（WU-28）ので、`getByText` は
+ * 隠れたページの同じ文言まで拾う。見出しはロールで引くので、見えている段だけが当たる。
+ */
+const panel = (title: string): HTMLElement => {
+  const found = screen.getByRole("heading", { name: new RegExp(`${title}$`) }).closest("section");
+
+  if (found === null) {
+    throw new TypeError(`The ${title} heading is not inside a panel`);
+  }
+
+  return found;
+};
+
 const connect = async (user: UserEvent): Promise<void> => {
   await user.type(screen.getByLabelText("Space domain"), SPACE);
   await user.type(screen.getByLabelText("API key"), API_KEY);
@@ -199,7 +213,7 @@ describe("接続", () => {
   it("ドメインを打つとそのスペースの API キーのページへの導線が出る", async () => {
     const user = await startApp();
 
-    expect(screen.queryByRole("link")).toBeNull();
+    expect(screen.queryByRole("link", { name: /Get an API key/ })).toBeNull();
 
     await user.type(screen.getByLabelText("Space domain"), SPACE);
 
@@ -217,7 +231,7 @@ describe("接続", () => {
     await connect(user);
 
     expect(await screen.findByText("V-B2", { exact: false })).toBeInTheDocument();
-    expect(screen.getByText("Connect to a space first.")).toBeInTheDocument();
+    expect(within(panel("Manifest")).getByText("Connect to a space first.")).toBeInTheDocument();
     expect(screen.queryByLabelText(/^Manifest/)).toBeNull();
   });
 });
@@ -760,5 +774,239 @@ describe("スペースのユーザーとチームの一覧", () => {
 
     expect(await within(pane("Teams")).findByText(/Boom/)).toBeInTheDocument();
     expect(screen.getByText(/Signed in as yamada/)).toBeInTheDocument();
+  });
+});
+
+/**
+ * 名前を完全一致で引かない。TabNav は太字になっても幅が変わらないよう、同じラベルを
+ * CSS で不可視にした要素にもう一度描く。happy-dom はその CSS を読まないので、
+ * 名前が `Export Export` になる。
+ */
+const tab = (name: string): HTMLElement =>
+  screen.getByRole("link", { name: new RegExp(`^${name}\\b`) });
+
+const exportedYaml = async (): Promise<string> => {
+  const shown = await screen.findByLabelText("Exported manifest PROJ_A.yaml");
+
+  return shown.textContent ?? "";
+};
+
+describe("Export ページ", () => {
+  /** 課題種別が0件のプロジェクトはマニフェストにできない（EX-9h）ので、1件持たせる。 */
+  const EXPORTABLE = {
+    "/api/v2/projects/PROJ_A/issueTypes": [{ id: 1, name: "タスク", color: "#7ea800" }],
+  };
+
+  const ISSUES_COUNT = "/api/v2/issues/count?projectId[]=100";
+
+  const openExport = async (user: UserEvent): Promise<void> => {
+    await user.click(tab("Export"));
+    await waitFor(() => {
+      expect(panel("Export")).toBeInTheDocument();
+    });
+  };
+
+  const connectedOnExport = async (responses: Record<string, unknown> = {}): Promise<UserEvent> => {
+    const user = await startApp({ ...EXPORTABLE, ...responses });
+
+    await openExport(user);
+    await connect(user);
+    await screen.findByText(/Signed in as yamada/);
+
+    return user;
+  };
+
+  const exportProject = async (user: UserEvent, key: string): Promise<void> => {
+    await user.type(screen.getByLabelText("Project key"), key);
+    await user.click(button("Export"));
+  };
+
+  beforeEach(() => {
+    globalThis.location.hash = "";
+  });
+
+  it("タブで Export を開くと Apply の段は見えなくなり、URL のハッシュが #/export になる", async () => {
+    const user = await startApp();
+
+    await openExport(user);
+
+    expect(globalThis.location.hash).toBe("#/export");
+    expect(screen.queryByRole("heading", { name: /Manifest$/ })).toBeNull();
+  });
+
+  it("#/export を開いた状態で読み込むと最初から Export ページが出る", async () => {
+    globalThis.location.hash = "#/export";
+
+    await startApp();
+
+    expect(panel("Export")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /Manifest$/ })).toBeNull();
+  });
+
+  it("Apply ページで接続すると、Export ページでも接続したまま使える", async () => {
+    const user = await startApp(EXPORTABLE);
+
+    await connect(user);
+    await screen.findByText(/Signed in as yamada/);
+    await openExport(user);
+    await exportProject(user, "PROJ_A");
+
+    expect(await exportedYaml()).toContain("key: PROJ_A\n");
+  });
+
+  it("接続する前は書き出せない", async () => {
+    const user = await startApp();
+
+    await openExport(user);
+
+    expect(screen.queryByLabelText("Project key")).toBeNull();
+    expect(within(panel("Export")).getByText("Connect to a space first.")).toBeInTheDocument();
+  });
+
+  it("書き出した Yaml はそのままコピーできる", async () => {
+    const user = await connectedOnExport();
+
+    await exportProject(user, "PROJ_A");
+
+    const yaml = await exportedYaml();
+
+    expect(yaml).toContain("key: PROJ_A\nname: プロジェクトA\n");
+    await user.click(button("Copy YAML"));
+    expect(await navigator.clipboard.readText()).toBe(yaml);
+  });
+
+  it("Download は <KEY>.yaml という名前で書き出した Yaml を保存させる", async () => {
+    const user = await connectedOnExport();
+    const saved: { filename: string; blob: Blob }[] = [];
+    const createObjectURL = vi.spyOn(URL, "createObjectURL").mockImplementation((blob) => {
+      saved.push({ filename: "", blob: blob as Blob });
+
+      return "blob:exported";
+    });
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      const last = saved.at(-1);
+
+      if (last !== undefined) {
+        last.filename = this.download;
+      }
+    });
+
+    await exportProject(user, "PROJ_A");
+
+    const yaml = await exportedYaml();
+
+    await user.click(button("Download"));
+
+    expect(saved).toHaveLength(1);
+    expect(saved[0]?.filename).toBe("PROJ_A.yaml");
+    expect(await saved[0]?.blob.text()).toBe(yaml);
+
+    createObjectURL.mockRestore();
+    click.mockRestore();
+  });
+
+  it("課題を持つプロジェクトも書き出せ、そのままでは plan と apply が拒むことを案内する", async () => {
+    const user = await connectedOnExport({ [ISSUES_COUNT]: { count: 3 } });
+
+    await exportProject(user, "PROJ_A");
+
+    expect(await exportedYaml()).toContain("key: PROJ_A\n");
+    expect(screen.getByText(/PROJ_A holds 3 issues/)).toBeInTheDocument();
+  });
+
+  it("課題が無ければ案内は出ない", async () => {
+    const user = await connectedOnExport();
+
+    await exportProject(user, "PROJ_A");
+    await exportedYaml();
+
+    expect(screen.queryByText(/holds/)).toBeNull();
+  });
+
+  it("キーの形が正しくなければ診断を出し、Yaml は何も出さない", async () => {
+    const user = await connectedOnExport();
+
+    await exportProject(user, "proj-a");
+
+    expect(
+      await within(panel("Export")).findByText(/export error\. Nothing has been written\./),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Copy YAML" })).toBeNull();
+  });
+
+  it("マニフェストにできない実状は全件の診断として出し、Yaml は何も出さない", async () => {
+    const user = await connectedOnExport({ "/api/v2/projects/PROJ_A/issueTypes": [] });
+
+    await exportProject(user, "PROJ_A");
+
+    expect(await within(panel("Export")).findAllByText(/EX-9h/)).not.toHaveLength(0);
+    expect(screen.queryByRole("button", { name: "Copy YAML" })).toBeNull();
+  });
+
+  it("読み取りに失敗したときは失敗の内容を出し、Yaml は何も出さない", async () => {
+    const user = await connectedOnExport({
+      "/api/v2/projects/PROJ_A/webhooks": httpFailure({
+        status: 500,
+        errors: [{ message: "Boom" }],
+      }),
+    });
+
+    await exportProject(user, "PROJ_A");
+
+    expect(await within(panel("Export")).findByText(/Boom/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Copy YAML" })).toBeNull();
+  });
+
+  it("キーの欄を書き換えても、書き出した結果はどのキーのものかを示したまま残る", async () => {
+    const user = await connectedOnExport();
+
+    await exportProject(user, "PROJ_A");
+    await exportedYaml();
+    await user.type(screen.getByLabelText("Project key"), "_B");
+
+    expect(screen.getByText("PROJ_A.yaml")).toBeInTheDocument();
+  });
+
+  it("接続の入力を変えると、書き出した結果は消える", async () => {
+    const user = await connectedOnExport();
+
+    await exportProject(user, "PROJ_A");
+    await exportedYaml();
+    await user.type(screen.getByLabelText("Space domain"), "x");
+
+    expect(screen.queryByText("PROJ_A.yaml")).toBeNull();
+  });
+
+  it("ページを行き来しても、書きかけのマニフェストと書き出した結果は残る", async () => {
+    const user = await startApp(EXPORTABLE);
+
+    await connect(user);
+    await screen.findByText(/Signed in as yamada/);
+    await writeManifest(user, MANIFEST);
+    await openExport(user);
+    await exportProject(user, "PROJ_A");
+    await exportedYaml();
+    await user.click(tab("Apply"));
+
+    expect(await manifestField()).toHaveValue(MANIFEST);
+
+    await openExport(user);
+
+    expect(screen.getByText("PROJ_A.yaml")).toBeInTheDocument();
+  });
+
+  it("書き出した Yaml を Apply のマニフェストへ送る導線は無い", async () => {
+    const user = await connectedOnExport();
+
+    await exportProject(user, "PROJ_A");
+    await exportedYaml();
+
+    expect(
+      within(panel("Export"))
+        .getAllByRole("button")
+        .map((element) => element.textContent),
+    ).toEqual(["Export", "Copy YAML", "Download"]);
   });
 });

@@ -47,13 +47,18 @@ const BLOCK_SEPARATOR = "\n\n";
  * 対応付けて切り分ける。並びを決めるのは `orderDiagnostics`（DG-3）で、同じ関数を
  * 通した配列と突き合わせれば対応が取れる。先頭の件数の要約は診断1件に対応しない。
  */
-export const diagnosticView = (diagnostics: Diagnostic[]): DiagnosticView => {
+export const diagnosticView = (
+  diagnostics: Diagnostic[],
+  { nothingWritten = false }: { nothingWritten?: boolean } = {},
+): DiagnosticView => {
   if (diagnostics.length === 0) {
     return { blocks: [] };
   }
 
   const ordered = orderDiagnostics(diagnostics);
-  const rendered = renderDiagnostics(diagnostics, { paint: PLAIN }).split(BLOCK_SEPARATOR);
+  const rendered = renderDiagnostics(diagnostics, { paint: PLAIN, nothingWritten }).split(
+    BLOCK_SEPARATOR,
+  );
   const offset = rendered.length - ordered.length;
   const blocks = ordered.map((diagnostic, index) => ({
     diagnostic,

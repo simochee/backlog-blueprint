@@ -258,6 +258,11 @@ The same validation and planning code runs in a browser at
 install anything. It is a static page with no server behind it: it talks to the Backlog API directly
 from the browser, and the API key is held in memory only, never written to storage of any kind.
 
+It has two pages. **Apply** walks through connect, manifest, plan and apply. **Export** reads an
+existing project and gives you its manifest to copy or download, the same YAML that
+`backlog-blueprint export` prints. The exported YAML is not passed to the Apply page: change `key`
+and `name` first, then paste it there.
+
 ## JSON Schema
 
 The schema is published alongside the Web UI, one URL per released version:
