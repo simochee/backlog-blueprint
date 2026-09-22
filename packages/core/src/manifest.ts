@@ -182,70 +182,222 @@ const CUSTOM_FIELD_CONDITIONS = [
   },
 ];
 
-const SettingsSchema = StrictObject({
-  textFormattingRule: Type.Optional(StringEnum(["backlog", "markdown"])),
-  chartEnabled: Type.Optional(Type.Boolean()),
-  useResolvedForChart: Type.Optional(Type.Boolean()),
-  subtaskingEnabled: Type.Optional(Type.Boolean()),
-  grandchildIssueEnabled: Type.Optional(Type.Boolean()),
-  projectLeaderCanEditProjectLeader: Type.Optional(Type.Boolean()),
-  useWiki: Type.Optional(Type.Boolean()),
-  useWikiTreeView: Type.Optional(Type.Boolean()),
-  useOriginalImageSizeAtWiki: Type.Optional(Type.Boolean()),
-  useDocument: Type.Optional(Type.Boolean()),
-  useFileSharing: Type.Optional(Type.Boolean()),
-  useGit: Type.Optional(Type.Boolean()),
-  useSubversion: Type.Optional(Type.Boolean()),
-  useDevAttributes: Type.Optional(Type.Boolean()),
-});
+/**
+ * 名前がそのまま意味になる項目（`useWiki` / `useGit` など）には説明を置かない。
+ * キー名を言い換えただけの文はホバーに何も足さず、説明のある項目とない項目の差が
+ * 「ここには言うべきことがある」という合図として働かなくなる。
+ */
+const SettingsSchema = StrictObject(
+  {
+    textFormattingRule: Type.Optional(
+      StringEnum(["backlog", "markdown"], {
+        description: "The markup syntax for issue and wiki text.",
+      }),
+    ),
+    chartEnabled: Type.Optional(Type.Boolean()),
+    useResolvedForChart: Type.Optional(
+      Type.Boolean({
+        description:
+          "Count an issue as finished on the chart once it reaches the resolved status, rather than only when it is closed.",
+      }),
+    ),
+    subtaskingEnabled: Type.Optional(Type.Boolean()),
+    grandchildIssueEnabled: Type.Optional(
+      Type.Boolean({
+        description: "Allow subtasks of subtasks. Requires subtaskingEnabled to be on as well.",
+      }),
+    ),
+    projectLeaderCanEditProjectLeader: Type.Optional(
+      Type.Boolean({
+        description: "Let project administrators appoint and remove other project administrators.",
+      }),
+    ),
+    useWiki: Type.Optional(Type.Boolean()),
+    useWikiTreeView: Type.Optional(
+      Type.Boolean({ description: "Show the wiki as a tree rather than a flat list." }),
+    ),
+    useOriginalImageSizeAtWiki: Type.Optional(
+      Type.Boolean({
+        description: "Show images in the wiki at their own size instead of scaling them to fit.",
+      }),
+    ),
+    useDocument: Type.Optional(Type.Boolean({ description: "Enable Backlog's Document feature." })),
+    useFileSharing: Type.Optional(Type.Boolean()),
+    useGit: Type.Optional(Type.Boolean()),
+    useSubversion: Type.Optional(Type.Boolean()),
+    useDevAttributes: Type.Optional(
+      Type.Boolean({
+        description: "Show the priority, affected version and milestone fields on issues.",
+      }),
+    ),
+  },
+  {
+    description:
+      "Project settings. A key left out is not sent at all, so Backlog keeps the value it already has. All of them travel in one request however many you write.",
+  },
+);
 
 const IssueTypeSchema = StrictObject({
-  name: Type.String({ minLength: 1 }),
-  color: StringEnum(ISSUE_TYPE_COLORS),
-  templateSummary: Type.Optional(Type.String()),
-  templateDescription: Type.Optional(Type.String()),
-  oldname: Type.Optional(Type.String({ minLength: 1 })),
+  name: Type.String({
+    minLength: 1,
+    description: "The name the issue type should end up with.",
+  }),
+  color: StringEnum(ISSUE_TYPE_COLORS, {
+    description:
+      "One of Backlog's ten issue type colors. Backlog has no default, so it is required.",
+  }),
+  templateSummary: Type.Optional(
+    Type.String({ description: "Prefilled into the summary of a new issue of this type." }),
+  ),
+  templateDescription: Type.Optional(
+    Type.String({ description: "Prefilled into the description of a new issue of this type." }),
+  ),
+  oldname: Type.Optional(
+    Type.String({
+      minLength: 1,
+      description:
+        "The name this issue type has in Backlog now. Resources are matched by name, so without it a renamed entry is deleted and recreated: two requests instead of one.",
+    }),
+  ),
 });
 
 const StatusSchema = StrictObject({
-  name: Type.String({ minLength: 1 }),
-  color: Type.Optional(StringEnum(STATUS_COLORS)),
-  oldname: Type.Optional(Type.String({ minLength: 1 })),
+  name: Type.String({
+    minLength: 1,
+    description:
+      "The name the status should end up with. The four default statuses cannot be renamed, so write those exactly as they are.",
+  }),
+  color: Type.Optional(
+    StringEnum(STATUS_COLORS, {
+      description:
+        "One of Backlog's ten status colors. Required on statuses you add; not allowed on the four default statuses, which cannot be recolored.",
+    }),
+  ),
+  oldname: Type.Optional(
+    Type.String({
+      minLength: 1,
+      description:
+        "The name this status has in Backlog now, so a renamed status is renamed rather than deleted and recreated. Not allowed on the four default statuses, which cannot be renamed.",
+    }),
+  ),
 });
 
 const CategorySchema = StrictObject({
-  name: Type.String({ minLength: 1 }),
-  oldname: Type.Optional(Type.String({ minLength: 1 })),
+  name: Type.String({ minLength: 1, description: "The name the category should end up with." }),
+  oldname: Type.Optional(
+    Type.String({
+      minLength: 1,
+      description:
+        "The name this category has in Backlog now. Resources are matched by name, so without it a renamed entry is deleted and recreated: two requests instead of one.",
+    }),
+  ),
 });
 
 const MilestoneSchema = StrictObject({
-  name: Type.String({ minLength: 1 }),
-  description: Type.Optional(Type.String()),
-  startDate: Type.Optional(Type.String({ pattern: DATE_PATTERN })),
-  releaseDueDate: Type.Optional(Type.String({ pattern: DATE_PATTERN })),
-  oldname: Type.Optional(Type.String({ minLength: 1 })),
+  name: Type.String({ minLength: 1, description: "The name the milestone should end up with." }),
+  description: Type.Optional(
+    Type.String({
+      description: "Shown on the milestone itself, not on the issues assigned to it.",
+    }),
+  ),
+  startDate: Type.Optional(
+    Type.String({ pattern: DATE_PATTERN, description: "Start date, as yyyy-MM-dd." }),
+  ),
+  releaseDueDate: Type.Optional(
+    Type.String({ pattern: DATE_PATTERN, description: "Release due date, as yyyy-MM-dd." }),
+  ),
+  oldname: Type.Optional(
+    Type.String({
+      minLength: 1,
+      description:
+        "The name this milestone has in Backlog now. Resources are matched by name, so without it a renamed entry is deleted and recreated: two requests instead of one.",
+    }),
+  ),
 });
 
-const CustomFieldRange = Type.Union([Type.Number(), Type.String({ pattern: DATE_PATTERN })]);
+const customFieldRange = (description: string) =>
+  Type.Union([Type.Number(), Type.String({ pattern: DATE_PATTERN })], { description });
 
 const CustomFieldSchema = StrictObject(
   {
-    name: Type.String({ minLength: 1 }),
-    type: StringEnum(CUSTOM_FIELD_TYPES),
-    description: Type.Optional(Type.String()),
-    required: Type.Optional(Type.Boolean({ default: false })),
-    applicableIssueTypes: Type.Optional(Type.Array(Type.String(), { uniqueItems: true })),
-    oldname: Type.Optional(Type.String({ minLength: 1 })),
-    min: Type.Optional(CustomFieldRange),
-    max: Type.Optional(CustomFieldRange),
-    initialValue: Type.Optional(Type.Number()),
-    unit: Type.Optional(Type.String()),
-    initialDate: Type.Optional(Type.String({ pattern: DATE_PATTERN })),
-    initialValueType: Type.Optional(StringEnum(INITIAL_VALUE_TYPES)),
-    initialShift: Type.Optional(Type.Integer()),
-    items: Type.Optional(Type.Array(Type.String())),
-    allowInput: Type.Optional(Type.Boolean()),
-    allowAddItem: Type.Optional(Type.Boolean()),
+    name: Type.String({
+      minLength: 1,
+      description: "The name the custom field should end up with.",
+    }),
+    type: StringEnum(CUSTOM_FIELD_TYPES, {
+      description:
+        "The field's type. Backlog cannot change the type of a field that exists, so changing this deletes the field and creates a new one.",
+    }),
+    description: Type.Optional(
+      Type.String({ description: "Shown to whoever fills the field in." }),
+    ),
+    required: Type.Optional(
+      Type.Boolean({
+        default: false,
+        description: "An issue cannot be saved while this field is empty.",
+      }),
+    ),
+    applicableIssueTypes: Type.Optional(
+      Type.Array(Type.String(), {
+        uniqueItems: true,
+        description:
+          "Names of the issue types this field appears on. Empty or absent means it appears on every issue type.",
+      }),
+    ),
+    oldname: Type.Optional(
+      Type.String({
+        minLength: 1,
+        description:
+          "The name this custom field has in Backlog now. Resources are matched by name, so without it a renamed entry is deleted and recreated: two requests instead of one.",
+      }),
+    ),
+    min: Type.Optional(
+      customFieldRange("Lowest value accepted: a number, or a yyyy-MM-dd date for a date field."),
+    ),
+    max: Type.Optional(
+      customFieldRange("Highest value accepted: a number, or a yyyy-MM-dd date for a date field."),
+    ),
+    initialValue: Type.Optional(
+      Type.Number({ description: "The value a new issue starts with. Number fields only." }),
+    ),
+    unit: Type.Optional(
+      Type.String({
+        description: "Shown after the value when the field is displayed. Number fields only.",
+      }),
+    ),
+    initialDate: Type.Optional(
+      Type.String({
+        pattern: DATE_PATTERN,
+        description:
+          "The fixed date a new issue starts with, when initialValueType is specifiedDate.",
+      }),
+    ),
+    initialValueType: Type.Optional(
+      StringEnum(INITIAL_VALUE_TYPES, {
+        description:
+          "How a date field is prefilled: today, today plus initialShift days, or the fixed date in initialDate.",
+      }),
+    ),
+    initialShift: Type.Optional(
+      Type.Integer({
+        description:
+          "Days added to today when initialValueType is todayPlusShift. A negative number moves it earlier.",
+      }),
+    ),
+    items: Type.Optional(
+      Type.Array(Type.String(), {
+        description:
+          "The choices, in the order they are offered. List, checkbox and radio fields only.",
+      }),
+    ),
+    allowInput: Type.Optional(
+      Type.Boolean({
+        description: 'Offer an "Other" box so a value outside items can be typed in.',
+      }),
+    ),
+    allowAddItem: Type.Optional(
+      Type.Boolean({ description: "Let people add new choices to items from the issue form." }),
+    ),
   },
   { allOf: CUSTOM_FIELD_CONDITIONS },
 );
@@ -255,31 +407,38 @@ const CustomFieldSchema = StrictObject(
  * 判定には `GET /users` の `roleType` が要るので、`plan` まで待たないと言えない。
  * スキーマの説明はエディタが書いている最中に出せる唯一の地点である。
  */
-const AccessSchema = StrictObject({
-  teams: Type.Optional(
-    Type.Array(Type.String(), {
-      uniqueItems: true,
-      description:
-        "Names of space teams to add to the project. A team costs one request however many people it holds.",
-    }),
-  ),
-  members: Type.Optional(
-    Type.Array(Type.String(), {
-      uniqueItems: true,
-      description:
-        "Login ids of people to add one by one. Write only those who are in none of the teams above; each one costs a request.",
-    }),
-  ),
-  administrators: Type.Optional(
-    Type.Array(Type.String(), {
-      uniqueItems: true,
-      description:
-        "Login ids of people to give the project administrator role to. Backlog refuses that role to space administrators, so do not write yourself here: you already administer the project without belonging to it.",
-    }),
-  ),
-});
+const AccessSchema = StrictObject(
+  {
+    teams: Type.Optional(
+      Type.Array(Type.String(), {
+        uniqueItems: true,
+        description:
+          "Names of space teams to add to the project. A team costs one request however many people it holds.",
+      }),
+    ),
+    members: Type.Optional(
+      Type.Array(Type.String(), {
+        uniqueItems: true,
+        description:
+          "Login IDs of people to add one by one, one request each. Leave out anyone already covered by teams or administrators.",
+      }),
+    ),
+    administrators: Type.Optional(
+      Type.Array(Type.String(), {
+        uniqueItems: true,
+        description:
+          "Login IDs of people to make project administrators. Do not write yourself: Backlog refuses that role to space administrators, and you can already operate the project without belonging to it.",
+      }),
+    ),
+  },
+  {
+    description:
+      "Who belongs to the project. Leaving this out removes every member and takes the role from every project administrator.",
+  },
+);
 
 const WebhookEventsSchema = Type.Unsafe<"all" | WebhookEvent[]>({
+  description: "Which events to send: all, or a list of event names or numeric event IDs.",
   oneOf: [
     { const: "all" },
     {
@@ -297,24 +456,74 @@ const WebhookEventsSchema = Type.Unsafe<"all" | WebhookEvent[]>({
 });
 
 const WebhookSchema = StrictObject({
-  name: Type.String({ minLength: 1 }),
-  description: Type.Optional(Type.String()),
-  hookUrl: Type.String({ minLength: 1 }),
+  name: Type.String({ minLength: 1, description: "The name the webhook should end up with." }),
+  description: Type.Optional(
+    Type.String({ description: "Shown on the webhook in Backlog's project settings." }),
+  ),
+  hookUrl: Type.String({
+    minLength: 1,
+    description:
+      "Where Backlog sends the notification. Write it as ${NAME} to keep the URL out of the file when it carries a token.",
+  }),
   events: WebhookEventsSchema,
 });
 
 export const ManifestSchema = StrictObject({
-  $schema: Type.Optional(Type.String()),
-  key: Type.String({ pattern: "^[A-Z0-9_]+$" }),
-  name: Type.String({ minLength: 1 }),
+  $schema: Type.Optional(
+    Type.String({
+      description:
+        "Accepted and ignored. The yaml-language-server comment at the top of the file is what selects the schema; writing this key as well does no harm.",
+    }),
+  ),
+  key: Type.String({
+    pattern: "^[A-Z0-9_]+$",
+    description:
+      "The project key: capital letters, digits and underscores. It identifies the project, so changing it points this file at a different project rather than renaming this one.",
+  }),
+  name: Type.String({
+    minLength: 1,
+    description: "The project's display name. Unlike the key, it can be changed freely.",
+  }),
   settings: Type.Optional(SettingsSchema),
-  issueTypes: Type.Optional(Type.Array(IssueTypeSchema, { minItems: 1 })),
-  statuses: Type.Optional(Type.Array(StatusSchema, { maxItems: 12 })),
-  categories: Type.Optional(Type.Array(CategorySchema)),
-  milestones: Type.Optional(Type.Array(MilestoneSchema)),
-  customFields: Type.Optional(Type.Array(CustomFieldSchema)),
+  issueTypes: Type.Optional(
+    Type.Array(IssueTypeSchema, {
+      minItems: 1,
+      description:
+        "Every issue type the project should end up with. One that exists in Backlog but is not listed here is deleted; a project must keep at least one, so an empty list is rejected. On a new project the first four entries take over Backlog's four default issue types.",
+    }),
+  ),
+  statuses: Type.Optional(
+    Type.Array(StatusSchema, {
+      maxItems: 12,
+      description:
+        "Every status, in display order. The four default statuses cannot be renamed, recolored or deleted, so list them as they are; the not-started status must come first, the closed one last, and in-progress before resolved.",
+    }),
+  ),
+  categories: Type.Optional(
+    Type.Array(CategorySchema, {
+      description:
+        "Every category the project should end up with. One that exists in Backlog but is not listed here is deleted, and leaving the key out deletes all of them.",
+    }),
+  ),
+  milestones: Type.Optional(
+    Type.Array(MilestoneSchema, {
+      description:
+        "Every milestone the project should end up with. One that exists in Backlog but is not listed here is deleted, and leaving the key out deletes all of them.",
+    }),
+  ),
+  customFields: Type.Optional(
+    Type.Array(CustomFieldSchema, {
+      description:
+        "Every custom field the project should end up with. One that exists in Backlog but is not listed here is deleted, and leaving the key out deletes all of them.",
+    }),
+  ),
   access: Type.Optional(AccessSchema),
-  webhooks: Type.Optional(Type.Array(WebhookSchema)),
+  webhooks: Type.Optional(
+    Type.Array(WebhookSchema, {
+      description:
+        "Every webhook the project should end up with. One that exists in Backlog but is not listed here is deleted, and leaving the key out deletes all of them.",
+    }),
+  ),
 });
 
 export type Settings = Static<typeof SettingsSchema>;

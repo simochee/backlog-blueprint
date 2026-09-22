@@ -14,7 +14,7 @@ describe("配布する JSON Schema", () => {
     const access = projectSchema("1.2.3").properties.access.properties;
 
     expect(access.administrators.description).toContain("space administrator");
-    expect(access.members.description).toContain("Login ids");
+    expect(access.members.description).toContain("Login IDs");
     expect(access.teams.description).toContain("team");
   });
 
