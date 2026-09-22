@@ -249,3 +249,100 @@ body {
   overflow: auto;
   white-space: pre;
 }
+
+/**
+ * 3列の外側を `1fr` で揃え、行き先の切り替えを画面の中央に置く。`justify-content:
+ * space-between` だと、左右の幅の差だけ中央がずれる。
+ */
+.navbar {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  grid-template-areas: "brand pages tools";
+  align-items: center;
+  gap: var(--space-4);
+  min-height: 56px;
+}
+
+.navbar-brand {
+  grid-area: brand;
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--gray-12);
+  font-size: var(--font-size-3);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.navbar-brand svg {
+  color: var(--accent-9);
+}
+
+.navbar-pages {
+  grid-area: pages;
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--radius-3);
+  background: var(--gray-a3);
+}
+
+.navbar-page {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 6rem;
+  height: var(--space-6);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-2);
+  color: var(--gray-11);
+  font-size: var(--font-size-2);
+  font-weight: 500;
+  text-decoration: none;
+  transition:
+    background-color 120ms,
+    color 120ms;
+}
+
+.navbar-page:hover {
+  color: var(--gray-12);
+}
+
+.navbar-page[aria-current="page"] {
+  background: var(--color-panel-solid);
+  color: var(--gray-12);
+  box-shadow: var(--shadow-2);
+}
+
+.navbar-page:focus-visible {
+  outline: 2px solid var(--focus-8);
+  outline-offset: 1px;
+}
+
+.navbar-tools {
+  grid-area: tools;
+  justify-self: end;
+}
+
+/* 狭い画面では3つが1行に収まらないので、行き先の切り替えを2段目に全幅で置く。 */
+@media (max-width: 640px) {
+  .navbar {
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "brand tools"
+      "pages pages";
+    row-gap: var(--space-2);
+    padding-block: var(--space-2);
+  }
+
+  .navbar-pages {
+    justify-self: stretch;
+  }
+
+  .navbar-page {
+    flex: 1;
+  }
+}

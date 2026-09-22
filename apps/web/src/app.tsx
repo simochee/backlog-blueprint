@@ -1,5 +1,6 @@
 import { type Diagnostic } from "@backlog-blueprint/core";
-import { Box, Button, Container, Flex, Heading, TabNav, Text, Theme } from "@radix-ui/themes";
+import { LayersIcon } from "@radix-ui/react-icons";
+import { Box, Button, Container, Flex, Heading, Text, Theme } from "@radix-ui/themes";
 import {
   startTransition,
   useActionState,
@@ -27,7 +28,7 @@ import {
   type Derived,
   type ManifestInputs,
 } from "./freshness";
-import { PAGES, usePage } from "./page";
+import { PAGE_INTROS, PAGES, usePage } from "./page";
 import { PASTED, preparePlan, type PlanAttempt, type PreparedPlan } from "./plan";
 import { isRunning, rejectedProgress, spentPlan, type ApplyRun } from "./progress";
 import { secretRevisions, subscribeSecrets } from "./secrets";
@@ -259,24 +260,29 @@ export const App = () => {
       <Box className="page" data-pane-open={pane !== undefined}>
         <Box asChild className="app-header" position="sticky" top="0">
           <header>
-            <Container maxWidth="1200px" px={{ initial: "4", sm: "6" }} py="3">
-              <Flex align="center" gap="4" justify="between" wrap="wrap">
-                <Flex direction="column" gap="1">
-                  <Heading as="h1" size="6">
-                    backlog-blueprint
-                  </Heading>
-                  <Text color="gray" size="2">
-                    Declare a Backlog project in YAML, review the plan, then apply it.
-                  </Text>
-                </Flex>
-                <TabNav.Root aria-label="Pages">
+            <Container maxWidth="1200px" px={{ initial: "4", sm: "6" }}>
+              <div className="navbar">
+                <a className="navbar-brand" href={PAGES[0]?.hash}>
+                  <LayersIcon aria-hidden height="18" width="18" />
+                  backlog-blueprint
+                </a>
+                {/**
+                 * Radix の `TabNav` を使わない。下線のタブはページの中の切り替えに見え、
+                 * サイト全体の行き先を選ぶ部品に見えない。
+                 */}
+                <nav aria-label="Pages" className="navbar-pages">
                   {PAGES.map((entry) => (
-                    <TabNav.Link active={page === entry.page} href={entry.hash} key={entry.page}>
+                    <a
+                      aria-current={page === entry.page ? "page" : undefined}
+                      className="navbar-page"
+                      href={entry.hash}
+                      key={entry.page}
+                    >
                       {entry.title}
-                    </TabNav.Link>
+                    </a>
                   ))}
-                </TabNav.Root>
-                <Flex gap="2">
+                </nav>
+                <Flex className="navbar-tools" gap="2">
                   {DIRECTORY_KINDS.map((kind) => (
                     <Button
                       aria-pressed={pane === kind}
@@ -292,12 +298,20 @@ export const App = () => {
                     </Button>
                   ))}
                 </Flex>
-              </Flex>
+              </div>
             </Container>
           </header>
         </Box>
         <Container maxWidth="1200px" px={{ initial: "4", sm: "6" }} py={{ initial: "5", sm: "6" }}>
           <Flex direction="column" gap="5">
+            <Flex direction="column" gap="1">
+              <Heading as="h1" size="6">
+                {PAGE_INTROS[page].title}
+              </Heading>
+              <Text color="gray" size="2">
+                {PAGE_INTROS[page].description}
+              </Text>
+            </Flex>
             {page === "apply" ? (
               <Stepper reached={applyReached} titles={APPLY_STEPS} />
             ) : (
