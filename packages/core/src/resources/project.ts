@@ -3,7 +3,6 @@ import { type Manifest, type Settings } from "../manifest";
 import { type Reconciler } from "../reconciler";
 import { asRecord, requiredNumber, requiredString } from "../api-response";
 import { defaultIssueTypeSlotRefs } from "./issue-types";
-import { sealer, type Seal } from "../secret";
 import { type Value } from "../value";
 
 export type ProjectDesired = Pick<Manifest, "key" | "name" | "settings">;
@@ -58,14 +57,6 @@ const declaredValues = (desired: ProjectDesired): Record<string, Value> => ({
 });
 
 /**
- * リクエストのキー名からマニフェストの path を引き直す。`settings` の項目は
- * リクエストでは平らに並ぶので（L-3）、`sealFields` のように
- * 「フィールド名 = path の末尾」を前提にした包み方ができない。
- */
-const manifestPath = (field: string): string =>
-  field === "key" || field === "name" ? field : `settings/${field}`;
-
-/**
  * 値が変わらない項目も落とさず、`field` はリクエストのキー名のまま置く（PO-11）。
  * `settings.useWiki` のように表示用の名前を付けると、`request.params` と
  * 突き合わせられなくなる。突き合わせられることが PO-11 の理由そのものである。
@@ -82,9 +73,6 @@ const changesOf = (
 
 const differs = (changes: Change[]): boolean =>
   changes.some(({ before, after }) => before !== after);
-
-const sealAfter = (changes: Change[], seal: Seal): Change[] =>
-  changes.map((change) => ({ ...change, after: seal(manifestPath(change.field), change.after) }));
 
 const paramsOf = (changes: Change[]): Record<string, Value> =>
   Object.fromEntries(changes.map(({ field, after }) => [field, after]));
@@ -109,20 +97,13 @@ export const projectReconciler: Reconciler<ProjectDesired, ProjectSnapshot> = {
   },
 
   plan(desired, snapshot, ctx) {
-    const seal = sealer(ctx.isSecret);
-
     if (snapshot.exists) {
-      /**
-       * 一致の判定は包む前の値で行う。`Secret` は `===` で一致しないので、包んだ値を
-       * 比べると `${ENV}` を書いたプロジェクト名や基本設定が毎回 update になり
-       * NFR-4 / AC-8 が崩れる。
-       */
-      const declared = changesOf(declaredValues(desired), {
+      const changes = changesOf(declaredValues(desired), {
         ...snapshot.settings,
         name: snapshot.name,
       });
 
-      if (!differs(declared)) {
+      if (!differs(changes)) {
         return [
           {
             id: `project/noop/${desired.key}`,
@@ -135,8 +116,6 @@ export const projectReconciler: Reconciler<ProjectDesired, ProjectSnapshot> = {
           },
         ];
       }
-
-      const changes = sealAfter(declared, seal);
 
       return [
         {
@@ -153,10 +132,7 @@ export const projectReconciler: Reconciler<ProjectDesired, ProjectSnapshot> = {
       ];
     }
 
-    const changes = sealAfter(
-      changesOf({ key: desired.key, ...declaredValues(desired) }, {}),
-      seal,
-    );
+    const changes = changesOf({ key: desired.key, ...declaredValues(desired) }, {});
 
     const create: Action = {
       id: `project/create/${desired.key}`,

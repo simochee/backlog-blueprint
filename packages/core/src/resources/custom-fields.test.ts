@@ -1,12 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  fixedPlanContext,
-  fixedReadContext,
-  fixedSnapshot,
-  secretPaths,
-} from "../../../test-utils/src/index";
-import { Secret } from "../secret";
+import { fixedPlanContext, fixedReadContext, fixedSnapshot } from "../../../test-utils/src/index";
 import { type CustomField } from "../manifest";
 import { customFieldsReconciler, type ExistingCustomField } from "./custom-fields";
 
@@ -424,48 +418,6 @@ describe("カスタム属性の oldname", () => {
     const actions = plan(
       [{ name: "環境", type: "text", oldname: "環境名", description: "デプロイ先" }],
       [{ id: 31, name: "環境", typeId: 1, description: "デプロイ先" }],
-    );
-
-    expect(actions.map(({ op }) => op)).toEqual(["noop"]);
-  });
-});
-
-describe("環境変数から展開した値", () => {
-  it("説明が ${ENV} 由来なら計画に実値が現れない", () => {
-    const actions = customFieldsReconciler.plan(
-      [{ name: "顧客名", type: "text", description: "社外秘の説明" }],
-      { customFields: [], issueTypes: [] },
-      fixedPlanContext({ isSecret: secretPaths("customFields/0/description") }),
-    );
-
-    expect(actions[0]?.request?.params.description).toBeInstanceOf(Secret);
-    expect(JSON.stringify(actions)).not.toContain("社外秘の説明");
-  });
-
-  it("カスタム属性名は同定名なので ${ENV} 由来でもリクエストにも差分にも平文で出る", () => {
-    const actions = customFieldsReconciler.plan(
-      [{ name: "社外秘の属性", type: "text" }],
-      { customFields: [], issueTypes: [] },
-      fixedPlanContext({ isSecret: secretPaths("customFields/0/name") }),
-    );
-
-    expect(actions[0]?.request?.params.name).toBe("社外秘の属性");
-    expect(actions[0]?.changes).toContainEqual({
-      field: "name",
-      before: null,
-      after: "社外秘の属性",
-    });
-    expect(actions[0]?.id).toBe("customFields/create/社外秘の属性");
-  });
-
-  it("${ENV} 由来の単位が現状と同じなら2回目は noop になる", () => {
-    const actions = customFieldsReconciler.plan(
-      [{ name: "予算", type: "number", unit: "億円" }],
-      {
-        customFields: [{ id: 31, name: "予算", typeId: 3, unit: "億円", applicableIssueTypes: [] }],
-        issueTypes: [],
-      },
-      fixedPlanContext({ isSecret: secretPaths("customFields/0/unit") }),
     );
 
     expect(actions.map(({ op }) => op)).toEqual(["noop"]);

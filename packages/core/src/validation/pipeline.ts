@@ -22,7 +22,6 @@ export type ValidateManifestOptions = {
 
 export type ValidationResult = {
   diagnostics: Diagnostic[];
-  expandedPaths: Set<string>;
   manifest?: Manifest;
 };
 
@@ -45,15 +44,15 @@ export const validateManifest = ({
   const syntax = parseManifestSyntax(text);
 
   if (!syntax.parsed) {
-    return { diagnostics: orderDiagnostics(syntax.diagnostics), expandedPaths: new Set() };
+    return { diagnostics: orderDiagnostics(syntax.diagnostics) };
   }
 
   const expand = expandEnvironment(syntax.parsed, { env, severity: unresolvedEnvSeverity });
-  const { expandedPaths, unresolvedPaths } = expand;
+  const { unresolvedPaths } = expand;
   const expanded = [...syntax.diagnostics, ...expand.diagnostics];
 
   if (blocksNextStage(expanded)) {
-    return { diagnostics: orderDiagnostics(expanded), expandedPaths };
+    return { diagnostics: orderDiagnostics(expanded) };
   }
 
   /**
@@ -67,19 +66,15 @@ export const validateManifest = ({
   const validated = [...expanded, ...schemaDiagnostics];
 
   if (blocksNextStage(validated)) {
-    return { diagnostics: orderDiagnostics(validated), expandedPaths };
+    return { diagnostics: orderDiagnostics(validated) };
   }
 
   const manifest = normalizeManifest(expand.parsed.value as ManifestInput);
-  const diagnostics = [
-    ...validated,
-    ...validateStaticSemantics(manifest, expand.parsed.source, expandedPaths),
-  ];
+  const diagnostics = [...validated, ...validateStaticSemantics(manifest, expand.parsed.source)];
   const applicable = !hasError(diagnostics) && unresolvedPaths.size === 0;
 
   return {
     diagnostics: orderDiagnostics(diagnostics),
-    expandedPaths,
     manifest: applicable ? manifest : undefined,
   };
 };

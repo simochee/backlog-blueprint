@@ -77,7 +77,7 @@ Backlog API が CORS に対応しているため、サーバを持たずにブ�
 UC-1 の「標準 Yaml をコピーする」の、その標準 Yaml を作る導線。
 
 1. P1 が、よくできているプロジェクトを `blueprint export PROJ_A > projects/standard.yaml` で書き出す
-2. Webhook の URL は `${WEBHOOK_URL_1}` に置き換わっているので、値を環境変数に用意する
+2. 必要なら環境ごとに変える値を `${ENV}` に置き換える
 3. `key` と `name` を新しいプロジェクトのものに書き換える
 4. UC-1 に入る
 

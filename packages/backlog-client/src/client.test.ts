@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { Secret, type ResolvedHttpRequest } from "@backlog-blueprint/core";
+import { type ResolvedHttpRequest } from "@backlog-blueprint/core";
 
 import { createBacklogClient } from "./client";
 import { BacklogHttpFailureError } from "./failure";
@@ -157,29 +157,21 @@ describe("送信", () => {
   });
 });
 
-describe("Secret の扱い", () => {
-  it("秘匿値は本文にだけ実値として現れる", async () => {
+describe("送信パラメータ", () => {
+  it("文字列値は本文に現れる", async () => {
     const { calls, client } = clientWith();
 
-    await client.send(aRequest({ params: { hookUrl: new Secret("https://hooks.example/abc") } }));
+    await client.send(aRequest({ params: { hookUrl: "https://hooks.example/abc" } }));
 
     expect(calls[0]?.body).toBe("hookUrl=https%3A%2F%2Fhooks.example%2Fabc");
   });
 
-  it("配列の要素の秘匿値も剥がして送る", async () => {
+  it("配列の文字列値も送る", async () => {
     const { calls, client } = clientWith();
 
-    await client.send(aRequest({ params: { values: [new Secret("one"), "two"] } }));
+    await client.send(aRequest({ params: { values: ["one", "two"] } }));
 
     expect(calls[0]?.body).toBe("values%5B%5D=one&values%5B%5D=two");
-  });
-
-  it("マスクされた文字列を送らない", async () => {
-    const { calls, client } = clientWith();
-
-    await client.send(aRequest({ params: { hookUrl: new Secret("https://hooks.example/abc") } }));
-
-    expect(calls[0]?.body).not.toContain("***");
   });
 });
 

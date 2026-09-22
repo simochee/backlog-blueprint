@@ -50,23 +50,10 @@ describe("環境変数の展開", () => {
     });
   });
 
-  it("展開後の値は素の文字列で、展開した path は別に返る", () => {
-    const { parsed, expandedPaths } = expand(MANIFEST, ENV);
+  it("展開後の値は通常の文字列になる", () => {
+    const { parsed } = expand(MANIFEST, ENV);
 
-    expect(typeof (parsed.value as { name: unknown }).name).toBe("string");
-    expect([...expandedPaths]).toEqual(["name", "webhooks/0/hookUrl"]);
-  });
-
-  it("リテラルに戻しただけの値は展開した path に入らない", () => {
-    const { expandedPaths } = expand(MANIFEST, ENV);
-
-    expect(expandedPaths.has("webhooks/0/templateDescription")).toBe(false);
-  });
-
-  it("Yaml に直接書かれた値は展開した path に入らない", () => {
-    const { expandedPaths } = expand(MANIFEST, ENV);
-
-    expect(expandedPaths.has("webhooks/0/name")).toBe(false);
+    expect((parsed.value as { name: string }).name).toBe("プロジェクトA");
   });
 });
 

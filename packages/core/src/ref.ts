@@ -1,7 +1,6 @@
 import { type HttpRequest, type ResolvedHttpRequest } from "./action";
 import { type ResolutionKey, type ResolutionTable } from "./resolution";
 import { RESOURCE_KINDS } from "./resource";
-import { Secret } from "./secret";
 import { type Ref, type ResolvedValue, type Value } from "./value";
 
 export type ResolveResult<T> =
@@ -59,7 +58,7 @@ const resolveValue = (
     return value.map((item) => resolveValue(item, resolutions, unresolved));
   }
 
-  if (value instanceof Secret || typeof value !== "object" || value === null) {
+  if (typeof value !== "object" || value === null) {
     return value;
   }
 

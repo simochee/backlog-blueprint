@@ -1,4 +1,3 @@
-import { Secret } from "../secret";
 import { type Ref, type Value } from "../value";
 import { WEBHOOK_EVENTS } from "../webhook-events";
 
@@ -9,11 +8,7 @@ const EVENT_DESCRIPTIONS: ReadonlyMap<number, string> = new Map(
 );
 
 export const isRef = (value: Value): value is Ref =>
-  typeof value === "object" &&
-  value !== null &&
-  !Array.isArray(value) &&
-  !(value instanceof Secret) &&
-  "$ref" in value;
+  typeof value === "object" && value !== null && !Array.isArray(value) && "$ref" in value;
 
 /**
  * 名前を落として数値だけにしない（W-5）。表に無い ID は Backlog が増やした新しい
@@ -36,10 +31,6 @@ export const formatValue = (value: Value | null | undefined, format: ValueFormat
     return value.map((item) => formatValue(item, format)).join(", ");
   }
 
-  if (value instanceof Secret) {
-    return String(value);
-  }
-
   if (isRef(value)) {
     return `<${value.$ref.kind} "${value.$ref.name}" (to be created)>`;
   }
@@ -55,19 +46,10 @@ export const formatValue = (value: Value | null | undefined, format: ValueFormat
   return JSON.stringify(value);
 };
 
-/**
- * `Secret` どうしを描画結果で比べない。どちらも `***` になるので、hookUrl が
- * 書き換わる変更を「同じ値」と見なして描かなくなる。`reveal()` を呼んでよい
- * 差分判定にあたる（`Secret` の定義）。
- */
 export const sameValue = (
   left: Value | null | undefined,
   right: Value | null | undefined,
 ): boolean => {
-  if (left instanceof Secret || right instanceof Secret) {
-    return left instanceof Secret && right instanceof Secret && left.reveal() === right.reveal();
-  }
-
   if (Array.isArray(left) || Array.isArray(right)) {
     return (
       Array.isArray(left) &&

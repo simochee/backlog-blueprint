@@ -61,8 +61,6 @@ export type Deps = {
 type StaticValidation = {
   path: string;
   diagnostics: Diagnostic[];
-  /** S2 が返す展開経路。そのまま `isSecret` になる（E-6 / FR-3.6） */
-  expandedPaths: Set<string>;
   manifest?: Manifest;
 };
 
@@ -91,7 +89,7 @@ const validateStatically = async (
   unresolvedEnvSeverity: Diagnostic["severity"],
 ): Promise<StaticValidation> => {
   const source = await readManifest(options.file, deps.io);
-  const { diagnostics, expandedPaths, manifest } = validateManifest({
+  const { diagnostics, manifest } = validateManifest({
     text: source.text,
     schemaStage,
     env: deps.io.env,
@@ -101,7 +99,6 @@ const validateStatically = async (
   return {
     path: source.path,
     diagnostics,
-    expandedPaths,
     ...(manifest === undefined ? {} : { manifest }),
   };
 };
@@ -159,7 +156,6 @@ const prepare = async (
     const built = await deps.buildPlan({
       manifest: statically.manifest,
       get: client.get,
-      isSecret: (path) => statically.expandedPaths.has(path),
     });
     const diagnostics = orderDiagnostics([...statically.diagnostics, ...built.diagnostics]);
 
@@ -343,7 +339,6 @@ export const runExport = async (options: ExportOptions, deps: Deps): Promise<num
     {
       projectKey: exported.projectKey,
       issueCount: exported.issueCount,
-      webhookVariables: exported.webhookVariables,
     },
     noticeRender(options),
   );

@@ -4,7 +4,6 @@ import {
   type Diagnostic,
   type Manifest,
   type Plan,
-  type PlanContext,
   type PlanReport,
   type ReadContext,
 } from "@backlog-blueprint/core";
@@ -28,7 +27,6 @@ export type PlanAttempt = { diagnostics: Diagnostic[]; failure?: unknown; prepar
 export type PreparePlanInput = {
   manifest: Manifest;
   get: ReadContext["get"];
-  isSecret: PlanContext["isSecret"];
   space: string;
   source: string;
   staticDiagnostics: Diagnostic[];
@@ -41,12 +39,11 @@ export type PreparePlanInput = {
 export const preparePlan = async ({
   manifest,
   get,
-  isSecret,
   space,
   source,
   staticDiagnostics,
 }: PreparePlanInput): Promise<PlanAttempt> => {
-  const built = await buildPlan({ manifest, get, isSecret });
+  const built = await buildPlan({ manifest, get });
   const diagnostics = orderDiagnostics([...staticDiagnostics, ...built.diagnostics]);
 
   if (built.plan === undefined) {

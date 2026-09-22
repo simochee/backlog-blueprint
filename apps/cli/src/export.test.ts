@@ -49,7 +49,6 @@ const aProjectExport = (overrides: Partial<ProjectExport> = {}): ProjectExport =
   yaml: YAML,
   manifest: MANIFEST,
   issueCount: 0,
-  webhookVariables: [],
   ...overrides,
 });
 

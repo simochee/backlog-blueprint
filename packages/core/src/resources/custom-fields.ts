@@ -1,7 +1,6 @@
 import { type Action, type Change } from "../action";
 import { CUSTOM_FIELD_TYPE_IDS, INITIAL_VALUE_TYPE_IDS, type CustomField } from "../manifest";
 import { type Reconciler } from "../reconciler";
-import { sealChanges, sealer } from "../secret";
 import {
   asArrayOf,
   asRecord,
@@ -78,8 +77,6 @@ const collectionPath = (projectKey: string) => `/api/v2/projects/${projectKey}/c
 const issueTypesPath = (projectKey: string) => `/api/v2/projects/${projectKey}/issueTypes`;
 
 const memberPath = (projectKey: string, id: number) => `${collectionPath(projectKey)}/${id}`;
-
-const basePath = (index: number) => `customFields/${index}`;
 
 /**
  * 日付型の `min` / `max` / `initialDate` は `yyyy-MM-dd` の文字列で、数値型の
@@ -234,15 +231,14 @@ export const customFieldsReconciler: Reconciler<CustomField[], CustomFieldsSnaps
     return { customFields: mapped, issueTypes: issueTypes.map(({ id, name }) => ({ id, name })) };
   },
 
-  plan: (desired, { customFields: snapshot, issueTypes }, { manifest, isSecret }) => {
-    const seal = sealer(isSecret);
+  plan: (desired, { customFields: snapshot, issueTypes }, { manifest }) => {
     const creates: Action[] = [];
     const updates: Action[] = [];
     const kept = new Set<number>();
 
     const replaced: ExistingCustomField[] = [];
 
-    for (const [index, customField] of desired.entries()) {
+    for (const customField of desired) {
       const fields = fieldsOf(customField);
       const found = findExistingCustomField(snapshot, customField);
       /**
@@ -251,10 +247,6 @@ export const customFieldsReconciler: Reconciler<CustomField[], CustomFieldsSnaps
        */
       const recreated = found !== undefined && found.typeId !== fields.typeId;
       const existing = recreated ? undefined : found;
-      /**
-       * 一致の判定は包む前の値で行う。`Secret` は `===` で一致しないので、包んだ値を
-       * 比べると `${ENV}` を書いたカスタム属性が毎回 update になり NFR-4 が崩れる。
-       */
       const declared = changesOf(
         fields,
         existing,
@@ -269,7 +261,6 @@ export const customFieldsReconciler: Reconciler<CustomField[], CustomFieldsSnaps
       /**
        * 絞りを解除するときだけ、空の配列を差分にも送信にも載せる（§9）。新しく作る
        * カスタム属性には解除する絞りが無いので、書かれていないキーは送らない（K-3）。
-       * 課題種別の名前は同定名なので包まない（E-7）。
        *
        * `current` の判定を畳むと、解除（`applicable` が空で `current` が空でない）が
        * 差分にも本文にも現れなくなる。空配列を `applicableIssueTypes[]=` にするのは
@@ -277,7 +268,7 @@ export const customFieldsReconciler: Reconciler<CustomField[], CustomFieldsSnaps
        */
       const filters = applicable.length > 0 || (current !== undefined && current.length > 0);
       const changes = [
-        ...sealChanges(declared, basePath(index), seal),
+        ...declared,
         ...(filters ? [{ field: APPLICABLE, before: current ?? null, after: applicable }] : []),
       ];
       const params = paramsOf(changes, filters ? applicable : undefined);

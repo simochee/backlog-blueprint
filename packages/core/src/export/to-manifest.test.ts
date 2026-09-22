@@ -1,10 +1,9 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { fixedResourceSnapshots } from "../../../test-utils/src/index";
 import { type ResourceSnapshots } from "../plan";
 import { type ExistingCustomField } from "../resources/custom-fields";
 import { type IssueTypesSnapshot } from "../resources/issue-types";
-import { Secret } from "../secret";
 import { expandEnvironment } from "../validation/expand-stage";
 import { type SourceMap } from "../validation/source-map";
 import { toManifest } from "./to-manifest";
@@ -47,7 +46,7 @@ const customField = (overrides: Partial<ExistingCustomField>): ExistingCustomFie
 const webhook = (overrides: Record<string, unknown> = {}) => ({
   id: 1,
   name: "Slack 通知",
-  hookUrl: new Secret("https://hooks.example.test/T000/B000"),
+  hookUrl: "https://hooks.example.test/T000/B000",
   allEvent: false,
   activityTypeIds: [1],
   ...overrides,
@@ -60,12 +59,11 @@ const NO_SOURCE: SourceMap = {
 
 describe("存在しないプロジェクト", () => {
   it("存在しないプロジェクトは EX-3 になり、マニフェストは作られない", () => {
-    const { diagnostics, manifest, webhookVariables } = exported({
+    const { diagnostics, manifest } = exported({
       project: { exists: false },
     });
 
     expect(manifest).toBeUndefined();
-    expect(webhookVariables).toEqual([]);
     expect(diagnostics).toEqual([
       {
         id: "EX-3",
@@ -381,23 +379,15 @@ describe("参加者", () => {
 });
 
 describe("Webhook", () => {
-  it("hookUrl は配列の位置から作った変数に置き換わり、実値は読まれない", () => {
+  it("hookUrl は取得値をマニフェストに書く", () => {
     const first = webhook();
-    const second = webhook({ id: 2, name: "監査ログ" });
-    const reveal = vi.spyOn(first.hookUrl, "reveal");
-
-    const { manifest, webhookVariables } = exported({ webhooks: [first, second] });
+    const second = webhook({ id: 2, name: "監査ログ", hookUrl: "https://audit.example.test" });
+    const { manifest } = exported({ webhooks: [first, second] });
 
     expect(manifest?.webhooks?.map(({ hookUrl }) => hookUrl)).toEqual([
-      "${WEBHOOK_URL_1}",
-      "${WEBHOOK_URL_2}",
+      "https://hooks.example.test/T000/B000",
+      "https://audit.example.test",
     ]);
-    expect(webhookVariables).toEqual([
-      { variable: "WEBHOOK_URL_1", webhook: "Slack 通知" },
-      { variable: "WEBHOOK_URL_2", webhook: "監査ログ" },
-    ]);
-    expect(reveal).not.toHaveBeenCalled();
-    expect(JSON.stringify(manifest)).not.toContain("hooks.example.test");
   });
 
   it("すべてのイベントを送る Webhook は all と書く", () => {
@@ -450,12 +440,6 @@ describe("${ を含む値", () => {
 
     expect(milestones.map(({ description }) => description)).toEqual(values);
   });
-
-  it("ツールが作る Webhook のプレースホルダはエスケープしない", () => {
-    const manifest = manifestOf({ webhooks: [webhook()] });
-
-    expect(manifest.webhooks?.[0]?.hookUrl).toBe("${WEBHOOK_URL_1}");
-  });
 });
 
 describe("マニフェストとして表現できない実状", () => {
@@ -481,7 +465,7 @@ describe("マニフェストとして表現できない実状", () => {
   });
 
   it("表現できない実状は1件で止まらず、全件並ぶ", () => {
-    const { diagnostics, manifest, webhookVariables } = exported({
+    const { diagnostics, manifest } = exported({
       project: {
         exists: true,
         id: 100,
@@ -508,7 +492,6 @@ describe("マニフェストとして表現できない実状", () => {
     });
 
     expect(manifest).toBeUndefined();
-    expect(webhookVariables).toEqual([]);
     expect(diagnostics.map(({ id, path }) => [id, path])).toEqual([
       ["EX-9c", "settings/textFormattingRule"],
       ["EX-9b", "issueTypes/0/name"],

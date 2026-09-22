@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import { embedRef, resolutionKey, resolvePath, resolveRequest } from "./ref";
-import { Secret } from "./secret";
 import { type ResolutionTable } from "./resolution";
 import { type Ref } from "./value";
 
@@ -138,12 +137,12 @@ describe("Ref を解決したリクエスト", () => {
     });
   });
 
-  it("Secret は解決を通しても Secret のまま残り、実値は現れない", () => {
+  it("文字列値は参照解決後もそのまま残る", () => {
     const result = resolveRequest(
       {
         method: "POST",
         path: "/api/v2/projects/PROJ_A/webhooks",
-        params: { name: "Slack 通知", hookUrl: new Secret("https://hooks.example.test/T000/B000") },
+        params: { name: "Slack 通知", hookUrl: "https://hooks.example.test/T000/B000" },
       },
       new Map(),
     );
@@ -154,8 +153,7 @@ describe("Ref を解決したリクエスト", () => {
       return;
     }
 
-    expect(result.value.params["hookUrl"]).toBeInstanceOf(Secret);
-    expect(JSON.stringify(result.value.params)).toBe('{"name":"Slack 通知","hookUrl":"***"}');
+    expect(result.value.params["hookUrl"]).toBe("https://hooks.example.test/T000/B000");
   });
 
   it("params の参照が解決できなければリクエストは組み上がらない", () => {

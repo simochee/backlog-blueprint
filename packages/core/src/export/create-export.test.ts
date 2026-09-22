@@ -84,24 +84,20 @@ describe("プロジェクトの書き出し", () => {
     ]);
   });
 
-  it("Webhook の URL は書き出さず、変数名と Webhook 名の対応だけを返す", async () => {
+  it("Webhook の URL を取得値のまま書き出す", async () => {
     const { exported } = await exportProject({
       "/api/v2/projects/PROJ_A/webhooks": [
         {
           id: 1,
           name: "Slack 通知",
-          hookUrl: "https://example.test/hooks/secret",
+          hookUrl: "https://example.test/hooks/value",
           allEvent: true,
           activityTypeIds: [],
         },
       ],
     });
 
-    expect(exported?.webhookVariables).toEqual([
-      { variable: "WEBHOOK_URL_1", webhook: "Slack 通知" },
-    ]);
-    expect(exported?.yaml).toContain("hookUrl: ${WEBHOOK_URL_1}");
-    expect(exported?.yaml).not.toContain("secret");
+    expect(exported?.yaml).toContain("hookUrl: https://example.test/hooks/value");
   });
 
   it("マニフェストとして書けない実状があれば、Yaml を1バイトも返さない", async () => {

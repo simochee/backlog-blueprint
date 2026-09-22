@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import { type Action } from "../action";
 import { type ResolutionTable } from "../resolution";
-import { Secret } from "../secret";
 import { walkthroughActions, walkthroughReport } from "./fixtures";
 import {
   APPLY_CONFIRMATION,
@@ -44,7 +43,7 @@ Project does not exist and will be created.
   ~ statusOrder    未対応, 処理中, レビュー中, 処理済み, 完了
   + projectTeam    "開発チーム"
   + projectMember  "suzuki"
-  + webhook        "Slack 通知"  hookUrl ***
+  + webhook        "Slack 通知"  hookUrl "https://hooks.example.com/T000/B000"
 
 Warnings:
   ! [V-A16] access.members: "suzuki" already belongs to team "開発チーム"
@@ -144,11 +143,10 @@ Write requests: 9 (estimated 9s)
     );
   });
 
-  it("環境変数由来の値は伏せられ、利用者が付けた名前はそのまま出る", () => {
+  it("Webhook URL と利用者が付けた名前はそのまま出る", () => {
     const text = renderPlanText(walkthroughReport());
 
-    expect(text).toContain('"Slack 通知"  hookUrl ***');
-    expect(text).not.toContain("hooks.example.com");
+    expect(text).toContain('"Slack 通知"  hookUrl "https://hooks.example.com/T000/B000"');
   });
 
   it("これから作られるリソースへの参照は、偽の ID ではなく名前で描かれる", () => {
@@ -314,7 +312,7 @@ The project must still have zero issues at that point.
       request: {
         method: "POST",
         path: "/api/v2/projects/PROJ_A/webhooks",
-        params: { hookUrl: new Secret("https://hooks.example.com/T000/B000") },
+        params: { hookUrl: "https://hooks.example.com/T000/B000" },
       },
       writeRequest: true,
     };

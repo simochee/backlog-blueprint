@@ -95,7 +95,7 @@ export const App = () => {
         return previous;
       }
 
-      const { manifest, expandedPaths, diagnostics } = validation;
+      const { manifest, diagnostics } = validation;
       const stamp = planKey;
 
       try {
@@ -104,7 +104,6 @@ export const App = () => {
           value: await preparePlan({
             manifest,
             get: transport.get,
-            isSecret: (path) => expandedPaths.has(path),
             space,
             source: manifestSource,
             staticDiagnostics: diagnostics,

@@ -12,7 +12,7 @@ import { authenticateExecutor } from "../validation/auth-stage";
 import { blocksNextStage } from "../validation/gate";
 import { invalidProjectKey, projectDoesNotExist } from "./diagnostics";
 import { serializeManifest } from "./serialize";
-import { toManifest, type WebhookVariable } from "./to-manifest";
+import { toManifest } from "./to-manifest";
 
 export type CreateExportOptions = {
   projectKey: string;
@@ -29,8 +29,6 @@ export type ProjectExport = {
   manifest: ManifestInput;
   /** CL-8 の案内に使う。0 なら案内は出ない */
   issueCount: number;
-  /** EX-4 の案内に使う。空なら案内は出ない */
-  webhookVariables: WebhookVariable[];
 };
 
 /**
@@ -88,7 +86,7 @@ export const createExport = async ({
     project: { exists: true, id: projectId, issueCount },
   };
   const snapshots = await readResourceSnapshots({ projectKey, snapshot, get });
-  const { diagnostics, manifest, webhookVariables } = toManifest(snapshots);
+  const { diagnostics, manifest } = toManifest(snapshots);
 
   if (manifest === undefined) {
     return { diagnostics };
@@ -101,7 +99,6 @@ export const createExport = async ({
       yaml: serializeManifest(manifest, { version }),
       manifest,
       issueCount,
-      webhookVariables,
     },
   };
 };

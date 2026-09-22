@@ -3,7 +3,7 @@ import { Backlog } from "backlog-js";
 import { type ExecuteContext, type ReadContext } from "@backlog-blueprint/core";
 
 import { toHttpFailure } from "./failure";
-import { revealParams } from "./params";
+import { prepareParams } from "./params";
 
 type Configure = ConstructorParameters<typeof Backlog>[0];
 
@@ -92,6 +92,6 @@ export const createBacklogClient = ({
      * 読むのはフェーズ0だけで、どの 404 が情報かを知っているのは core の側である。
      */
     get: (path) => call("GET", relative(path), {}),
-    send: ({ method, path, params }) => call(method, relative(path), revealParams(params)),
+    send: ({ method, path, params }) => call(method, relative(path), prepareParams(params)),
   };
 };

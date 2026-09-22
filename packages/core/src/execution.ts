@@ -15,8 +15,6 @@ export type ExecuteContext = {
    * path と params の Ref を潰すのは Executor の仕事。送信側に HttpRequest を渡すと、
    * 解決表を送信側にも配ることになり、解決の責任が二箇所に分かれる。
    *
-   * 一方で Secret は Secret のまま渡る。剥がすのは §2.4 の通り送信の直前、
-   * つまりこの関数の実装（トランスポート）側である。
    */
   send: (request: ResolvedHttpRequest) => Promise<unknown>;
 };

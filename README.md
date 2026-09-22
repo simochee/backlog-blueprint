@@ -124,7 +124,7 @@ issues:
 ```sh
 export BACKLOG_SPACE=example.backlog.com
 export BACKLOG_API_KEY=...
-export SLACK_WEBHOOK_URL=...
+export SLACK_WEBHOOK_URL=https://hooks.example.com/T000/B000
 
 npx @simochee/backlog-blueprint plan -f projects/PROJ_A.yaml
 ```
@@ -140,7 +140,7 @@ Blueprint: PROJ_A (example.backlog.com)
   ~ statusOrder    未対応, 処理中, レビュー中, 処理済み, 完了
   + projectTeam    "開発チーム"
   + projectMember  "suzuki"
-  + webhook        "Slack 通知"  hookUrl ***
+  + webhook        "Slack 通知"  hookUrl "https://hooks.example.com/T000/B000"
 
 Warnings:
   ! [V-A16] access.members: "suzuki" already belongs to team "開発チーム"
@@ -176,7 +176,7 @@ that decides how long a run takes, and [Writing a manifest](docs/manifest.md) ex
 
 The difference between `validate` and `plan` is one thing only: whether Backlog is consulted.
 `validate` is for the editor loop and for pull request checks in a CI job that holds neither an API
-key nor your other secrets. It cannot see your space, so it cannot tell you about default statuses,
+key nor values referenced by `${ENV}`. It cannot see your space, so it cannot tell you about default statuses,
 existing members, or issue counts.
 
 If validation fails, every command stops before the first write and reports every problem it found,
@@ -229,10 +229,9 @@ never leaves you with half a manifest.
 
 Two things are worth knowing before you use the result.
 
-- **Webhook URLs are left out.** Each one becomes `${WEBHOOK_URL_1}`, `${WEBHOOK_URL_2}` and so on,
-  and `export` prints which webhook each variable belongs to. A URL registered in Backlog is not in
-  your repository, and `export` is not the thing that should put it there. Set the variables before
-  you run `plan`; `validate` does not need them.
+- **Webhook URLs are included.** `export` writes the values returned by Backlog. Replace any value
+  with `${NAME}` yourself when you want to supply it from the environment. Review the generated
+  file before committing it.
 - **The project it came from can have issues.** `export` only reads, so any project can be a
   template. Applying that manifest back to the same project is another matter: `plan` and `apply`
   still refuse a project that holds issues. Change `key` and `name` first, which is what you would

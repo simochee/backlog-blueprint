@@ -55,14 +55,10 @@ import {
   webhookWithoutEvents,
 } from "./diagnostics";
 
-export type WebhookVariable = { variable: string; webhook: string };
-
 export type ToManifestResult = {
   diagnostics: Diagnostic[];
   /** 診断にエラーが1件でもあれば undefined（EX-9 / EX-17） */
   manifest?: ManifestInput;
-  /** EX-4 の案内に使う。diagnostics がエラーなら空配列 */
-  webhookVariables: WebhookVariable[];
 };
 
 type Report = (diagnostic: Diagnostic) => void;
@@ -359,15 +355,13 @@ const toAccess = ({
   };
 };
 
-const webhookVariable = (index: number): string => `WEBHOOK_URL_${index + 1}`;
-
 const events = (activityTypeIds: number[]): WebhookEvent[] =>
   ascendingEventIds(activityTypeIds).map((id) => WEBHOOK_EVENT_NAMES_BY_ID.get(id) ?? id);
 
 const toWebhooks = (existing: WebhooksSnapshot, report: Report): Webhook[] => {
   reportName(report, "webhooks", "webhook", existing);
 
-  return existing.map(({ name, description, allEvent, activityTypeIds }, index) => {
+  return existing.map(({ name, description, hookUrl, allEvent, activityTypeIds }, index) => {
     if (!allEvent && activityTypeIds.length === 0) {
       report(webhookWithoutEvents(path("webhooks", index, "events"), name));
     }
@@ -375,7 +369,7 @@ const toWebhooks = (existing: WebhooksSnapshot, report: Report): Webhook[] => {
     return {
       name: escaped(name),
       ...(description === undefined ? {} : { description: escaped(description) }),
-      hookUrl: `\${${webhookVariable(index)}}`,
+      hookUrl: escaped(hookUrl),
       events: allEvent ? "all" : events(activityTypeIds),
     };
   });
@@ -404,20 +398,17 @@ const unwritableValues = (manifest: ManifestInput, reported: Diagnostic[]): Diag
 
   return [
     ...validateSchema(manifest),
-    ...validateStaticSemantics(normalizeManifest(manifest), NO_SOURCE, new Set()),
+    ...validateStaticSemantics(normalizeManifest(manifest), NO_SOURCE),
   ]
     .filter((diagnostic) => diagnostic.severity === "error" && !covered.has(diagnostic.path))
     .map(cannotBeWritten);
 };
 
-const webhookVariables = (existing: WebhooksSnapshot): WebhookVariable[] =>
-  existing.map(({ name }, index) => ({ variable: webhookVariable(index), webhook: name }));
-
 export const toManifest = (snapshots: ResourceSnapshots): ToManifestResult => {
   const project = exportableProject(snapshots);
 
   if (project === undefined) {
-    return { diagnostics: [projectDoesNotExist(snapshots.projectKey)], webhookVariables: [] };
+    return { diagnostics: [projectDoesNotExist(snapshots.projectKey)] };
   }
 
   const diagnostics: Diagnostic[] = [];
@@ -443,7 +434,5 @@ export const toManifest = (snapshots: ResourceSnapshots): ToManifestResult => {
 
   const all = [...diagnostics, ...unwritableValues(manifest, diagnostics)];
 
-  return hasError(all)
-    ? { diagnostics: all, webhookVariables: [] }
-    : { diagnostics: all, manifest, webhookVariables: webhookVariables(snapshots.webhooks) };
+  return hasError(all) ? { diagnostics: all } : { diagnostics: all, manifest };
 };

@@ -1,6 +1,5 @@
 import { type Action } from "../action";
 import { type Diagnostic } from "../diagnostic";
-import { Secret } from "../secret";
 import { type PlanReport, type ValidateReport } from "./report";
 
 /**
@@ -156,7 +155,7 @@ export const walkthroughActions = (): Action[] => [
       path: "/api/v2/projects/PROJ_A/webhooks",
       params: {
         name: "Slack 通知",
-        hookUrl: new Secret("https://hooks.example.com/T000/B000"),
+        hookUrl: "https://hooks.example.com/T000/B000",
         allEvent: false,
         activityTypeIds: [1, 2],
       },

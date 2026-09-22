@@ -1,7 +1,6 @@
 import { type Action, type Change } from "../action";
 import { type Category } from "../manifest";
 import { type Reconciler } from "../reconciler";
-import { sealChanges, sealFields, sealer } from "../secret";
 import { asArrayOf, asRecord, requiredNumber, requiredString } from "../api-response";
 
 export type ExistingCategory = {
@@ -14,8 +13,6 @@ export type CategoriesSnapshot = ExistingCategory[];
 const collectionPath = (projectKey: string) => `/api/v2/projects/${projectKey}/categories`;
 
 const memberPath = (projectKey: string, id: number) => `${collectionPath(projectKey)}/${id}`;
-
-const basePath = (index: number) => `categories/${index}`;
 
 const findExisting = (snapshot: CategoriesSnapshot, { name, oldname }: Category) =>
   snapshot.find((category) => category.name === name) ??
@@ -41,15 +38,14 @@ export const categoriesReconciler: Reconciler<Category[], CategoriesSnapshot> = 
     });
   },
 
-  plan: (desired, snapshot, { manifest, isSecret }) => {
-    const seal = sealer(isSecret);
+  plan: (desired, snapshot, { manifest }) => {
     const creates: Action[] = [];
     const updates: Action[] = [];
     const kept = new Set<number>();
 
-    for (const [index, category] of desired.entries()) {
+    for (const category of desired) {
       const existing = findExisting(snapshot, category);
-      const fields = sealFields({ name: category.name }, basePath(index), seal);
+      const fields = { name: category.name };
 
       if (existing === undefined) {
         creates.push({
@@ -64,7 +60,7 @@ export const categoriesReconciler: Reconciler<Category[], CategoriesSnapshot> = 
             params: fields,
           },
           provides: [{ kind: "category", name: category.name }],
-          changes: sealChanges(changesOf(category.name, undefined), basePath(index), seal),
+          changes: changesOf(category.name, undefined),
           writeRequest: true,
         });
 
@@ -100,7 +96,7 @@ export const categoriesReconciler: Reconciler<Category[], CategoriesSnapshot> = 
           params: fields,
         },
         provides: [{ kind: "category", name: category.name }],
-        changes: sealChanges(changesOf(category.name, existing), basePath(index), seal),
+        changes: changesOf(category.name, existing),
         notes: [{ type: "renamed", from: existing.name }],
         writeRequest: true,
       });

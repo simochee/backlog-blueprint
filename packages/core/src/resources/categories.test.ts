@@ -1,11 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  fixedPlanContext,
-  fixedReadContext,
-  fixedSnapshot,
-  secretPaths,
-} from "../../../test-utils/src/index";
+import { fixedPlanContext, fixedReadContext, fixedSnapshot } from "../../../test-utils/src/index";
 import { type Category } from "../manifest";
 import { categoriesReconciler, type CategoriesSnapshot } from "./categories";
 
@@ -160,31 +155,7 @@ describe("カテゴリーの oldname", () => {
   });
 });
 
-describe("環境変数から展開した値", () => {
-  it("カテゴリー名は同定名なので ${ENV} 由来でもリクエストにも差分にも平文で出る", () => {
-    const [action] = categoriesReconciler.plan(
-      [{ name: "社外秘カテゴリー" }],
-      [],
-      fixedPlanContext({ isSecret: secretPaths("categories/0/name") }),
-    );
-
-    expect(action?.request?.params.name).toBe("社外秘カテゴリー");
-    expect(action?.changes).toEqual([{ field: "name", before: null, after: "社外秘カテゴリー" }]);
-    expect(action?.id).toBe("categories/create/社外秘カテゴリー");
-  });
-});
-
 describe("冪等性（NFR-4）", () => {
-  it("${ENV} 由来のカテゴリー名が現状と同じなら2回目は noop になる", () => {
-    const actions = categoriesReconciler.plan(
-      [{ name: "社外秘カテゴリー" }],
-      [{ id: 11, name: "社外秘カテゴリー" }],
-      fixedPlanContext({ isSecret: secretPaths("categories/0/name") }),
-    );
-
-    expect(actions.map(({ op }) => op)).toEqual(["noop"]);
-  });
-
   it("適用後の現状に同じマニフェストを当てると全部 noop になる", () => {
     const desired: Category[] = [
       { name: "インフラ" },

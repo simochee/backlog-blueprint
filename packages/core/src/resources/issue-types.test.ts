@@ -1,12 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  fixedPlanContext,
-  fixedReadContext,
-  fixedSnapshot,
-  secretPaths,
-} from "../../../test-utils/src/index";
-import { Secret } from "../secret";
+import { fixedPlanContext, fixedReadContext, fixedSnapshot } from "../../../test-utils/src/index";
 import { type IssueType } from "../manifest";
 import {
   DEFAULT_ISSUE_TYPE_SLOTS,
@@ -318,51 +312,7 @@ describe("未作成のプロジェクト", () => {
   });
 });
 
-describe("環境変数から展開した値", () => {
-  it("課題テンプレートが ${ENV} 由来なら計画に実値が現れない", () => {
-    const actions = issueTypesReconciler.plan(
-      [{ name: "バグ", color: "#990000", templateDescription: "社外秘の手順" }],
-      { source: "project", issueTypes: [] },
-      fixedPlanContext({ isSecret: secretPaths("issueTypes/0/templateDescription") }),
-    );
-
-    expect(actions[0]?.request?.params.templateDescription).toBeInstanceOf(Secret);
-    expect(JSON.stringify(actions)).not.toContain("社外秘の手順");
-  });
-
-  it("課題種別の名前は同定名なので ${ENV} 由来でもリクエストにも差分にも平文で出る", () => {
-    const actions = issueTypesReconciler.plan(
-      [{ name: "社外秘の課題種別", color: "#990000" }],
-      { source: "project", issueTypes: [] },
-      fixedPlanContext({ isSecret: secretPaths("issueTypes/0/name") }),
-    );
-
-    expect(actions[0]?.request?.params.name).toBe("社外秘の課題種別");
-    expect(actions[0]?.changes).toContainEqual({
-      field: "name",
-      before: null,
-      after: "社外秘の課題種別",
-    });
-    expect(actions[0]?.id).toBe("issueTypes/create/社外秘の課題種別");
-  });
-});
-
 describe("冪等性（NFR-4）", () => {
-  it("${ENV} 由来の課題テンプレートが現状と同じなら2回目は noop になる", () => {
-    const actions = issueTypesReconciler.plan(
-      [{ name: "バグ", color: "#990000", templateDescription: "社外秘の手順" }],
-      {
-        source: "project",
-        issueTypes: [
-          { id: 101, name: "バグ", color: "#990000", templateDescription: "社外秘の手順" },
-        ],
-      },
-      fixedPlanContext({ isSecret: secretPaths("issueTypes/0/templateDescription") }),
-    );
-
-    expect(actions.map(({ op }) => op)).toEqual(["noop"]);
-  });
-
   it("適用後の現状に同じマニフェストを当てると全部 noop になる", () => {
     const desired: IssueType[] = [
       { name: "タスク", color: "#7ea800" },

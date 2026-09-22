@@ -2,7 +2,6 @@ import { type Action, type Change, type ProvidedRef } from "../action";
 import { type IssueType } from "../manifest";
 import { type Reconciler } from "../reconciler";
 import { embedRef } from "../ref";
-import { sealChanges, sealFields, sealer, type Seal } from "../secret";
 import { type IdOrRef, type Ref, type Value } from "../value";
 import {
   asArrayOf,
@@ -63,8 +62,6 @@ export const defaultIssueTypeSlotRefs = (desired: IssueType[]): ProvidedRef[] =>
       : { kind: "issueType", name: adopted.name };
   });
 
-const basePath = (index: number): string => `issueTypes/${index}`;
-
 const memberPath = (key: string, target: IdOrRef): string =>
   `${issueTypesPath(key)}/${typeof target === "number" ? target : embedRef(target)}`;
 
@@ -114,13 +111,7 @@ const differs = (changes: Change[]): boolean =>
  * 既定を全削除して作り直す形は採らない。L-2 / L-6 が数えている節約
  * （既定を使い回せば削除＋作成の2リクエストが1リクエストで済む）が丸ごと消える。
  */
-const createAction = (
-  item: IssueType,
-  index: number,
-  key: string,
-  seal: Seal,
-  adoptsSlot = false,
-): Action => ({
+const createAction = (item: IssueType, key: string, adoptsSlot = false): Action => ({
   id: `issueTypes/create/${item.name}`,
   phase: 2,
   kind: "issueType",
@@ -131,20 +122,16 @@ const createAction = (
     ...(adoptsSlot
       ? { method: "PATCH" as const, path: memberPath(key, issueTypeRef(item.name)) }
       : { method: "POST" as const, path: issueTypesPath(key) }),
-    params: sealFields(declaredFields(item), basePath(index), seal),
+    params: declaredFields(item),
   },
   provides: [{ kind: "issueType", name: item.name }],
-  changes: sealChanges(changesOf(item, undefined), basePath(index), seal),
+  changes: changesOf(item, undefined),
   writeRequest: true,
 });
 
-const planDefaults = (desired: IssueType[], slots: number, key: string, seal: Seal): Action[] => {
-  const adopted = desired
-    .slice(0, slots)
-    .map((item, slot) => createAction(item, slot, key, seal, true));
-  const creates = desired
-    .slice(slots)
-    .map((item, offset) => createAction(item, slots + offset, key, seal));
+const planDefaults = (desired: IssueType[], slots: number, key: string): Action[] => {
+  const adopted = desired.slice(0, slots).map((item) => createAction(item, key, true));
+  const creates = desired.slice(slots).map((item) => createAction(item, key));
   const substitute = desired.at(0);
   const spare = Array.from(
     { length: Math.max(0, slots - desired.length) },
@@ -176,14 +163,13 @@ const planProject = (
   desired: IssueType[],
   snapshot: ExistingIssueType[],
   key: string,
-  seal: Seal,
 ): Action[] => {
   const byName = new Map(snapshot.map((issueType) => [issueType.name, issueType]));
   const kept = new Set<string>();
   const creates: Action[] = [];
   const updates: Action[] = [];
 
-  const updateAction = (item: IssueType, index: number, existing: ExistingIssueType): Action => ({
+  const updateAction = (item: IssueType, existing: ExistingIssueType): Action => ({
     id: `issueTypes/update/${item.name}`,
     phase: 2,
     kind: "issueType",
@@ -193,9 +179,9 @@ const planProject = (
     request: {
       method: "PATCH",
       path: memberPath(key, existing.id),
-      params: sealFields(declaredFields(item), basePath(index), seal),
+      params: declaredFields(item),
     },
-    changes: sealChanges(changesOf(item, existing), basePath(index), seal),
+    changes: changesOf(item, existing),
     ...(existing.name === item.name
       ? {}
       : {
@@ -205,7 +191,7 @@ const planProject = (
     writeRequest: true,
   });
 
-  for (const [index, item] of desired.entries()) {
+  for (const item of desired) {
     const sameName = byName.get(item.name);
 
     if (sameName !== undefined) {
@@ -213,7 +199,7 @@ const planProject = (
 
       updates.push(
         differs(changesOf(item, sameName))
-          ? updateAction(item, index, sameName)
+          ? updateAction(item, sameName)
           : {
               id: `issueTypes/noop/${item.name}`,
               phase: 2,
@@ -232,12 +218,12 @@ const planProject = (
 
     if (renamed !== undefined) {
       kept.add(renamed.name);
-      updates.push(updateAction(item, index, renamed));
+      updates.push(updateAction(item, renamed));
 
       continue;
     }
 
-    creates.push(createAction(item, index, key, seal));
+    creates.push(createAction(item, key));
   }
 
   const substitute = desired.at(0);
@@ -293,10 +279,9 @@ export const issueTypesReconciler: Reconciler<IssueType[], IssueTypesSnapshot> =
 
   plan(desired, snapshot, ctx) {
     const { key } = ctx.manifest;
-    const seal = sealer(ctx.isSecret);
 
     return snapshot.source === "defaults"
-      ? planDefaults(desired, snapshot.slots, key, seal)
-      : planProject(desired, snapshot.issueTypes, key, seal);
+      ? planDefaults(desired, snapshot.slots, key)
+      : planProject(desired, snapshot.issueTypes, key);
   },
 };

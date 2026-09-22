@@ -128,40 +128,17 @@ type Change = { field: string; before: Value | null; after: Value | null }
 
 ```ts
 type Ref = { $ref: { kind: ResourceKind; name: string } }
-type Value = string | number | boolean | null | Secret | Ref | Value[]
+type Value = string | number | boolean | null | Ref | Value[]
 type IdOrRef = number | Ref
 ```
 
 `Ref` は「Backlog ID がまだ分からないリソース」を名前で指す。
 plan の時点では解決できないものが必ず残るため、Action は ID ではなく `Ref` を持つ。
 
-### 2.4 Secret
+### 2.4 API キー
 
-```ts
-class Secret {
-  #value: string
-  toString() { return '***' }
-  toJSON()   { return '***' }
-  reveal()   { return this.#value }   // 送信の直前と、値を外に出さない比較だけが呼ぶ
-}
-```
-
-`reveal()` を呼んでよいのは2種類だけである。
-
-1. **HTTP 送信の直前**（シリアライズする層）
-2. **値を外に出さない比較**。差分判定（§6.4 の `hookUrl`）と、描画側で「前後が同じ項目を描かない」を決めるとき。
-   どちらも**結果の真偽だけが外に出て、実値はその関数から出ない**
-
-2 を許すのは、比較を `Secret` のまま行う手段が無いためである。`===` は必ず偽になるので、
-禁じると「`${ENV}` 由来の値が現状と同じでも毎回 `update` が出る」ことになり、NFR-4 と AC-8 が壊れる。
-**呼び出しの数を増やさないことではなく、実値が関数の外へ出ないことが守りたい不変条件**である。
-
-`${ENV}` で展開された値（E-4）は必ず `Secret` になる。
-`toString` / `toJSON` がマスクを返すので、**マスクし忘れるという書き方ができない**。
-FR-3.6 / NFR-3 / AC-10 を実装の注意ではなく型で担保する。
-
-API キーは `Action` にも `Secret` にも現れない。HTTP クライアントが保持する
-トランスポートの関心事であり、計画のデータ構造に載せない。
+API キーは `Action` に現れない。
+HTTP クライアントが認証情報として保持し、計画と中断レポートに渡さない（NFR-3 / AC-10）。
 
 ## 3. 解決表と参照の解決
 
@@ -390,8 +367,6 @@ interface Reconciler<Desired, Snapshot> {
 type PlanContext = {
   manifest: Manifest
   snapshot: Snapshot
-  /** その path の値が ${ENV} 由来か。E-6 */
-  isSecret: (path: string) => boolean
 }
 ```
 
@@ -491,11 +466,7 @@ L-4 が言う「書かせない」は、ツールが無視するという意味�
 | --- | --- |
 | `events` の比較 | 名前をすべて数値に解決してから、**順序を無視した集合として**比較する。同じイベントを名前と数値で書いても差分にならない |
 | `events: all` | `allEvent: true` として比較する。全イベントを列挙した指定とは**別物**として扱う（API 上の表現が違い、将来イベントが増えたときの挙動も違う） |
-| `hookUrl` | 差分判定は `Secret.reveal()` の実値で行い、表示だけマスクする。**`read()` が返す既存の値も `Secret` で包む** |
-
-既存 Webhook の `hookUrl` を `read()` の段で包むのは、E-5（Yaml に直接書かれた値はマスクしない）が
-除外しているのが**マニフェスト側の値**だからである。Backlog に登録済みの URL はリポジトリに無く、
-plan を PR コメントに貼る運用（PO-3）で CI ログに出ることになる。`changes[].before` に平文で載せない。
+| `hookUrl` | GET で取得した値とマニフェストの値を比較し、差分があれば変更前後を表示する（E-8） |
 
 ### 6.5 `settings` の差分算出
 
@@ -579,4 +550,3 @@ state ファイルを持たない（要求設計 §6 非スコープ）ので、
 | C-4 | 進捗は `AsyncIterable` | core にロガー／コールバックを渡す。CLI と Web の表現差が core に漏れる |
 | RF-1 | 再取得点は `op: refresh` の1箇所 | 既定リソースの ID を推測する。ステータスだけ推測できる非対称を説明できない |
 | X-3 | レート制限は常に本文 API | Node ではヘッダを読む。Web でだけ起きる不具合ができる |
-| — | `Secret` クラスでマスク | 出力時にキー名でマスク。対象の追加漏れがそのまま漏洩になる |
