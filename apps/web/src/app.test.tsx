@@ -287,7 +287,7 @@ describe("入力値の表示", () => {
     await openEnvironment(user);
     await user.type(await screen.findByLabelText("WEBHOOK_URL"), hookUrl);
 
-    expect(carrying(hookUrl)).toStrictEqual(["INPUT:password"]);
+    expect(carrying(hookUrl)).toStrictEqual(["INPUT:"]);
 
     await user.click(screen.getByRole("button", { name: "Done" }));
     await plan(user);

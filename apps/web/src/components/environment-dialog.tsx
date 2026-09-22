@@ -18,7 +18,7 @@ export type EnvironmentDialogProps = {
 export const EnvironmentDialog = ({ names }: EnvironmentDialogProps) => {
   /**
    * React Compiler に畳ませない。この部品は未入力の件数も入力欄の初期値も、React が
-   * 追えないモジュールの値から読む（§2.4 がそこにしか置かせない）。畳まれると、件数は
+   * 追えないモジュールの値（secrets.ts）から読む。畳まれると、件数は
    * 打った直後に増減せず、閉じて開き直した入力欄が打つ前の値で描き直される。
    */
   "use no memo";
@@ -56,7 +56,6 @@ export const EnvironmentDialog = ({ names }: EnvironmentDialogProps) => {
                 defaultValue={environmentValue(name)}
                 id={`env-${name}`}
                 onChange={(event) => setEnvironmentValue(name, event.target.value)}
-                type="password"
               />
             </Flex>
           ))}
