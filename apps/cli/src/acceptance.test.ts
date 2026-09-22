@@ -443,6 +443,18 @@ describe("受け入れ基準", () => {
   });
 });
 
+describe("環境変数から展開した値（E-8）", () => {
+  it("plan の人間向け出力にも JSON にも、展開後の値がそのまま出る", async () => {
+    const text = plan(space(), MANIFEST);
+    const machine = plan(space(), MANIFEST, ["--output", "json"]);
+
+    await expect(text.code).resolves.toBe(2);
+    await expect(machine.code).resolves.toBe(2);
+    expect(text.io.stdout).toContain(`hookUrl "${SLACK_WEBHOOK_URL}"`);
+    expect(machine.io.stdout).toContain(`"hookUrl": "${SLACK_WEBHOOK_URL}"`);
+  });
+});
+
 describe("カスタム属性の絞り", () => {
   it("課題種別の絞りを消したマニフェストを適用するとどの課題種別でも使えるようになり、続けて plan しても差分は出ない", async () => {
     const backlog = space();
