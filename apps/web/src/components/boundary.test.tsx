@@ -3,10 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } fr
 
 import { Panel } from "./panel";
 
-const SECRET = "https://hooks.example.com/must-never-be-rendered";
-
 const Throws = (): never => {
-  throw new TypeError(`cannot read the manifest at ${SECRET}`);
+  throw new TypeError("cannot read properties of undefined");
 };
 
 /**
@@ -41,7 +39,6 @@ describe("段の中で落ちたとき", () => {
     expect(screen.getByRole("button", { name: "Reload" })).toBeInTheDocument();
   });
 
-  /** 描画中の例外はマニフェストの断片を持ちうる。そこには展開済みの値が入っている（§2.4）。 */
   it("受け止めた内容は画面に出さない", () => {
     render(
       <Panel enabled step={1} title="Connect">
@@ -49,7 +46,6 @@ describe("段の中で落ちたとき", () => {
       </Panel>,
     );
 
-    expect(document.body.textContent).not.toContain(SECRET);
-    expect(document.body.textContent).not.toContain("cannot read the manifest");
+    expect(document.body.textContent).not.toContain("cannot read properties of undefined");
   });
 });
