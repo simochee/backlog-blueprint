@@ -293,7 +293,7 @@ GitHub Action・Docker イメージ・PR コメント機能は提供しない。
 | FR-7.1 | static hosting で動作する（サーバを持たない） |
 | FR-7.2 | Yaml を貼り付ける入力欄、スペースドメインと API キーの入力欄を持つ |
 | FR-7.3 | plan の結果を表示し、確認のうえ apply できる |
-| FR-7.4 | API キーをメモリ上のみで保持し、localStorage 等に永続化しない |
+| FR-7.4 | API キーはメモリ上と、そのタブの `sessionStorage` にだけ保持する。`localStorage` など、タブを閉じた後に残る場所には書かない（[WU-38](../design/cli-and-web-ui.md#接続画面)） |
 | FR-7.5 | 環境変数が使えないため、`${ENV}` を含む Yaml では値の入力を求める |
 | FR-7.6 | レート制限の残量は `GET /rateLimit` で取得する | 
 

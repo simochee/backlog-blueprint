@@ -4,7 +4,8 @@ import { type ReactNode } from "react";
 import { StepBoundary } from "./boundary";
 
 export type PanelProps = {
-  step: number;
+  /** 段が1つしか無いページ（Export）では番号を振らない */
+  step?: number;
   title: string;
   enabled: boolean;
   hint?: string;
@@ -17,7 +18,7 @@ export const Panel = ({ step, title, enabled, hint, children }: PanelProps) => (
       <Flex direction="column" gap="4">
         <Flex align="center" asChild gap="3">
           <Heading as="h2" size="4">
-            <span className="panel-number">{step}</span>
+            {step === undefined ? null : <span className="panel-number">{step}</span>}
             {title}
           </Heading>
         </Flex>
