@@ -1,4 +1,4 @@
-import { type Diagnostic } from "@backlog-blueprint/core";
+import { LayersIcon } from "@radix-ui/react-icons";
 import { Box, Button, Container, Flex, Heading, Text, Theme } from "@radix-ui/themes";
 import {
   startTransition,
@@ -12,12 +12,15 @@ import {
 
 import { runApply } from "./apply";
 import { useAppearance } from "./appearance";
+import { AccountMenu } from "./components/account-menu";
 import { ConfirmDialog } from "./components/confirm";
+import { ConnectDialog } from "./components/connect-dialog";
+import { ConnectScreen } from "./components/connect-screen";
 import { DIRECTORY_PANES, DirectoryPane } from "./components/directory-pane";
 import { Panel } from "./components/panel";
 import { Stepper } from "./components/stepper";
-import { connect, type Connection } from "./connection";
 import { type DirectoryKind } from "./directory";
+import { prepareExport, type ExportAttempt } from "./export";
 import {
   connectionStamp,
   fresh,
@@ -26,38 +29,60 @@ import {
   type Derived,
   type ManifestInputs,
 } from "./freshness";
+import { PAGE_INTROS, PAGES, usePage } from "./page";
 import { PASTED, preparePlan, type PlanAttempt, type PreparedPlan } from "./plan";
 import { isRunning, rejectedProgress, spentPlan, type ApplyRun } from "./progress";
 import { secretRevisions, subscribeSecrets } from "./secrets";
 import { ApplyStep } from "./steps/apply";
-import { ConnectStep } from "./steps/connect";
+import { ExportStep } from "./steps/export";
 import { ManifestStep } from "./steps/manifest";
 import { PlanStep } from "./steps/plan";
-import { openTransport, transport } from "./transport";
+import { pinTransport, transport } from "./transport";
+import { RESTORED_FORM_ID, useConnection } from "./use-connection";
 import { useDirectory } from "./use-directory";
+import { useIcon } from "./use-icon";
 import { validatedFor } from "./validation";
 
-const STEPS = ["Connect", "Manifest", "Plan", "Apply"];
+const APPLY_STEPS = ["Manifest", "Plan", "Apply"];
 
 const DIRECTORY_KINDS: DirectoryKind[] = ["users", "teams"];
-
-type ConnectAttempt = { diagnostics: Diagnostic[]; failure?: unknown; connection?: Connection };
 
 /** WU-15。Action の dispatch は transition の中から呼ぶ。 */
 const start = (action: () => void) => () => startTransition(action);
 
 export const App = () => {
   const appearance = useAppearance();
+  const page = usePage();
   const revisions = useSyncExternalStore(subscribeSecrets, secretRevisions);
-  const [space, setSpace] = useState("");
+  const connectionControl = useConnection();
+  const { session } = connectionControl;
+  const connection = session?.connection;
+  const space = session?.domain ?? "";
+  const [formId, setFormId] = useState(RESTORED_FORM_ID);
+  const [switchingFrom, setSwitchingFrom] = useState<number>();
   const [manifestText, setManifestText] = useState("");
   const [manifestSource, setManifestSource] = useState(PASTED);
   const [showUnchanged, setShowUnchanged] = useState(false);
   const [confirmingPlan, setConfirmingPlan] = useState<PreparedPlan>();
   const [applyRecord, setApplyRecord] = useState<Derived<ApplyRun>>();
   const [paneRecord, setPaneRecord] = useState<Derived<DirectoryKind>>();
+  const [exportKey, setExportKey] = useState("");
 
-  const connectionKey = connectionStamp({ space, credentials: revisions.credentials });
+  const connectionKey = connectionStamp(session?.id);
+  const icons = {
+    space: useIcon(connectionKey, connection?.icons.space),
+    user: useIcon(connectionKey, connection?.icons.user),
+  };
+
+  /** 失敗は、それを出したフォームにだけ見せる。開き直したフォームに前の失敗を残さない */
+  const attempt =
+    connectionControl.attempt?.formId === formId ? connectionControl.attempt : undefined;
+
+  /**
+   * モーダルは開いた時点の接続に紐づける。新しい接続が通れば番号が変わって閉じるので、
+   * 「成功したら閉じる」を成功の経路に書き足さずに済む（WU-36）。
+   */
+  const switching = switchingFrom !== undefined && switchingFrom === session?.id;
 
   /**
    * 束ね直さない。`useDeferredValue` は同一性で新旧を見分けるので、描画のたびに別の
@@ -78,28 +103,11 @@ export const App = () => {
 
   const validation = fresh(validated, manifestKey);
 
-  const [connectAttempt, runConnect, connecting] = useActionState<
-    Derived<ConnectAttempt> | undefined
-  >(async () => {
-    const stamp = connectionKey;
-
-    try {
-      openTransport(space);
-
-      return { stamp, value: await connect(transport.get) };
-    } catch (error) {
-      return { stamp, value: { diagnostics: [], failure: error } };
-    }
-  }, undefined);
-
-  const attempt = fresh(connectAttempt, connectionKey);
-  const connection = attempt?.connection;
-
   const directories = {
     users: useDirectory("users", connectionKey),
     teams: useDirectory("teams", connectionKey),
   };
-  /** WU-21。開いているペインも接続の印に紐づけ、接続が無効になれば閉じる。 */
+  /** WU-21。開いているペインも接続の印に紐づけ、接続を差し替えれば閉じる。 */
   const pane = connection === undefined ? undefined : fresh(paneRecord, connectionKey);
 
   const togglePane = (kind: DirectoryKind): void => {
@@ -117,6 +125,26 @@ export const App = () => {
       startTransition(directory.load);
     }
   };
+
+  const [exportRecord, runExport, exporting] = useActionState<Derived<ExportAttempt> | undefined>(
+    async (previous) => {
+      if (connection === undefined) {
+        return previous;
+      }
+
+      const stamp = connectionKey;
+
+      try {
+        return { stamp, value: await prepareExport(exportKey, transport.get) };
+      } catch (error) {
+        return { stamp, value: { diagnostics: [], failure: error } };
+      }
+    },
+    undefined,
+  );
+
+  /** WU-32。キーの欄には紐づけない。どのキーを書き出したかは結果が持っている。 */
+  const exportAttempt = fresh(exportRecord, connectionKey);
 
   const [planAttempt, runPlan, planning] = useActionState<Derived<PlanAttempt> | undefined>(
     async (previous) => {
@@ -205,7 +233,9 @@ export const App = () => {
 
     const stamp = planKey;
 
-    void runApply({ plan: prepared.plan, space }, (value) => setApplyRecord({ stamp, value }));
+    void runApply({ plan: prepared.plan, space, client: pinTransport() }, (value) =>
+      setApplyRecord({ stamp, value }),
+    );
   };
 
   const cancelApply = (): void => {
@@ -220,125 +250,200 @@ export const App = () => {
     });
   };
 
-  const reached = [connection !== undefined, plan !== undefined, run !== undefined].filter(
-    Boolean,
-  ).length;
+  const openSwitch = (): void => {
+    setFormId(formId + 1);
+    setSwitchingFrom(session?.id);
+  };
 
-  return (
-    <Theme accentColor="blue" appearance={appearance} grayColor="slate" radius="medium">
-      <Box className="page" data-pane-open={pane !== undefined}>
-        <Box asChild className="app-header" position="sticky" top="0">
-          <header>
-            <Container maxWidth="1200px" px={{ initial: "4", sm: "6" }} py="3">
-              <Flex align="center" gap="4" justify="between" wrap="wrap">
-                <Flex direction="column" gap="1">
-                  <Heading as="h1" size="6">
-                    backlog-blueprint
-                  </Heading>
-                  <Text color="gray" size="2">
-                    Declare a Backlog project in YAML, review the plan, then apply it.
-                  </Text>
-                </Flex>
-                <Flex gap="2">
+  const disconnect = (): void => {
+    setFormId(formId + 1);
+    connectionControl.disconnect();
+  };
+
+  const applyReached = [plan !== undefined, run !== undefined].filter(Boolean).length;
+
+  const header = (
+    <Box asChild className="app-header" position="sticky" top="0">
+      <header>
+        <Container maxWidth="1200px" px={{ initial: "4", sm: "6" }}>
+          <div className="navbar" data-connected={connection !== undefined}>
+            <a className="navbar-brand" href={PAGES[0]?.hash}>
+              <LayersIcon aria-hidden height="18" width="18" />
+              backlog-blueprint
+            </a>
+            {session === undefined ? null : (
+              <>
+                {/**
+                 * Radix の `TabNav` を使わない。下線のタブはページの中の切り替えに見え、
+                 * サイト全体の行き先を選ぶ部品に見えない。
+                 */}
+                <nav aria-label="Pages" className="navbar-pages">
+                  {PAGES.map((entry) => (
+                    <a
+                      aria-current={page === entry.page ? "page" : undefined}
+                      className="navbar-page"
+                      href={entry.hash}
+                      key={entry.page}
+                    >
+                      {entry.title}
+                    </a>
+                  ))}
+                </nav>
+                <Flex align="center" className="navbar-tools" gap="2">
                   {DIRECTORY_KINDS.map((kind) => (
                     <Button
+                      aria-label={DIRECTORY_PANES[kind].title}
                       aria-pressed={pane === kind}
                       color="gray"
-                      disabled={connection === undefined}
                       key={kind}
                       onClick={() => togglePane(kind)}
                       type="button"
                       variant={pane === kind ? "solid" : "soft"}
                     >
                       {DIRECTORY_PANES[kind].icon}
-                      {DIRECTORY_PANES[kind].title}
+                      <span className="navbar-tool-label">{DIRECTORY_PANES[kind].title}</span>
                     </Button>
                   ))}
+                  <AccountMenu
+                    connection={session.connection}
+                    domain={session.domain}
+                    icons={icons}
+                    locked={running}
+                    onDisconnect={disconnect}
+                    onSwitch={openSwitch}
+                  />
                 </Flex>
-              </Flex>
-            </Container>
-          </header>
+              </>
+            )}
+          </div>
+        </Container>
+      </header>
+    </Box>
+  );
+
+  if (session === undefined) {
+    return (
+      <Theme accentColor="blue" appearance={appearance} grayColor="slate" radius="medium">
+        <Box className="page">
+          {header}
+          <ConnectScreen
+            connecting={connectionControl.connecting}
+            diagnostics={attempt?.diagnostics ?? []}
+            failure={attempt?.failure}
+            hasApiKey={revisions.hasApiKey}
+            initialSpace={connectionControl.storedSpace}
+            key={formId}
+            onConnect={(domain) => connectionControl.connectTo(domain, formId)}
+            reconnectingTo={connectionControl.reconnectingTo}
+          />
         </Box>
+      </Theme>
+    );
+  }
+
+  return (
+    <Theme accentColor="blue" appearance={appearance} grayColor="slate" radius="medium">
+      <Box className="page" data-pane-open={pane !== undefined}>
+        {header}
         <Container maxWidth="1200px" px={{ initial: "4", sm: "6" }} py={{ initial: "5", sm: "6" }}>
           <Flex direction="column" gap="5">
-            <Stepper reached={reached} titles={STEPS} />
-            <Panel enabled step={1} title="Connect">
-              <ConnectStep
-                canConnect={space !== "" && revisions.hasApiKey}
-                connecting={connecting}
-                diagnostics={attempt?.diagnostics ?? []}
-                failure={attempt?.failure}
-                onConnect={start(runConnect)}
-                onSpaceChange={setSpace}
-                connection={attempt?.connection}
-                space={space}
-              />
-            </Panel>
-            <Panel
-              enabled={connection !== undefined}
-              hint="Connect to a space first."
-              step={2}
-              title="Manifest"
-            >
-              <ManifestStep
-                canPlan={validation?.manifest !== undefined}
-                names={validated.value.names}
-                onFileDropped={(name, text) => {
-                  setManifestSource(name);
-                  setManifestText(text);
-                }}
-                onPlan={start(runPlan)}
-                onTextChange={(text) => {
-                  setManifestSource(PASTED);
-                  setManifestText(text);
-                }}
-                planning={planning}
-                text={manifestText}
-                validation={validation}
-              />
-            </Panel>
-            <Panel
-              enabled={plan !== undefined}
-              hint="Run Plan to see what apply would do. The plan is discarded whenever an input changes, and once it has been applied."
-              step={3}
-              title="Plan"
-            >
-              <PlanStep
-                applying={running}
-                diagnostics={plan?.diagnostics ?? []}
-                failure={plan?.failure}
-                onApply={() => setConfirmingPlan(plan?.prepared)}
-                onShowUnchangedChange={setShowUnchanged}
-                prepared={plan?.prepared}
-                showUnchanged={showUnchanged}
-              />
-            </Panel>
-            <Panel
-              enabled={run !== undefined}
-              hint="Nothing has been applied yet."
-              step={4}
-              title="Apply"
-            >
-              {run === undefined ? null : <ApplyStep run={run} />}
-            </Panel>
-            {confirming && plan?.prepared !== undefined ? (
-              <ConfirmDialog onCancel={cancelApply} onConfirm={applyPlan} />
-            ) : null}
+            <Flex direction="column" gap="1">
+              <Heading as="h1" size="6">
+                {PAGE_INTROS[page].title}
+              </Heading>
+              <Text color="gray" size="2">
+                {PAGE_INTROS[page].description}
+              </Text>
+            </Flex>
+            {/**
+             * 見えないページもアンマウントしない（WU-28）。apply の最中に Export を開いた
+             * だけで進捗と離脱の警告が消え、書きかけのマニフェストも失われる。
+             */}
+            <Flex className="page-view" direction="column" gap="5" hidden={page !== "apply"}>
+              <Stepper reached={applyReached} titles={APPLY_STEPS} />
+              <Panel enabled step={1} title="Manifest">
+                <ManifestStep
+                  canPlan={validation?.manifest !== undefined}
+                  names={validated.value.names}
+                  onFileDropped={(name, text) => {
+                    setManifestSource(name);
+                    setManifestText(text);
+                  }}
+                  onPlan={start(runPlan)}
+                  onTextChange={(text) => {
+                    setManifestSource(PASTED);
+                    setManifestText(text);
+                  }}
+                  planning={planning}
+                  text={manifestText}
+                  validation={validation}
+                />
+              </Panel>
+              <Panel
+                enabled={plan !== undefined}
+                hint="Run Plan to see what apply would do. The plan is discarded whenever an input changes, and once it has been applied."
+                step={2}
+                title="Plan"
+              >
+                <PlanStep
+                  applying={running}
+                  diagnostics={plan?.diagnostics ?? []}
+                  failure={plan?.failure}
+                  onApply={() => setConfirmingPlan(plan?.prepared)}
+                  onShowUnchangedChange={setShowUnchanged}
+                  prepared={plan?.prepared}
+                  showUnchanged={showUnchanged}
+                />
+              </Panel>
+              <Panel
+                enabled={run !== undefined}
+                hint="Nothing has been applied yet."
+                step={3}
+                title="Apply"
+              >
+                {run === undefined ? null : <ApplyStep run={run} />}
+              </Panel>
+              {confirming && plan?.prepared !== undefined ? (
+                <ConfirmDialog onCancel={cancelApply} onConfirm={applyPlan} />
+              ) : null}
+            </Flex>
+            <Flex className="page-view" direction="column" gap="5" hidden={page !== "export"}>
+              <Panel enabled title="Export">
+                <ExportStep
+                  canExport={exportKey.trim() !== ""}
+                  diagnostics={exportAttempt?.diagnostics ?? []}
+                  exported={exportAttempt?.exported}
+                  exporting={exporting}
+                  failure={exportAttempt?.failure}
+                  onExport={start(runExport)}
+                  onProjectKeyChange={setExportKey}
+                  projectKey={exportKey}
+                />
+              </Panel>
+            </Flex>
           </Flex>
         </Container>
       </Box>
-      {connection === undefined
-        ? null
-        : DIRECTORY_KINDS.map((kind) => (
-            <DirectoryPane
-              directory={directories[kind]}
-              key={`${kind}:${connectionKey}`}
-              kind={kind}
-              onClose={() => setPaneRecord(undefined)}
-              onReload={start(directories[kind].load)}
-              open={pane === kind}
-            />
-          ))}
+      {DIRECTORY_KINDS.map((kind) => (
+        <DirectoryPane
+          directory={directories[kind]}
+          key={`${kind}:${connectionKey}`}
+          kind={kind}
+          onClose={() => setPaneRecord(undefined)}
+          onReload={start(directories[kind].load)}
+          open={pane === kind}
+        />
+      ))}
+      <ConnectDialog
+        connecting={connectionControl.connecting}
+        diagnostics={attempt?.diagnostics ?? []}
+        failure={attempt?.failure}
+        hasApiKey={revisions.hasApiKey}
+        initialSpace={session.domain}
+        onClose={() => setSwitchingFrom(undefined)}
+        onConnect={(domain) => connectionControl.connectTo(domain, formId)}
+        open={switching}
+      />
     </Theme>
   );
 };

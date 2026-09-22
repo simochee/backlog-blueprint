@@ -37,6 +37,22 @@ export type BacklogClient = {
 };
 
 /**
+ * `BacklogClient` に入れない。core の reconciler と Executor が使うのは JSON を返す口だけで、
+ * 画像を読むのは Web UI のアイコン（WU-35）だけである。入れると CLI の送信層の差し替えまで
+ * 使わない口を実装することになる。
+ */
+export type BacklogBinaryReader = {
+  /** 画像などの本文をバイト列のまま返す。API キーは他の取得と同じくヘッダで送る */
+  getBytes: (path: string) => Promise<ArrayBuffer>;
+};
+
+/**
+ * `Blob` を型に書かない。このパッケージは DOM の型を読まない（NFR-5）ので、backlog-js の
+ * `download()` が返す `Blob` は型として解決できない。`ArrayBuffer` は ES2022 にある。
+ */
+type BinaryResponse = { arrayBuffer: () => Promise<ArrayBuffer> };
+
+/**
  * 型付きのエンドポイント別メソッドを使わない。`request` 以外を経由すると、
  * 送られる本文がメソッドの実装に決められ、`Action.request` が「実際に飛ぶ
  * リクエスト」でなくなる（PO-3）。
@@ -48,7 +64,7 @@ export const createBacklogClient = ({
   space,
   apiKey,
   fetch,
-}: BacklogClientOptions): BacklogClient => {
+}: BacklogClientOptions): BacklogClient & BacklogBinaryReader => {
   /**
    * backlog-js は渡した関数を `this.fetch = ...` に置き、`this.fetch(url, init)` と
    * 呼ぶ（0.20.1)。ブラウザの `fetch` はレシーバが Window でないと
@@ -92,6 +108,19 @@ export const createBacklogClient = ({
      * 読むのはフェーズ0だけで、どの 404 が情報かを知っているのは core の側である。
      */
     get: (path) => call("GET", relative(path), {}),
+    getBytes: async (path) => {
+      try {
+        const response: BinaryResponse = await backlog.request({
+          method: "GET",
+          path: relative(path),
+          params: {},
+        });
+
+        return await response.arrayBuffer();
+      } catch (error) {
+        throw toHttpFailure(error);
+      }
+    },
     send: ({ method, path, params }) => call(method, relative(path), prepareParams(params)),
   };
 };

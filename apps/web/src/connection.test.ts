@@ -25,6 +25,27 @@ describe("接続の判定", () => {
     expect(connection?.user).toBe("yamada");
   });
 
+  it("アイコンはスペースのものと、利用者の数値の id で引くものを取りに行く", async () => {
+    const { connection } = await connect(
+      get({ [MYSELF]: { id: 7, userId: "yamada", roleType: 1 } }),
+    );
+
+    expect(connection?.icons).toStrictEqual({
+      space: "/api/v2/space/image",
+      user: "/api/v2/users/7/icon",
+    });
+  });
+
+  it("表示名があれば持ち、無ければ持たない", async () => {
+    const named = await connect(
+      get({ [MYSELF]: { id: 1, userId: "yamada", name: "山田 太郎", roleType: 1 } }),
+    );
+    const unnamed = await connect(get());
+
+    expect(named.connection?.userName).toBe("山田 太郎");
+    expect(unnamed.connection).not.toHaveProperty("userName");
+  });
+
   it("接続できると更新系レート制限の残量が分かる", async () => {
     const { connection } = await connect(get());
 

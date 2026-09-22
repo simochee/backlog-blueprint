@@ -293,16 +293,16 @@ GitHub Action・Docker イメージ・PR コメント機能は提供しない。
 | FR-7.1 | static hosting で動作する（サーバを持たない） |
 | FR-7.2 | Yaml を貼り付ける入力欄、スペースドメインと API キーの入力欄を持つ |
 | FR-7.3 | plan の結果を表示し、確認のうえ apply できる |
-| FR-7.4 | API キーをメモリ上のみで保持し、localStorage 等に永続化しない |
+| FR-7.4 | API キーはメモリ上と、そのタブの `sessionStorage` にだけ保持する。`localStorage` など、タブを閉じた後に残る場所には書かない（[WU-38](../design/cli-and-web-ui.md#接続画面)） |
 | FR-7.5 | 環境変数が使えないため、`${ENV}` を含む Yaml では値の入力を求める |
 | FR-7.6 | レート制限の残量は `GET /rateLimit` で取得する | 
 
 Yaml を GUI フォームから生成する機能は初期スコープ外。
-既存プロジェクトからの書き出し（export）は FR-8 として CLI に提供する。
+既存プロジェクトからの書き出し（export）は FR-8 として CLI と Web UI の両方に提供する。
 写像とシリアライズは core が持つ（[EX-1](../design/export.md#ex-1-read--tomanifest--serializemanifest-の3段にする)）ので、
-Web UI に載せても NFR-6 は保たれる。ただし Step 2 にどう置くか
-（読み込んだ結果で入力欄を上書きすることと WU-3 の関係）は未決であり、決まるまで Web UI は貼り付け実行のみとする
-（[EX-20](../design/export.md#ex-20-web-ui-への搭載は未決)）。
+Web UI に載せても NFR-6 は保たれる。Web UI では Apply とは別のページに置き、
+書き出した結果を Apply の入力欄へ送る導線は持たない
+（[EX-20](../design/export.md#ex-20-web-ui-に載せ別のページに置く)）。
 
 ### FR-8 export
 

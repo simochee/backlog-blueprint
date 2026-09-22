@@ -256,7 +256,16 @@ longer be managed with this tool.
 The same validation and planning code runs in a browser at
 **<https://simochee.github.io/backlog-blueprint/>**, for people who would rather paste YAML than
 install anything. It is a static page with no server behind it: it talks to the Backlog API directly
-from the browser, and the API key is held in memory only, never written to storage of any kind.
+from the browser. The space and API key are kept in the tab's session storage so that a reload does
+not ask for them again. They are never written anywhere that outlives the tab, and **Disconnect**
+removes them at once.
+
+You connect first, as a Space Administrator. The space and user you are connected as stay in the
+top-right corner, and that is also where you switch to another space. After that there are two
+pages. **Apply** walks through manifest, plan and apply. **Export** reads an
+existing project and gives you its manifest to copy or download, the same YAML that
+`backlog-blueprint export` prints. The exported YAML is not passed to the Apply page: change `key`
+and `name` first, then paste it there.
 
 ## JSON Schema
 

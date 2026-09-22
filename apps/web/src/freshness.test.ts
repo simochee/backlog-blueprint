@@ -3,22 +3,20 @@ import { describe, expect, it } from "vitest";
 import { connectionStamp, fresh, manifestStamp, planStamp } from "./freshness";
 
 type Inputs = {
-  space: string;
+  sessionId: number;
   manifestText: string;
-  credentials: number;
   environment: number;
 };
 
 const inputs = (overrides: Partial<Inputs> = {}): Inputs => ({
-  space: "example.backlog.com",
+  sessionId: 1,
   manifestText: "key: PROJ_A\n",
-  credentials: 1,
   environment: 1,
   ...overrides,
 });
 
 const planOf = (values: Inputs): string =>
-  planStamp(connectionStamp(values), manifestStamp(values));
+  planStamp(connectionStamp(values.sessionId), manifestStamp(values));
 
 const PLAN = "a plan";
 
@@ -43,42 +41,27 @@ describe("算出済みの計画は入力の派生状態として読む", () => {
     expect(fresh({ stamp, value: PLAN }, planOf(inputs({ environment: 2 })))).toBe(undefined);
   });
 
-  it("API キーを打ち直した時点で計画は使えない", () => {
+  it("接続を差し替えた時点で計画は使えない", () => {
     const stamp = planOf(inputs());
 
-    expect(fresh({ stamp, value: PLAN }, planOf(inputs({ credentials: 2 })))).toBe(undefined);
-  });
-
-  it("スペースを変えた時点で計画は使えない", () => {
-    const stamp = planOf(inputs());
-
-    expect(fresh({ stamp, value: PLAN }, planOf(inputs({ space: "other.backlog.com" })))).toBe(
-      undefined,
-    );
+    expect(fresh({ stamp, value: PLAN }, planOf(inputs({ sessionId: 2 })))).toBe(undefined);
   });
 });
 
-describe("接続は接続情報だけに従う", () => {
-  it("スペースを変えると接続し直しになる", () => {
-    const stamp = connectionStamp(inputs());
+describe("接続の印は確立した接続だけに従う", () => {
+  it("別の接続に差し替えると印が変わる", () => {
+    const stamp = connectionStamp(1);
 
-    expect(
-      fresh({ stamp, value: PLAN }, connectionStamp(inputs({ space: "other.backlog.com" }))),
-    ).toBe(undefined);
+    expect(fresh({ stamp, value: PLAN }, connectionStamp(2))).toBe(undefined);
   });
 
-  it("API キーを打ち直すと接続し直しになる", () => {
-    const stamp = connectionStamp(inputs());
+  it("切断した後の印は、どの接続の印とも一致しない", () => {
+    const stamp = connectionStamp(1);
 
-    expect(fresh({ stamp, value: PLAN }, connectionStamp(inputs({ credentials: 2 })))).toBe(
-      undefined,
-    );
+    expect(fresh({ stamp, value: PLAN }, connectionStamp(undefined))).toBe(undefined);
   });
 
-  it("マニフェストと環境変数の値を変えても接続は保たれる", () => {
-    const stamp = connectionStamp(inputs());
-    const edited = inputs({ manifestText: "key: PROJ_B\n", environment: 9 });
-
-    expect(fresh({ stamp, value: PLAN }, connectionStamp(edited))).toBe(PLAN);
+  it("同じ接続のままなら、マニフェストと環境変数の値を変えても印は保たれる", () => {
+    expect(fresh({ stamp: connectionStamp(1), value: PLAN }, connectionStamp(1))).toBe(PLAN);
   });
 });
