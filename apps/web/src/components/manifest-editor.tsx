@@ -22,6 +22,17 @@ const SCHEMA_VERSION = __SCHEMA_VERSION__;
 
 const LANGUAGE = "yaml";
 
+/**
+ * モデルに URI を自前で与える。Monaco に任せると `inmemory://model/1` になり、
+ * yaml-language-server の `fileMatch` がスキーマを1つも結び付けられない。
+ * そうなっても YAML 構文の検証だけはワーカーが素で行うため波線は出てしまい、
+ * 補完とホバーだけが黙って消える。
+ */
+const MODEL_URI = monaco.Uri.parse("file:///manifest.yaml");
+
+/** monaco-yaml が突き合わせるのは URI そのものではなく glob（README の用例）。 */
+const MODEL_GLOB = "**/manifest.yaml";
+
 globalThis.MonacoEnvironment = {
   getWorker: (_workerId: string, label: string) =>
     label === LANGUAGE ? new YamlWorker() : new EditorWorker(),
@@ -39,7 +50,7 @@ configureMonacoYaml(monaco, {
   validate: true,
   schemas: [
     {
-      fileMatch: ["*"],
+      fileMatch: [MODEL_GLOB],
       schema: projectSchema(SCHEMA_VERSION),
       uri: projectSchemaUrl(SCHEMA_VERSION),
     },
@@ -82,16 +93,17 @@ export const ManifestEditor = ({ id, value, onChange, onFileDropped }: ManifestE
       return;
     }
 
+    const model =
+      monaco.editor.getModel(MODEL_URI) ?? monaco.editor.createModel(value, LANGUAGE, MODEL_URI);
     const created = monaco.editor.create(host.current, {
       ariaLabel: "Manifest",
       automaticLayout: true,
       fontSize: 13,
-      language: LANGUAGE,
       minimap: { enabled: false },
+      model,
       padding: { bottom: 12, top: 12 },
       scrollBeyondLastLine: false,
       tabSize: 2,
-      value,
     });
 
     editor.current = created;
