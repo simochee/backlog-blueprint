@@ -356,10 +356,9 @@ body {
 .account-trigger {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
-  max-width: 16rem;
+  gap: var(--space-1);
   height: 40px;
-  padding: 0 var(--space-2) 0 var(--space-1);
+  padding: 0 var(--space-1);
   border: 0;
   border-radius: var(--radius-3);
   background: transparent;
@@ -401,13 +400,6 @@ body {
   box-shadow: 0 0 0 2px var(--color-background);
 }
 
-.account-names {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  line-height: 1.2;
-}
-
 .account-chevron {
   flex: none;
   color: var(--gray-10);
@@ -415,8 +407,7 @@ body {
 
 /* 狭い画面では右上に文字を並べる幅が無いので、アイコンだけにする。名前は aria-label が持つ。 */
 @media (max-width: 640px) {
-  .navbar-tool-label,
-  .account-names {
+  .navbar-tool-label {
     display: none;
   }
 }

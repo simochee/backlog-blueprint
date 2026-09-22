@@ -18,6 +18,9 @@ let respond: (path: string, space?: string) => Promise<unknown>;
 
 let deliver: (request: ResolvedHttpRequest) => Promise<unknown>;
 
+/** アイコンを取りに行った先。取った中身は描画の対象にしない（happy-dom は画像を読まない） */
+let bytesRequested: string[] = [];
+
 /**
  * Monaco は happy-dom では動かない。レイアウトの測定に実ブラウザの API を使うので、
  * 読み込んだだけで落ちる。ここで確かめたいのはステッパーの挙動なので、入力の口と
@@ -57,6 +60,11 @@ vi.mock("@backlog-blueprint/backlog-client", () => ({
   createBacklogClient: ({ space }: { space: string }) => ({
     get: (path: string) => respond(path, space),
     send: (request: ResolvedHttpRequest) => deliver(request),
+    getBytes: (path: string) => {
+      bytesRequested.push(`${space}${path}`);
+
+      return Promise.resolve(new ArrayBuffer(0));
+    },
   }),
 }));
 
@@ -210,6 +218,7 @@ beforeEach(() => {
   deliver = recordingSend(() => ({ id: 900 })).send;
   globalThis.sessionStorage.clear();
   globalThis.location.hash = "";
+  bytesRequested = [];
 });
 
 const openAccount = async (user: UserEvent): Promise<void> => {
@@ -262,6 +271,55 @@ describe("接続", () => {
     expect(screen.getByText(SPACE)).toBeInTheDocument();
     expect(screen.getByText("Space Administrator")).toBeInTheDocument();
     expect(screen.getByText("150 / 150 remaining")).toBeInTheDocument();
+  });
+
+  it("ヘッダーのアカウント表示はアイコンだけで、名前は出さない", async () => {
+    const user = await startApp();
+
+    await connect(user);
+
+    const account = await signedIn();
+
+    expect(account).not.toHaveTextContent("yamada");
+    expect(account).not.toHaveTextContent("Example Inc.");
+  });
+
+  it("アイコンは API キーを URL に載せず、接続した先から送信層で取る", async () => {
+    const user = await startApp();
+
+    await connect(user);
+    await signedIn();
+
+    await waitFor(() => {
+      expect(bytesRequested).toEqual(
+        expect.arrayContaining([`${SPACE}/api/v2/space/image`, `${SPACE}/api/v2/users/1/icon`]),
+      );
+    });
+    expect(carrying(API_KEY)).toStrictEqual([]);
+  });
+
+  it("ログイン ID は表示名のコメント付きで、access の直下に貼れる Yaml としてコピーできる", async () => {
+    const user = await startApp({
+      "/api/v2/users/myself": { id: 1, userId: "yamada", name: "山田 太郎", roleType: 1 },
+    });
+
+    await connect(user);
+    await openAccount(user);
+    await user.click(await screen.findByRole("button", { name: "Copy login ID as YAML" }));
+
+    expect(await navigator.clipboard.readText()).toBe("    - yamada # 山田 太郎\n");
+  });
+
+  it("数字だけのログイン ID は文字列として読めるよう引用してコピーする", async () => {
+    const user = await startApp({
+      "/api/v2/users/myself": { id: 1, userId: "123", roleType: 1 },
+    });
+
+    await connect(user);
+    await user.click(await screen.findByRole("button", { name: "123 at Example Inc." }));
+    await user.click(await screen.findByRole("button", { name: "Copy login ID as YAML" }));
+
+    expect(await navigator.clipboard.readText()).toBe('    - "123"\n');
   });
 
   it("ドメインを打つとそのスペースの API キーのページへの導線が出る", async () => {

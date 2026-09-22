@@ -40,6 +40,7 @@ import { PlanStep } from "./steps/plan";
 import { pinTransport, transport } from "./transport";
 import { RESTORED_FORM_ID, useConnection } from "./use-connection";
 import { useDirectory } from "./use-directory";
+import { useIcon } from "./use-icon";
 import { validatedFor } from "./validation";
 
 const APPLY_STEPS = ["Manifest", "Plan", "Apply"];
@@ -68,6 +69,10 @@ export const App = () => {
   const [exportKey, setExportKey] = useState("");
 
   const connectionKey = connectionStamp(session?.id);
+  const icons = {
+    space: useIcon(connectionKey, connection?.icons.space),
+    user: useIcon(connectionKey, connection?.icons.user),
+  };
 
   /** 失敗は、それを出したフォームにだけ見せる。開き直したフォームに前の失敗を残さない */
   const attempt =
@@ -302,6 +307,7 @@ export const App = () => {
                   <AccountMenu
                     connection={session.connection}
                     domain={session.domain}
+                    icons={icons}
                     locked={running}
                     onDisconnect={disconnect}
                     onSwitch={openSwitch}

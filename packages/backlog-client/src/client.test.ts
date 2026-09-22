@@ -9,7 +9,7 @@ const API_KEY = "api-key-must-never-be-printed";
 
 type Call = { url: string; method: string; headers: Record<string, string>; body?: string };
 
-type Reply = { status: number; statusText?: string; body?: unknown };
+type Reply = { status: number; statusText?: string; body?: unknown; bytes?: ArrayBuffer };
 
 const transport = (...replies: Reply[]) => {
   const calls: Call[] = [];
@@ -32,6 +32,7 @@ const transport = (...replies: Reply[]) => {
       status: reply.status,
       statusText: reply.statusText ?? "",
       headers: { get: () => null },
+      arrayBuffer: () => Promise.resolve(reply.bytes ?? new ArrayBuffer(0)),
       json: () =>
         reply.body === undefined
           ? Promise.reject(new SyntaxError("no body"))
@@ -239,5 +240,32 @@ describe("失敗", () => {
     expect(
       JSON.stringify({ ...failure, message: failure.message, stack: failure.stack }),
     ).not.toContain(API_KEY);
+  });
+});
+
+describe("バイト列の取得", () => {
+  it("本文を解釈せずにバイト列のまま返す", async () => {
+    /** PNG の先頭4バイト。16進で書くと oxfmt が小文字に、oxlint が大文字に直させ合う */
+    const bytes = new Uint8Array([137, 80, 78, 71]).buffer;
+    const { client } = clientWith({ status: 200, bytes });
+
+    await expect(client.getBytes("/api/v2/space/image")).resolves.toBe(bytes);
+  });
+
+  it("API キーはヘッダで送り、URL には載せない", async () => {
+    const { calls, client } = clientWith({ status: 200 });
+
+    await client.getBytes("/api/v2/users/1/icon");
+
+    expect(calls[0]?.url).toBe("https://example.backlog.com/api/v2/users/1/icon");
+    expect(calls[0]?.url).not.toContain(API_KEY);
+  });
+
+  it("失敗は JSON の取得と同じく状態コード付きで投げる", async () => {
+    const { client } = clientWith({ status: 404, body: { errors: [{ message: "No icon" }] } });
+
+    await expect(client.getBytes("/api/v2/space/image")).rejects.toBeInstanceOf(
+      BacklogHttpFailureError,
+    );
   });
 });
