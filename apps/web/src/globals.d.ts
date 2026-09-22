@@ -15,3 +15,11 @@ declare module "*?worker" {
 
   export default WorkerConstructor;
 }
+
+/**
+ * monaco-editor 0.52 の型はこの global を宣言しない（後の版で入った）。
+ * 使う面だけを写す。`var` なのは `globalThis` への代入を許すため。
+ */
+declare var MonacoEnvironment:
+  | { getWorker: (workerId: string, label: string) => Worker }
+  | undefined;

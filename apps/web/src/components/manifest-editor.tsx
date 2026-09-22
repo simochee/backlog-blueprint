@@ -3,13 +3,10 @@ import { projectSchema, projectSchemaUrl } from "@backlog-blueprint/schema";
  * `monaco-editor` をまるごと読まない。既定の入口は 80 以上の言語と、TypeScript や
  * JSON の言語サービスまで抱えている。ここで要るのは YAML の色付けだけで、検証と補完は
  * monaco-yaml（中身は yaml-language-server）が持つ。
- *
- * path が `esm/vs` から始まらないのは exports マップが `"./*": "./esm/vs/*.js"` だから。
- * よく見る `monaco-editor/esm/vs/...` は `esm/vs` が二重になって解決できない。
  */
-import * as monaco from "monaco-editor/editor/editor.api";
-import EditorWorker from "monaco-editor/editor/editor.worker?worker";
-import "monaco-editor/languages/definitions/yaml/register";
+import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
+import EditorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
+import "monaco-editor/esm/vs/basic-languages/yaml/yaml.contribution";
 import { configureMonacoYaml } from "monaco-yaml";
 import YamlWorker from "monaco-yaml/yaml.worker?worker";
 import { useEffect, useRef, type DragEvent } from "react";
