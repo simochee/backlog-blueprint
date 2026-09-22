@@ -67,7 +67,7 @@ export const ManifestStep = ({
       )}
     </Box>
     <Flex justify="end">
-      <Button disabled={!canPlan || planning} loading={planning} onClick={onPlan} size="3">
+      <Button disabled={!canPlan || planning} loading={planning} onClick={() => onPlan()} size="3">
         Plan
       </Button>
     </Flex>

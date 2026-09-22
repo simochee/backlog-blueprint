@@ -1,7 +1,15 @@
 import { type Action, type ExecutionEvent } from "@backlog-blueprint/core";
 import { describe, expect, it } from "vitest";
 
-import { foldExecutionEvent, idleProgress, type ApplyProgress } from "./progress";
+import {
+  foldExecutionEvent,
+  idleProgress,
+  isRunning,
+  rejectedProgress,
+  spentPlan,
+  type ApplyProgress,
+  type ApplyRun,
+} from "./progress";
 
 const action = (name: string): Action => ({
   id: `issueTypes/create/${name}`,
@@ -107,5 +115,63 @@ describe("実行イベントを進捗に畳み込む", () => {
       failed: { action: BUG, errors: [{ message: "Failed to fetch" }] },
       pending: [],
     });
+  });
+});
+
+const run = (progress: ApplyProgress, failure?: unknown): ApplyRun => ({
+  progress,
+  projectKey: "PROJ_A",
+  space: "example.backlog.com",
+  ...(failure === undefined ? {} : { failure }),
+});
+
+const applying = fold(
+  { type: "started", total: 2 },
+  { type: "actionStarted", index: 0, total: 2, action: BUG },
+  { type: "actionSucceeded", action: BUG, response: {}, resolved: [] },
+);
+
+const succeeded = foldExecutionEvent(applying, { type: "finished" });
+
+const abortedRun = fold(
+  { type: "started", total: 2 },
+  { type: "actionStarted", index: 0, total: 2, action: BUG },
+  { type: "actionFailed", action: BUG, status: 400, errors: [{ message: "bad request" }] },
+  { type: "aborted", applied: [], failed: BUG, pending: [TASK] },
+);
+
+describe("実行中かどうかは記録そのものから読む", () => {
+  it("結末が出るまでが実行中", () => {
+    expect(isRunning(run(idleProgress))).toBe(true);
+    expect(isRunning(run(applying))).toBe(true);
+  });
+
+  it("完了・中断・拒否のいずれも実行中ではない", () => {
+    expect(isRunning(run(succeeded))).toBe(false);
+    expect(isRunning(run(abortedRun))).toBe(false);
+    expect(isRunning(run(rejectedProgress))).toBe(false);
+  });
+
+  it("送信そのものが失敗したときも実行中ではない", () => {
+    expect(isRunning(run(applying, new TypeError("Failed to fetch")))).toBe(false);
+  });
+});
+
+describe("計画を使い切ったかどうか", () => {
+  it("完了と中断はその計画を使い切る", () => {
+    expect(spentPlan(run(succeeded))).toBe(true);
+    expect(spentPlan(run(abortedRun))).toBe(true);
+  });
+
+  it("送信そのものが失敗したときも使い切る", () => {
+    expect(spentPlan(run(applying, new TypeError("Failed to fetch")))).toBe(true);
+  });
+
+  it("断られた確認は使い切らない", () => {
+    expect(spentPlan(run(rejectedProgress))).toBe(false);
+  });
+
+  it("走っている途中の計画はまだ使い切っていない", () => {
+    expect(spentPlan(run(applying))).toBe(false);
   });
 });

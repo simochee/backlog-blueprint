@@ -1,23 +1,10 @@
-import {
-  renderApplyResult,
-  renderHttpFailure,
-  type ResolutionTable,
-} from "@backlog-blueprint/core";
+import { renderApplyResult, renderHttpFailure } from "@backlog-blueprint/core";
 import { ExternalLinkIcon } from "@radix-ui/react-icons";
 import { Callout, Card, Flex, Link, Progress, Text } from "@radix-ui/themes";
 
 import { CopyButton } from "../components/copy-button";
 import { projectUrl } from "../plan";
-import { type ApplyProgress } from "../progress";
-
-export type ApplyRun = {
-  progress: ApplyProgress;
-  running: boolean;
-  resolutions?: ResolutionTable;
-  projectKey: string;
-  space: string;
-  failure?: unknown;
-};
+import { isRunning, type ApplyProgress, type ApplyRun } from "../progress";
 
 export type ApplyStepProps = { run: ApplyRun };
 
@@ -31,7 +18,7 @@ const percent = ({ completed, total }: ApplyProgress): number =>
   total === 0 ? 0 : Math.round((completed / total) * 100);
 
 export const ApplyStep = ({ run }: ApplyStepProps) => {
-  const { progress, running, failure } = run;
+  const { progress, failure } = run;
   const text = resultText(run);
   const succeeded = progress.outcome?.result === "succeeded";
   const aborted = progress.outcome?.result === "aborted";
@@ -76,7 +63,7 @@ export const ApplyStep = ({ run }: ApplyStepProps) => {
       {failure === undefined ? null : (
         <pre className="mono">{renderHttpFailure(failure, { color: false })}</pre>
       )}
-      {running ? (
+      {isRunning(run) ? (
         <Text color="gray" size="2">
           Applying. Do not close this tab.
         </Text>

@@ -70,7 +70,7 @@ export const ConnectStep = ({
         <Button
           disabled={!canConnect || connecting}
           loading={connecting}
-          onClick={onConnect}
+          onClick={() => onConnect()}
           size="3"
         >
           Connect

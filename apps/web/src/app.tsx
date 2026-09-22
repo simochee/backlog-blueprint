@@ -1,6 +1,14 @@
 import { execute, type Diagnostic } from "@backlog-blueprint/core";
 import { Container, Flex, Heading, Text, Theme } from "@radix-ui/themes";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import {
+  startTransition,
+  useActionState,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from "react";
 
 import { useAppearance } from "./appearance";
 import { ConfirmDialog } from "./components/confirm";
@@ -18,9 +26,16 @@ import {
   type Mark,
 } from "./freshness";
 import { PASTED, preparePlan, type PlanAttempt } from "./plan";
-import { foldExecutionEvent, idleProgress, rejectedProgress } from "./progress";
+import {
+  foldExecutionEvent,
+  idleProgress,
+  isRunning,
+  rejectedProgress,
+  spentPlan,
+  type ApplyRun,
+} from "./progress";
 import { environmentValue, hasApiKey, secretRevisions, subscribeSecrets } from "./secrets";
-import { ApplyStep, type ApplyRun } from "./steps/apply";
+import { ApplyStep } from "./steps/apply";
 import { ConnectStep } from "./steps/connect";
 import { ManifestStep } from "./steps/manifest";
 import { PlanStep } from "./steps/plan";
@@ -28,8 +43,6 @@ import { openTransport, transport } from "./transport";
 import { validateInBrowser, type ManifestValidation } from "./validation";
 
 const STEPS = ["Connect", "Manifest", "Plan", "Apply"];
-
-const VALIDATION_DELAY_MS = 300;
 
 const EMPTY_VALIDATION: ManifestValidation = {
   diagnostics: [],
@@ -39,6 +52,13 @@ const EMPTY_VALIDATION: ManifestValidation = {
 
 type ConnectAttempt = { diagnostics: Diagnostic[]; failure?: unknown; connection?: Connection };
 
+/**
+ * Action を呼ぶのは `startTransition` の中から。`<form action>` に渡す形も React は
+ * 認めるが、それだと送信のたびに非制御の入力欄が空になるので、API キーの欄が繋いだ
+ * 直後に消える。空になったのか打っていないのかが画面から区別できなくなる。
+ */
+const start = (action: () => void) => () => startTransition(action);
+
 export const App = () => {
   const appearance = useAppearance();
   const revisions = useSyncExternalStore(subscribeSecrets, secretRevisions);
@@ -46,48 +66,102 @@ export const App = () => {
   const [manifestText, setManifestText] = useState("");
   const [manifestSource, setManifestSource] = useState(PASTED);
   const [showUnchanged, setShowUnchanged] = useState(false);
-  const [connectAttempt, setConnectAttempt] = useState<Derived<ConnectAttempt>>();
-  const [validated, setValidated] = useState<Derived<ManifestValidation>>();
-  const [planAttempt, setPlanAttempt] = useState<Derived<PlanAttempt>>();
-  const [connecting, setConnecting] = useState(false);
-  const [planning, setPlanning] = useState(false);
   const [confirmingPlan, setConfirmingPlan] = useState<Mark>();
-  const [appliedPlan, setAppliedPlan] = useState<Mark>();
-  const [run, setRun] = useState<ApplyRun>();
+  const [applied, setApplied] = useState<Derived<ApplyRun>>();
 
-  const inputs: Inputs = { space, manifestText, revisions };
+  /**
+   * 入力の束を描画のたびに作り直さない。`useDeferredValue` は同一性で新旧を見分けるので、
+   * 毎回別の object を渡すと後回しの描画がいつまでも追いつかない。
+   */
+  const inputs: Inputs = useMemo(
+    () => ({ space, manifestText, revisions }),
+    [space, manifestText, revisions],
+  );
   const connectionKey = connectionStamp(inputs);
   const manifestKey = manifestStamp(inputs);
   const planKey = planStamp(inputs);
 
+  /**
+   * 検証は後回しの描画として走らせる（WU-16）。打鍵のほうが優先されるので入力は詰まらず、
+   * 追い越された分は React が捨てる。結果は落ち着いた入力の派生そのものなので、
+   * 印が合わないあいだ `fresh` が古い検証結果を弾き、Plan は押せないままになる。
+   */
+  const settled = useDeferredValue(inputs);
+  const validated = useMemo<Derived<ManifestValidation>>(
+    () => ({
+      stamp: manifestStamp(settled),
+      value:
+        settled.manifestText.trim() === ""
+          ? EMPTY_VALIDATION
+          : validateInBrowser({ text: settled.manifestText, valueOf: environmentValue }),
+    }),
+    [settled],
+  );
+
+  const validation = fresh(validated, manifestKey);
+
+  const [connectAttempt, runConnect, connecting] = useActionState<
+    Derived<ConnectAttempt> | undefined
+  >(async () => {
+    const stamp = connectionKey;
+
+    openTransport(space);
+
+    try {
+      return { stamp, value: await connect(transport.get) };
+    } catch (error) {
+      return { stamp, value: { diagnostics: [], failure: error } };
+    }
+  }, undefined);
+
   const attempt = fresh(connectAttempt, connectionKey);
   const connection = attempt?.connection;
-  const validation = fresh(validated, manifestKey);
-  const plan = marked(appliedPlan, planKey) ? undefined : fresh(planAttempt, planKey);
+
+  const [planAttempt, runPlan, planning] = useActionState<Derived<PlanAttempt> | undefined>(
+    async (previous) => {
+      if (validation?.manifest === undefined || connection === undefined) {
+        return previous;
+      }
+
+      const { manifest, expandedPaths, diagnostics } = validation;
+      const stamp = planKey;
+
+      try {
+        return {
+          stamp,
+          value: await preparePlan({
+            manifest,
+            get: transport.get,
+            isSecret: (path) => expandedPaths.has(path),
+            space,
+            source: manifestSource,
+            staticDiagnostics: diagnostics,
+          }),
+        };
+      } catch (error) {
+        return { stamp, value: { diagnostics: [], failure: error } };
+      }
+    },
+    undefined,
+  );
+
+  /**
+   * 適用の記録は印が合わなくなっても消さない。残すのは「何を適用したか」であって、
+   * 「同じ計画をもう一度適用できること」ではない（WU-3 (b)）。
+   */
+  const run = applied?.value;
+  const running = run !== undefined && isRunning(run);
+  const runOfPlan = fresh(applied, planKey);
+  const plan =
+    runOfPlan !== undefined && spentPlan(runOfPlan) ? undefined : fresh(planAttempt, planKey);
   const confirming = marked(confirmingPlan, planKey);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setValidated({
-        stamp: manifestKey,
-        value:
-          manifestText.trim() === ""
-            ? EMPTY_VALIDATION
-            : validateInBrowser({ text: manifestText, valueOf: environmentValue }),
-      });
-    }, VALIDATION_DELAY_MS);
-
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [manifestKey, manifestText]);
 
   /**
    * 離脱の警告は apply の実行中だけ出す（§2.4）。常に出すと、何も適用していない
    * 段階のタブを閉じるだけで警告が出て、警告そのものが読まれなくなる。
    */
   useEffect(() => {
-    if (run?.running !== true) {
+    if (!running) {
       return undefined;
     }
 
@@ -107,100 +181,63 @@ export const App = () => {
     return () => {
       window.removeEventListener("beforeunload", warn);
     };
-  }, [run?.running]);
+  }, [running]);
 
-  const runConnect = async (): Promise<void> => {
-    const stamp = connectionKey;
+  /**
+   * apply だけは Action にしない。Action の中で置いた state は、その Action が解決するまで
+   * 画面に出ない（終わるまで中途半端な姿を見せないための仕組み）。apply は進捗を1件ずつ
+   * 出すのが仕事なので、包んだ瞬間に進捗が全部終わってからまとめて出る。
+   * `useOptimistic` で流す形も採らない。あれを await の後に呼ぶのは Action の外からの
+   * 更新になり、進捗が出たそばから消える。
+   *
+   * 保留中の真偽値を持たないこと（WU-15）は、ここでは記録そのものから読むことで満たす
+   * （WU-17）。走っているかどうかを別に持たないので、Action に任せるものが残らない。
+   */
+  const applyPlan = (): void => {
+    const prepared = plan?.prepared;
 
-    setConnecting(true);
-    openTransport(space);
+    setConfirmingPlan(undefined);
 
-    try {
-      const result = await connect(transport.get);
-
-      setConnectAttempt({ stamp, value: result });
-    } catch (error) {
-      setConnectAttempt({ stamp, value: { diagnostics: [], failure: error } });
-    } finally {
-      setConnecting(false);
-    }
-  };
-
-  const runPlan = async (manifest: NonNullable<ManifestValidation["manifest"]>): Promise<void> => {
-    if (connection === undefined || validation === undefined) {
+    if (prepared === undefined) {
       return;
     }
 
     const stamp = planKey;
-
-    setPlanning(true);
-
-    try {
-      const attempted = await preparePlan({
-        manifest,
-        get: transport.get,
-        isSecret: (path) => validation.expandedPaths.has(path),
-        space,
-        source: manifestSource,
-        staticDiagnostics: validation.diagnostics,
-      });
-
-      setPlanAttempt({ stamp, value: attempted });
-    } catch (error) {
-      setPlanAttempt({ stamp, value: { diagnostics: [], failure: error } });
-    } finally {
-      setPlanning(false);
-    }
-  };
-
-  const runApply = async (): Promise<void> => {
-    if (plan?.prepared === undefined || connection === undefined) {
-      return;
-    }
-
-    const stamp = planKey;
-    const { actions, resolutions, manifest } = plan.prepared.plan;
+    const { actions, resolutions, manifest } = prepared.plan;
     const base = { resolutions, projectKey: manifest.key, space };
 
-    let progress = idleProgress;
+    const apply = async (): Promise<void> => {
+      let progress = idleProgress;
 
-    setRun({ ...base, progress, running: true });
+      setApplied({ stamp, value: { ...base, progress } });
 
-    try {
-      for await (const event of execute(actions, {
-        projectKey: manifest.key,
-        resolutions,
-        get: transport.get,
-        send: transport.send,
-      })) {
-        progress = foldExecutionEvent(progress, event);
-        setRun({ ...base, progress, running: true });
+      try {
+        for await (const event of execute(actions, {
+          projectKey: manifest.key,
+          resolutions,
+          get: transport.get,
+          send: transport.send,
+        })) {
+          progress = foldExecutionEvent(progress, event);
+          setApplied({ stamp, value: { ...base, progress } });
+        }
+      } catch (error) {
+        setApplied({ stamp, value: { ...base, progress, failure: error } });
       }
+    };
 
-      setRun({ ...base, progress, running: false });
-    } catch (error) {
-      setRun({ ...base, progress, running: false, failure: error });
-    } finally {
-      /**
-       * 完了も中断も同じ1箇所で印を置く（WU-3 (b)）。終わり方ごとに書くと、
-       * 終わり方が1つ増えたときに書き忘れた経路だけ同じ計画を2度適用できる。
-       */
-      setAppliedPlan(stamp);
-    }
-  };
-
-  const applyPlan = (): void => {
-    setConfirmingPlan(undefined);
-    void runApply();
+    void apply();
   };
 
   const cancelApply = (): void => {
     setConfirmingPlan(undefined);
-    setRun({
-      progress: rejectedProgress,
-      running: false,
-      projectKey: plan?.prepared?.plan.manifest.key ?? "",
-      space,
+    setApplied({
+      stamp: planKey,
+      value: {
+        progress: rejectedProgress,
+        projectKey: plan?.prepared?.plan.manifest.key ?? "",
+        space,
+      },
     });
   };
 
@@ -227,7 +264,7 @@ export const App = () => {
               connecting={connecting}
               diagnostics={attempt?.diagnostics ?? []}
               failure={attempt?.failure}
-              onConnect={() => void runConnect()}
+              onConnect={start(runConnect)}
               onSpaceChange={setSpace}
               connection={attempt?.connection}
               space={space}
@@ -241,16 +278,12 @@ export const App = () => {
           >
             <ManifestStep
               canPlan={validation?.manifest !== undefined}
-              names={validated?.value.names ?? []}
+              names={validated.value.names}
               onFileDropped={(name, text) => {
                 setManifestSource(name);
                 setManifestText(text);
               }}
-              onPlan={() => {
-                if (validation?.manifest !== undefined) {
-                  void runPlan(validation.manifest);
-                }
-              }}
+              onPlan={start(runPlan)}
               onTextChange={(text) => {
                 setManifestSource(PASTED);
                 setManifestText(text);
@@ -267,7 +300,7 @@ export const App = () => {
             title="Plan"
           >
             <PlanStep
-              applying={run?.running === true}
+              applying={running}
               diagnostics={plan?.diagnostics ?? []}
               failure={plan?.failure}
               onApply={() => setConfirmingPlan(planKey)}
