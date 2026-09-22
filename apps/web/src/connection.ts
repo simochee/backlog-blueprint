@@ -11,7 +11,9 @@ import {
 
 const MYSELF_PATH = "/api/v2/users/myself";
 
-export type Connection = { user: string; updateRateLimit: RateLimit };
+const SPACE_PATH = "/api/v2/space";
+
+export type Connection = { user: string; space: string; updateRateLimit: RateLimit };
 
 export type ConnectionResult = { diagnostics: Diagnostic[]; connection?: Connection };
 
@@ -39,6 +41,7 @@ export const connect = async (get: ReadContext["get"]): Promise<ConnectionResult
     diagnostics: auth.diagnostics,
     connection: {
       user: requiredString(asRecord(responses.get(MYSELF_PATH)), "userId"),
+      space: requiredString(asRecord(await get(SPACE_PATH)), "name"),
       updateRateLimit: await readUpdateRateLimit(get),
     },
   };

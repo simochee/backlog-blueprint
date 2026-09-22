@@ -3,6 +3,7 @@ import { renderHttpFailure, type Diagnostic } from "@backlog-blueprint/core";
 import { DiagnosticList } from "../components/diagnostics";
 import { type Connection } from "../connection";
 import { setApiKey } from "../secrets";
+import { apiKeyPageUrl } from "../space";
 
 export type ConnectStepProps = {
   space: string;
@@ -27,17 +28,25 @@ export const ConnectStep = ({
 }: ConnectStepProps) => (
   <div className="step-body">
     <div className="field-row">
-      <label className="field">
-        <span className="field-label">Space domain</span>
+      <div className="field">
+        <label className="field-label" htmlFor="space-domain">
+          Space domain
+        </label>
         <input
           className="input"
+          id="space-domain"
           onChange={(event) => onSpaceChange(event.target.value)}
           placeholder="example.backlog.com"
           spellCheck={false}
           type="text"
           value={space}
         />
-      </label>
+        {apiKeyPageUrl(space) === undefined ? null : (
+          <a className="field-hint" href={apiKeyPageUrl(space)} rel="noreferrer" target="_blank">
+            Get an API key on {space.trim()}
+          </a>
+        )}
+      </div>
       <label className="field">
         <span className="field-label">API key</span>
         <input
@@ -60,7 +69,9 @@ export const ConnectStep = ({
     </div>
     {connection === undefined ? null : (
       <div className="connected">
-        <p className="connected-user">Signed in as {connection.user} (Space Administrator)</p>
+        <p className="connected-user">
+          Signed in as {connection.user} at {connection.space} (Space Administrator)
+        </p>
         <p className="connected-rate">
           Update rate limit: {connection.updateRateLimit.remaining} /{" "}
           {connection.updateRateLimit.limit} remaining

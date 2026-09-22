@@ -100,6 +100,7 @@ export const fixedSpaceResponses = (
   overrides: Record<string, unknown> = {},
 ): Record<string, unknown> => ({
   "/api/v2/users/myself": { id: 1, userId: "yamada", roleType: 1 },
+  "/api/v2/space": { spaceKey: "example", name: "Example Inc." },
   "/api/v2/rateLimit": { rateLimit: { update: { limit: 150, remaining: 150, reset: 0 } } },
   "/api/v2/projects/PROJ_A": { id: 100, name: "プロジェクトA" },
   "/api/v2/issues/count?projectId[]=100": { count: 0 },

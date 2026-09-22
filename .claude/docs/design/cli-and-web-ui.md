@@ -162,6 +162,8 @@ CI で `--auto-approve` を付け忘れたとき、マニフェストの内容�
 | WU-1 | ルーティングを持たない単一ページ | 状態はメモリ上にしか無い（FR-7.4）ので、リロードすると全て消える。URL に状態を持たせる意味が無い。GitHub Pages の SPA フォールバック設定も不要になる |
 | WU-2 | Vite の `base` を `/backlog-blueprint/` にする | GitHub Pages のサブパス配信（要件定義 §7.1） |
 | WU-4 | UI は React で組む | WU-3（入力が変わったら計画を破棄する）を、書き忘れない行儀ではなく**入力の派生状態**として構造で守れる。素の DOM 操作だと、入力のハンドラごとに破棄を書く必要があり、1つ漏れると「見た計画と違うものが適用される」が起きる |
+| WU-7 | 接続できたら、利用者名と並べて**スペース名**（`GET /api/v2/space` の `name`）を出す | ドメインは打った本人にしか読めない識別子で、打ち間違えても形は正しいままになる。スペース名を返すと「意図した先に繋がったか」を人が確かめられる。core-reconciler §297 が `GET /api/v2/space` を採らなかったのは既定名の言語判定の話で、ここは目的が違う |
+| WU-8 | スペースドメインがホスト名として成立したら、`https://<domain>/EditApiSettings.action` へのリンクを入力欄の下に出す | API キーは Backlog の個人設定の中にあり、初めて使う人はまずそれを探しに行く。スペースごとに URL が違うので、打ったドメインからしか作れない。打ちかけの値では出さない（踏んでも届かないため） |
 
 `apps/web` は `packages/core` ではないので、NFR-5（プラットフォーム固有 API を使わない）の
 対象外である。`document` も `localStorage` も使える。**使えないのは core の側**で、
@@ -170,9 +172,11 @@ CI で `--auto-approve` を付け忘れたとき、マニフェストの内容�
 ```
 ┌ 1 Connect ─────────────────────────────────────┐
 │ Space domain  [ example.backlog.com          ] │
+│   Get an API key on example.backlog.com        │
 │ API key       [ ••••••••••••••••             ] │
 │                                    [ Connect ] │
-│ ✓ Signed in as yamada (Space Administrator)    │
+│ ✓ Signed in as yamada at Example Inc.          │
+│   (Space Administrator)                        │
 │   Update rate limit: 148 / 150 remaining       │
 └────────────────────────────────────────────────┘
 ┌ 2 Manifest ────────────────────────────────────┐
@@ -204,9 +208,10 @@ CI で `--auto-approve` を付け忘れたとき、マニフェストの内容�
 
 #### Step 1 Connect
 
-- スペースドメインと API キーを受け取り、`GET /users/myself` と `GET /rateLimit` を叩く
+- スペースドメインと API キーを受け取り、`GET /users/myself`・`GET /space`・`GET /rateLimit` を叩く
 - **V-B1（キーが有効）と V-B2（スペース管理者）をここで判定する。** 管理者でなければ先へ進ませない
-- 接続中のユーザー名と、更新系レート制限の残量を表示する（FR-7.6）
+- 接続中のユーザー名・スペース名（WU-7）と、更新系レート制限の残量を表示する（FR-7.6）
+- ドメインを打った時点で API キーのページへの導線を出す（WU-8）
 - 入力欄は `type="password"` / `autocomplete="off"`
 
 権限の確認を最初に置くのは、マニフェストを書き終えてから「権限がありません」と言われる

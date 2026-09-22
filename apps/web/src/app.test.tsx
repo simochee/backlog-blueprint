@@ -117,6 +117,27 @@ beforeEach(() => {
 });
 
 describe("接続", () => {
+  it("繋いだ先のスペース名を利用者名と並べて出す", async () => {
+    const user = await startApp();
+
+    await connect(user);
+
+    expect(await screen.findByText(/Signed in as yamada at Example Inc\./)).toBeInTheDocument();
+  });
+
+  it("ドメインを打つとそのスペースの API キーのページへの導線が出る", async () => {
+    const user = await startApp();
+
+    expect(screen.queryByRole("link")).toBeNull();
+
+    await user.type(screen.getByLabelText("Space domain"), SPACE);
+
+    expect(screen.getByRole("link", { name: /Get an API key/ })).toHaveAttribute(
+      "href",
+      `https://${SPACE}/EditApiSettings.action`,
+    );
+  });
+
   it("スペース管理者でなければマニフェストを書く段には進めない", async () => {
     const user = await startApp({
       "/api/v2/users/myself": { id: 2, userId: "suzuki", roleType: 2 },
