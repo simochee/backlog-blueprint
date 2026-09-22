@@ -6,8 +6,8 @@ import { EnvironmentDialog } from "../components/environment-dialog";
 import { type ManifestValidation } from "../validation";
 
 /**
- * Monaco は束ねると本体の数倍になる。この段はスペースに繋がるまで現れないので、
- * 最初の読み込みに載せない。接続前の画面が Monaco を待つ理由が無い。
+ * エディタとスキーマ一式は、この段がスペースに繋がるまで現れないので最初の読み込みに
+ * 載せない。接続前の画面がエディタを待つ理由が無い。
  */
 const ManifestEditor = lazy(async () => {
   const loaded = await import("../components/manifest-editor");

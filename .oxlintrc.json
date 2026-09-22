@@ -103,8 +103,7 @@
     {
       "files": ["**/*.d.ts"],
       "rules": {
-        "typescript/consistent-type-definitions": "off",
-        "no-var": "off"
+        "typescript/consistent-type-definitions": "off"
       }
     },
     {
@@ -114,20 +113,9 @@
       }
     },
     {
-      "files": [
-        "apps/web/src/test-setup.ts",
-        "apps/web/src/main.tsx",
-        "apps/web/src/components/manifest-editor.tsx",
-        "apps/web/src/components/yaml.worker.ts"
-      ],
+      "files": ["apps/web/src/test-setup.ts", "apps/web/src/main.tsx"],
       "rules": {
         "import/no-unassigned-import": "off"
-      }
-    },
-    {
-      "files": ["apps/web/src/components/manifest-editor.tsx"],
-      "rules": {
-        "import/default": "off"
       }
     },
     {

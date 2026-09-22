@@ -152,12 +152,26 @@ body {
 }
 
 /**
- * 高さを親から決める。Monaco は自分の高さを持たないので、指定しないと 0 で
- * 描画され、エディタがあるのに何も見えない状態になる。
+ * 高さは器が決める。CodeMirror は中身の行数だけ伸びるので、指定しないと
+ * マニフェストの長さで画面が跳ね、下のボタンの位置が入力のたびに変わる。
  */
 .manifest-editor {
   height: 28rem;
   border: 1px solid var(--gray-a6);
   border-radius: var(--radius-3);
   overflow: hidden;
+}
+
+.manifest-editor .cm-editor {
+  height: 100%;
+  font-size: var(--font-size-1);
+}
+
+.manifest-editor .cm-editor.cm-focused {
+  outline: 2px solid var(--accent-8);
+  outline-offset: -2px;
+}
+
+.manifest-editor .cm-scroller {
+  overflow: auto;
 }
