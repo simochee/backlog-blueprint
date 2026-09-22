@@ -1,10 +1,15 @@
 import { projectSchema, projectSchemaUrl } from "@backlog-blueprint/schema";
 /**
- * `monaco-editor` をまるごと読まない。既定の入口は 80 以上の言語と、TypeScript や
- * JSON の言語サービスまで抱えている。ここで要るのは YAML の色付けだけで、検証と補完は
- * monaco-yaml（中身は yaml-language-server）が持つ。
+ * `monaco-editor` の既定の入口（`editor.main`）は 80 以上の言語と、TypeScript や JSON の
+ * 言語サービスまで抱えている。要るのは YAML だけなので、部品を選んで読む。
+ *
+ * `editor.all` を落とさない。`editor.api` は API だけで、補完もホバーも
+ * 「寄与」として `editor.all` の側にいる。これが無いと検証の波線だけが出て、
+ * 候補も説明も一切出ないエディタになる（波線はコアがマーカーを描くので出てしまい、
+ * 壊れていることに気づきにくい）。
  */
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
+import "monaco-editor/esm/vs/editor/editor.all";
 import EditorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
 import "monaco-editor/esm/vs/basic-languages/yaml/yaml.contribution";
 import { configureMonacoYaml } from "monaco-yaml";
