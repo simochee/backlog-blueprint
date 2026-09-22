@@ -117,7 +117,8 @@
       "files": [
         "apps/web/src/test-setup.ts",
         "apps/web/src/main.tsx",
-        "apps/web/src/components/manifest-editor.tsx"
+        "apps/web/src/components/manifest-editor.tsx",
+        "apps/web/src/components/yaml.worker.ts"
       ],
       "rules": {
         "import/no-unassigned-import": "off"

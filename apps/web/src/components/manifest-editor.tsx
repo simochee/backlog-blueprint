@@ -13,7 +13,7 @@ import "monaco-editor/esm/vs/editor/editor.all";
 import EditorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
 import "monaco-editor/esm/vs/basic-languages/yaml/yaml.contribution";
 import { configureMonacoYaml } from "monaco-yaml";
-import YamlWorker from "monaco-yaml/yaml.worker?worker";
+import YamlWorker from "./yaml.worker?worker";
 import { useEffect, useRef, type DragEvent } from "react";
 
 import { useAppearance } from "../appearance";
@@ -39,13 +39,17 @@ globalThis.MonacoEnvironment = {
 };
 
 /**
- * スキーマを URL から取りに行かせない（`enableSchemaRequest` は既定の false のまま）。
- * 走っているコードと同じ定義をその場で渡すほうが、版がずれない。マニフェストの
- * `# yaml-language-server: $schema=` が指す URL でそのまま登録するので、
- * その行を書いたファイルも通信なしで解決する。
+ * 走っているコードと同じ定義をその場で渡す。登録した URI はマニフェストの
+ * `# yaml-language-server: $schema=` が指す URL と同じなので、その行を書いたファイルも
+ * 通信なしで解決する。
+ *
+ * それでも `enableSchemaRequest` は開ける。利用者が古い版の URL を指して書いた
+ * マニフェストは、その版のスキーマで見るのが正しい。取りに行くのは登録に無い URI の
+ * ときだけで、配布元は同じオリジンである。
  */
 configureMonacoYaml(monaco, {
   completion: true,
+  enableSchemaRequest: true,
   hover: true,
   validate: true,
   schemas: [
