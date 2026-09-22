@@ -1,4 +1,6 @@
 import { type Diagnostic } from "../diagnostic";
+import { PROJECT_KEY_PATTERN } from "../manifest";
+import { PROJECT_KEY_HINT } from "../validation/schema-stage";
 import { type Value } from "../value";
 
 /**
@@ -15,6 +17,19 @@ const snapshotError = (id: string, path: string, message: string, hint: string):
 });
 
 const shown = (value: Value): string => JSON.stringify(value);
+
+/**
+ * ここだけ `snapshotError` を使わず、EX-9* に並ぶ ID も振らない。S3 の `key` と同じ規則を
+ * 同じ hint で指摘するものなので、V-A3 と `"schema"` をそのまま借りる（EX-3）。
+ */
+export const invalidProjectKey = (key: string): Diagnostic => ({
+  id: "V-A3",
+  severity: "error",
+  stage: "schema",
+  path: "key",
+  message: `${JSON.stringify(key)} does not match ${PROJECT_KEY_PATTERN}`,
+  hint: PROJECT_KEY_HINT,
+});
 
 export const projectDoesNotExist = (projectKey: string): Diagnostic =>
   snapshotError(

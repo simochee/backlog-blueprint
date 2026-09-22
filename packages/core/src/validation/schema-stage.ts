@@ -11,6 +11,9 @@ export type SchemaStageOptions = {
 
 const validateManifest = new Ajv2020({ allErrors: true, strict: true }).compile(ManifestSchema);
 
+export const PROJECT_KEY_HINT =
+  "write the project key with uppercase letters, digits and underscores only";
+
 const CUSTOM_FIELD_CONDITIONS = "#/properties/customFields/items/allOf/";
 
 const UNION_BRANCH = /\/(?:anyOf|oneOf)\/\d+\//;
@@ -273,10 +276,7 @@ const asCustomFieldWording = (error: ErrorObject, data: unknown): Wording => {
 const wordingFor = (id: string, error: ErrorObject, data: unknown): Wording => {
   switch (id) {
     case "V-A3": {
-      return {
-        ...byKeyword(error, data),
-        hint: "write the project key with uppercase letters, digits and underscores only",
-      };
+      return { ...byKeyword(error, data), hint: PROJECT_KEY_HINT };
     }
     case "V-A8": {
       return {

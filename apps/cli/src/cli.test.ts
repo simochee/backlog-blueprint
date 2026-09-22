@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { type BacklogClient } from "@backlog-blueprint/backlog-client";
-import { type Action, type Diagnostic } from "@backlog-blueprint/core";
+import { type Action, type CreateExportResult, type Diagnostic } from "@backlog-blueprint/core";
 
 import { type Deps } from "./commands";
 import { type Io } from "./io";
@@ -81,8 +81,8 @@ const aWarning = (): Diagnostic => ({
 });
 
 const fakeOutput: Output = {
-  diagnostics: (diagnostics, { color, nothingApplied }) =>
-    `diagnostics(color=${color},nothingApplied=${nothingApplied === true}) ${diagnostics.map(({ id, severity }) => `${id}:${severity}`).join(",")}\n`,
+  diagnostics: (diagnostics, { color, nothingApplied, nothingWritten }) =>
+    `diagnostics(color=${color},nothingApplied=${nothingApplied === true},nothingWritten=${nothingWritten === true}) ${diagnostics.map(({ id, severity }) => `${id}:${severity}`).join(",")}\n`,
   failure: (error) => `failure:${JSON.stringify(error)}\n`,
   validateJson: ({ diagnostics }) => `${JSON.stringify({ diagnostics: diagnostics.length })}\n`,
   plan: (_input, { color, showUnchanged }) =>
@@ -91,6 +91,7 @@ const fakeOutput: Output = {
   progress: (event) => `progress:${event.type}\n`,
   applyResult: ({ outcome }) => `apply-result:${outcome.result}\n`,
   applyJson: ({ outcome }) => `${JSON.stringify({ result: outcome.result })}\n`,
+  exportNotes: ({ projectKey }, { color }) => `export-notes(color=${color}) ${projectKey}\n`,
 };
 
 const fakePlan = (overrides: Partial<PlanResult> = {}): PlanResult => ({
@@ -108,6 +109,9 @@ const fakePlan = (overrides: Partial<PlanResult> = {}): PlanResult => ({
   ...overrides,
 });
 
+const notExported = (): Promise<CreateExportResult> =>
+  Promise.reject(new Error("createExport was not expected to be called"));
+
 const deps = (
   io: FakeIo,
   overrides: Partial<Omit<Deps, "io">> & { plan?: PlanResult; respond?: () => unknown } = {},
@@ -121,6 +125,7 @@ const deps = (
 
       return Promise.resolve({ diagnostics: plan.diagnostics, plan });
     }),
+  createExport: overrides.createExport ?? notExported,
   createClient:
     overrides.createClient ??
     ((): BacklogClient => ({

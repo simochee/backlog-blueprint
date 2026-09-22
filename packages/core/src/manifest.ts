@@ -22,6 +22,8 @@ const StrictObject = <Properties extends TProperties>(
 
 export const DATE_PATTERN = String.raw`^\d{4}-\d{2}-\d{2}$`;
 
+export const PROJECT_KEY_PATTERN = String.raw`^[A-Z0-9_]+$`;
+
 export const ISSUE_TYPE_COLORS = [
   "#e30000",
   "#990000",
@@ -534,7 +536,7 @@ export const ManifestSchema = StrictObject({
     }),
   ),
   key: Type.String({
-    pattern: "^[A-Z0-9_]+$",
+    pattern: PROJECT_KEY_PATTERN,
     description:
       "The project key: capital letters, digits and underscores. It identifies the project, so changing it points this file at a different project rather than renaming this one.",
   }),

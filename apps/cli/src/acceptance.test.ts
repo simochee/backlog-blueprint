@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createBacklogClient } from "@backlog-blueprint/backlog-client";
-import { NO_CHANGES } from "@backlog-blueprint/core";
+import { createExport, NO_CHANGES } from "@backlog-blueprint/core";
 import {
   mockBacklog,
   withoutWritePacing,
@@ -155,6 +155,7 @@ const cliOn = (
     io,
     output: createOutput(),
     buildPlan,
+    createExport,
     createClient: ({ space: domain, apiKey }) =>
       createBacklogClient({ space: domain, apiKey, fetch: backlog.fetch as never }),
   };

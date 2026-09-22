@@ -1,5 +1,5 @@
 import { type Diagnostic } from "../diagnostic";
-import { type ManifestInput } from "../manifest";
+import { type ManifestInput, PROJECT_KEY_PATTERN } from "../manifest";
 import {
   readIssueCount,
   readProjectId,
@@ -10,7 +10,7 @@ import { type ReadContext } from "../reconciler";
 import { type Snapshot } from "../snapshot";
 import { authenticateExecutor } from "../validation/auth-stage";
 import { blocksNextStage } from "../validation/gate";
-import { projectDoesNotExist } from "./diagnostics";
+import { invalidProjectKey, projectDoesNotExist } from "./diagnostics";
 import { serializeManifest } from "./serialize";
 import { toManifest, type WebhookVariable } from "./to-manifest";
 
@@ -40,12 +40,23 @@ export type ProjectExport = {
  */
 export type CreateExportResult = { diagnostics: Diagnostic[]; exported?: ProjectExport };
 
+const isProjectKey = (value: string): boolean => new RegExp(PROJECT_KEY_PATTERN).test(value);
+
 /** GET は X-2 のとおり間隔を空けない。 */
 export const createExport = async ({
   projectKey,
   get,
   version,
 }: CreateExportOptions): Promise<CreateExportResult> => {
+  /**
+   * 呼び出し側ではなくここで判定する（EX-3 / CL-7）。`projectKey` は下の `read*` が
+   * URL のパスに埋める値で、GET を出すこの層の外へ移すと呼び出し側ごとに同じ検査が
+   * 要る（NFR-6）。
+   */
+  if (!isProjectKey(projectKey)) {
+    return { diagnostics: [invalidProjectKey(projectKey)] };
+  }
+
   const auth = await authenticateExecutor(get);
 
   if (auth.executor === undefined || blocksNextStage(auth.diagnostics)) {

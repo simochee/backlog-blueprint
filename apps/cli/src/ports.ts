@@ -1,8 +1,11 @@
 import {
   type Action,
   type ApplyOutcome,
+  type CreateExportOptions,
+  type CreateExportResult,
   type Diagnostic,
   type ExecutionEvent,
+  type ExportNotesInput,
   type Manifest,
   type PlanContext,
   type ReadContext,
@@ -24,7 +27,11 @@ export type RenderOptions = { color: boolean };
  * `Nothing has been applied.` を添えるのは `apply` だけ（要件定義 §5.3）。
  * `validate` と `plan` はもともと何も適用しない。
  */
-export type DiagnosticsOptions = RenderOptions & { nothingApplied?: boolean };
+export type DiagnosticsOptions = RenderOptions & {
+  nothingApplied?: boolean;
+  /** `export` のみ（CL-9）。集計行の名詞も export のものになる */
+  nothingWritten?: boolean;
+};
 
 /**
  * S5〜S7 を走らせて計画を組み立てた結果。`resolutions` を持つのは、apply が
@@ -52,6 +59,8 @@ export type BuildPlan = (input: {
   isSecret: PlanContext["isSecret"];
 }) => Promise<PlanOutcome>;
 
+export type CreateExport = (input: CreateExportOptions) => Promise<CreateExportResult>;
+
 /**
  * 描画は文字列を返すだけにする（C-4 / NFR-6）。ストリームもロガーも渡さない。
  * どこへ書くかは §1.3 が決める CLI の関心事で、描画側が書き出すと
@@ -72,4 +81,5 @@ export type Output = {
     options: RenderOptions,
   ) => string;
   applyJson: (input: { context: OutputContext; plan: PlanResult; outcome: ApplyOutcome }) => string;
+  exportNotes: (input: ExportNotesInput, options: RenderOptions) => string;
 };

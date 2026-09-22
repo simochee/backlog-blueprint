@@ -21,6 +21,19 @@ const exportProject = async (responses: Record<string, unknown> = {}) => {
 };
 
 describe("プロジェクトの書き出し", () => {
+  it("大文字・数字・アンダースコア以外を含むキーは V-A3 で止まり、Backlog を1回も読まない", async () => {
+    const { get, requested } = recordingGet(fixedSpaceResponses({}));
+    const { diagnostics, exported } = await createExport({
+      projectKey: "proj_a",
+      get,
+      version: VERSION,
+    });
+
+    expect(diagnostics.map(({ id }) => id)).toEqual(["V-A3"]);
+    expect(exported).toBeUndefined();
+    expect(requested).toEqual([]);
+  });
+
   it("スペース管理者でなければスナップショットの取得を始めない", async () => {
     const { ids, exported, requested } = await exportProject({
       "/api/v2/users/myself": { id: 2, userId: "sato", roleType: 2 },

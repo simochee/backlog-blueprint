@@ -4,6 +4,7 @@ import {
   renderApplyJson,
   renderApplyResult,
   renderDiagnostics,
+  renderExportNotes,
   renderHttpFailure,
   renderPlanJson,
   renderPlanText,
@@ -43,8 +44,10 @@ export const createOutput = (): Output => {
   let started: Started | undefined;
 
   return {
-    diagnostics: (diagnostics, { color, nothingApplied }) =>
-      block(renderDiagnostics(diagnostics, { paint: painter(color), nothingApplied })),
+    diagnostics: (diagnostics, { color, nothingApplied, nothingWritten }) =>
+      block(
+        renderDiagnostics(diagnostics, { paint: painter(color), nothingApplied, nothingWritten }),
+      ),
 
     failure: (error, { color }) => block(renderHttpFailure(error, { color })),
 
@@ -77,5 +80,16 @@ export const createOutput = (): Output => {
 
     applyJson: ({ context, plan, outcome }) =>
       renderApplyJson(report(context, plan), outcome, { resolutions: plan.resolutions }),
+
+    /**
+     * 空文字列は `block` に通さない。案内が無いことは呼び出し側が
+     * 「stderr に何も書かない」判断に使う（CL-8）ので、空を `"\n"` に変えてしまうと
+     * その判定が壊れる。
+     */
+    exportNotes: (input, { color }) => {
+      const notes = renderExportNotes(input, { paint: painter(color) });
+
+      return notes === "" ? notes : block(notes);
+    },
   };
 };

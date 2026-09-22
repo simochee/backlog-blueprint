@@ -2,11 +2,14 @@ import { Command, InvalidArgumentError, Option } from "commander";
 
 import {
   runApply,
+  runExport,
   runPlan,
   runValidate,
   type ApplyOptions,
   type CommonOptions,
+  type ConnectionOptions,
   type Deps,
+  type ExportOptions,
   type PlanOptions,
 } from "./commands";
 import { API_KEY_VARIABLE, SPACE_VARIABLE } from "./credentials";
@@ -38,18 +41,29 @@ const onlyOnce = () => {
   };
 };
 
-const withCommonOptions = (command: Command): Command =>
+/**
+ * 3分割する（CL-7）。`export` は位置引数1つを主語に取り、`-f` / `--output` という
+ * 修飾子を持たないので、全コマンド共通の接続オプションだけ別に切り出す。
+ */
+const withConnectionOptions = (command: Command): Command =>
   command
-    .requiredOption(
-      "-f, --file <path>",
-      `Manifest path, or "${STDIN_PATH}" to read standard input`,
-      onlyOnce(),
-    )
     .option("--space <domain>", `Backlog space domain (falls back to ${SPACE_VARIABLE})`)
-    .addOption(
-      new Option("--output <format>", "Output format").choices(["text", "json"]).default("text"),
-    )
     .option("--no-color", "Disable colored output");
+
+const withManifestOption = (command: Command): Command =>
+  command.requiredOption(
+    "-f, --file <path>",
+    `Manifest path, or "${STDIN_PATH}" to read standard input`,
+    onlyOnce(),
+  );
+
+const withOutputOption = (command: Command): Command =>
+  command.addOption(
+    new Option("--output <format>", "Output format").choices(["text", "json"]).default("text"),
+  );
+
+const withCommonOptions = (command: Command): Command =>
+  withOutputOption(withManifestOption(withConnectionOptions(command)));
 
 /**
  * 色は `--no-color` と `NO_COLOR` のどちらでも落ちる。`NO_COLOR` は空でない値が
@@ -61,17 +75,26 @@ const colorAllowed = (options: RawOptions, io: Io): boolean => {
   return options["color"] !== false && (noColor === undefined || noColor === "");
 };
 
-const commonOptions = (options: RawOptions, io: Io): CommonOptions => {
+const connectionOptions = (options: RawOptions, io: Io): ConnectionOptions => {
   const { space } = options;
   const allowed = colorAllowed(options, io);
 
   return {
-    file: options["file"] as string,
     ...(typeof space === "string" ? { space } : {}),
-    output: options["output"] as CommonOptions["output"],
     color: { stdout: allowed && io.isStdoutTty, stderr: allowed && io.isStderrTty },
   };
 };
+
+const commonOptions = (options: RawOptions, io: Io): CommonOptions => ({
+  ...connectionOptions(options, io),
+  file: options["file"] as string,
+  output: options["output"] as CommonOptions["output"],
+});
+
+const exportOptions = (key: string, options: RawOptions, io: Io): ExportOptions => ({
+  ...connectionOptions(options, io),
+  key,
+});
 
 const planOptions = (options: RawOptions, io: Io): PlanOptions => ({
   ...commonOptions(options, io),
@@ -87,7 +110,7 @@ const applyOptions = (options: RawOptions, io: Io): ApplyOptions => ({
  * コマンドの外に例外を出さない。commander の `parseAsync` まで抜けた例外は
  * commander のものと区別が付かず、握りつぶすと原因を出さないまま 1 で終わる。
  */
-const runCommand = async <T extends CommonOptions>(
+const runCommand = async <T extends ConnectionOptions>(
   options: T,
   deps: Deps,
   run: (options: T, deps: Deps) => Promise<number>,
@@ -143,6 +166,15 @@ export const runCli = async (argv: string[], deps: Deps): Promise<number> => {
     .action(async (options: RawOptions) => {
       code = await runCommand(applyOptions(options, deps.io), deps, runApply);
     });
+
+  withConnectionOptions(
+    program
+      .command("export")
+      .description("Write an existing project out as a manifest (read-only)")
+      .argument("<key>", "The project key to export"),
+  ).action(async (key: string, options: RawOptions) => {
+    code = await runCommand(exportOptions(key, options, deps.io), deps, runExport);
+  });
 
   try {
     await program.parseAsync(argv, { from: "user" });

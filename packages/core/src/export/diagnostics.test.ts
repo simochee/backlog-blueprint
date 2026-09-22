@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   duplicateName,
+  invalidProjectKey,
   listWithoutItems,
   nameHoldsBrace,
   nonBooleanSetting,
@@ -67,6 +68,17 @@ describe("書き出しの診断", () => {
     expect(unknownColor("issueTypes/1/color", "issue type", "バグ", "#123456").message).toBe(
       'the issue type "バグ" has the color "#123456", which is not one of the ten colors this tool accepts',
     );
+  });
+
+  it("引数に渡されたプロジェクトキーの不備は、マニフェストの key と同じ V-A3 になる", () => {
+    expect(invalidProjectKey("proj_a")).toEqual({
+      id: "V-A3",
+      severity: "error",
+      stage: "schema",
+      path: "key",
+      message: '"proj_a" does not match ^[A-Z0-9_]+$',
+      hint: "write the project key with uppercase letters, digits and underscores only",
+    });
   });
 
   it("書き出されるはずだった位置を指す", () => {
