@@ -324,6 +324,25 @@ describe("確認ダイアログ", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
+  /**
+   * 背面は操作できる（confirm.tsx）ので、確認を開いたまま Plan を押し直せる。入力は
+   * 変わっていないので印も変わらないが、読み直した先の状態は変わりうる。
+   */
+  it("入力を変えずに計画を取り直しても閉じる", async () => {
+    const user = await startApp();
+
+    await reach(user);
+    await user.click(button("Apply"));
+
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+
+    await user.click(button("Plan"));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).toBeNull();
+    });
+  });
+
   it("計画をやり直しても自動では開き直さない", async () => {
     const user = await startApp();
 

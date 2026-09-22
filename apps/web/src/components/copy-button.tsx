@@ -1,5 +1,5 @@
 import { Button } from "@radix-ui/themes";
-import { startTransition, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 export type CopyButtonProps = { label: string; text: () => string };
 
@@ -26,18 +26,13 @@ export const CopyButton = ({ label, text }: CopyButtonProps) => {
     };
   }, [copied]);
 
-  const copy = (): void => {
-    startTransition(async () => {
-      await navigator.clipboard.writeText(text());
-
-      startTransition(() => {
-        setCopied(true);
-      });
-    });
+  const copy = async (): Promise<void> => {
+    await navigator.clipboard.writeText(text());
+    setCopied(true);
   };
 
   return (
-    <Button color="gray" onClick={copy} size="3" type="button" variant="soft">
+    <Button color="gray" onClick={() => void copy()} size="3" type="button" variant="soft">
       {copied ? "Copied" : label}
     </Button>
   );

@@ -19,13 +19,11 @@ import {
   connectionStamp,
   fresh,
   manifestStamp,
-  marked,
   planStamp,
   type Derived,
   type ManifestInputs,
-  type Mark,
 } from "./freshness";
-import { PASTED, preparePlan, type PlanAttempt } from "./plan";
+import { PASTED, preparePlan, type PlanAttempt, type PreparedPlan } from "./plan";
 import {
   foldExecutionEvent,
   idleProgress,
@@ -52,11 +50,7 @@ const EMPTY_VALIDATION: ManifestValidation = {
 
 type ConnectAttempt = { diagnostics: Diagnostic[]; failure?: unknown; connection?: Connection };
 
-/**
- * Action を呼ぶのは `startTransition` の中から。`<form action>` に渡す形も React は
- * 認めるが、それだと送信のたびに非制御の入力欄が空になるので、API キーの欄が繋いだ
- * 直後に消える。空になったのか打っていないのかが画面から区別できなくなる。
- */
+/** WU-15。Action の dispatch は transition の中から呼ぶ。 */
 const start = (action: () => void) => () => startTransition(action);
 
 export const App = () => {
@@ -66,8 +60,8 @@ export const App = () => {
   const [manifestText, setManifestText] = useState("");
   const [manifestSource, setManifestSource] = useState(PASTED);
   const [showUnchanged, setShowUnchanged] = useState(false);
-  const [confirmingPlan, setConfirmingPlan] = useState<Mark>();
-  const [applied, setApplied] = useState<Derived<ApplyRun>>();
+  const [confirmingPlan, setConfirmingPlan] = useState<PreparedPlan>();
+  const [applyRecord, setApplyRecord] = useState<Derived<ApplyRun>>();
 
   const connectionKey = connectionStamp({ space, credentials: revisions.credentials });
 
@@ -82,11 +76,7 @@ export const App = () => {
   const manifestKey = manifestStamp(manifestInputs);
   const planKey = planStamp(connectionKey, manifestKey);
 
-  /**
-   * 検証は後回しの描画として走らせる（WU-16）。打鍵のほうが優先されるので入力は詰まらず、
-   * 追い越された分は React が捨てる。結果は落ち着いた入力の派生そのものなので、
-   * 印が合わないあいだ `fresh` が古い検証結果を弾き、Plan は押せないままになる。
-   */
+  /** WU-16。追いついていない結果は印が合わないので `fresh` が弾き、Plan は押せないままになる。 */
   const settled = useDeferredValue(manifestInputs);
   const validated = useMemo<Derived<ManifestValidation>>(
     () => ({
@@ -106,9 +96,9 @@ export const App = () => {
   >(async () => {
     const stamp = connectionKey;
 
-    openTransport(space);
-
     try {
+      openTransport(space);
+
       return { stamp, value: await connect(transport.get) };
     } catch (error) {
       return { stamp, value: { diagnostics: [], failure: error } };
@@ -150,12 +140,19 @@ export const App = () => {
    * 適用の記録は印が合わなくなっても消さない。残すのは「何を適用したか」であって、
    * 「同じ計画をもう一度適用できること」ではない（WU-3 (b)）。
    */
-  const run = applied?.value;
+  const run = applyRecord?.value;
   const running = run !== undefined && isRunning(run);
-  const runOfPlan = fresh(applied, planKey);
+  const runOfPlan = fresh(applyRecord, planKey);
   const plan =
     runOfPlan !== undefined && spentPlan(runOfPlan) ? undefined : fresh(planAttempt, planKey);
-  const confirming = marked(confirmingPlan, planKey);
+
+  /**
+   * 確認は計画そのものに紐づける。印に紐づけると、入力を変えずに Plan を押し直したときだけ
+   * 印が変わらないので、開いたままの確認の後ろで計画が差し替わる。背面は操作できる
+   * （confirm.tsx）ので、これは押せる経路である。同一性で見れば、確認が開いていること自体が
+   * 「画面の計画と承認された計画が同じもの」の証拠になる（WU-3）。
+   */
+  const confirming = confirmingPlan !== undefined && confirmingPlan === plan?.prepared;
 
   /**
    * 離脱の警告は apply の実行中だけ出す（§2.4）。常に出すと、何も適用していない
@@ -204,7 +201,7 @@ export const App = () => {
     const apply = async (): Promise<void> => {
       let progress = idleProgress;
 
-      setApplied({ stamp, value: { ...base, progress } });
+      setApplyRecord({ stamp, value: { ...base, progress } });
 
       try {
         for await (const event of execute(actions, {
@@ -214,10 +211,10 @@ export const App = () => {
           send: transport.send,
         })) {
           progress = foldExecutionEvent(progress, event);
-          setApplied({ stamp, value: { ...base, progress } });
+          setApplyRecord({ stamp, value: { ...base, progress } });
         }
       } catch (error) {
-        setApplied({ stamp, value: { ...base, progress, failure: error } });
+        setApplyRecord({ stamp, value: { ...base, progress, failure: error } });
       }
     };
 
@@ -226,7 +223,7 @@ export const App = () => {
 
   const cancelApply = (): void => {
     setConfirmingPlan(undefined);
-    setApplied({
+    setApplyRecord({
       stamp: planKey,
       value: {
         progress: rejectedProgress,
@@ -298,7 +295,7 @@ export const App = () => {
               applying={running}
               diagnostics={plan?.diagnostics ?? []}
               failure={plan?.failure}
-              onApply={() => setConfirmingPlan(planKey)}
+              onApply={() => setConfirmingPlan(plan?.prepared)}
               onShowUnchangedChange={setShowUnchanged}
               prepared={plan?.prepared}
               showUnchanged={showUnchanged}

@@ -52,6 +52,26 @@ describe("秘匿値の書き換えを知らせる", () => {
     expect(secretRevisions().credentials).toBe(before + 1);
   });
 
+  /**
+   * この版が進むことに検証のやり直しが乗っている（WU-16）。進まなければ、値を打ち直しても
+   * 印が変わらず、古い検証結果が新しい値のものとして通る。
+   */
+  it("環境変数の値を書き換えると環境の版が進む", () => {
+    const before = secretRevisions().environment;
+
+    setEnvironmentValue("TOKEN", "v");
+
+    expect(secretRevisions().environment).toBe(before + 1);
+  });
+
+  it("API キーを書き換えても環境の版は進まない", () => {
+    const before = secretRevisions().environment;
+
+    setApiKey("yet another");
+
+    expect(secretRevisions().environment).toBe(before);
+  });
+
   it("環境変数の値を書き換えても接続の版は進まない", () => {
     const before = secretRevisions().credentials;
 

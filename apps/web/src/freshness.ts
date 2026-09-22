@@ -29,12 +29,3 @@ export const planStamp = (connection: string, manifest: string): string =>
  */
 export const fresh = <T>(derived: Derived<T> | undefined, stamp: string): T | undefined =>
   derived?.stamp === stamp ? derived.value : undefined;
-
-export type Mark = string | undefined;
-
-/**
- * 値を持たない状態（確認ダイアログが開いているか、その計画を apply が使い切ったか）も
- * 印に紐づける（WU-3）。真偽値で持つと入力が変わっても真のまま残り、計画を取り直した
- * 瞬間に蘇る。
- */
-export const marked = (mark: Mark, stamp: string): boolean => mark === stamp;

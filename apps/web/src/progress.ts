@@ -31,19 +31,11 @@ export type ApplyRun = {
   failure?: unknown;
 };
 
-/**
- * 実行中かどうかを別の真偽値で持たない（WU-17）。`execute` は必ず `finished` か
- * `aborted` で終わる（core §7）ので、終わったことは記録そのものが持っている。
- * 別に持つと、進捗の最後の1件と「終わった」が別々の描画に乗りうる。
- */
+/** WU-17。`execute` は必ず `finished` か `aborted` で終わる（core §7）ので、結末の有無で足りる。 */
 export const isRunning = ({ progress, failure }: ApplyRun): boolean =>
   progress.outcome === undefined && failure === undefined;
 
-/**
- * その計画を使い切ったかどうか（WU-3 (b)）。断られた確認は使い切らないので、同じ計画に
- * もう一度 Apply を押せる。終わり方ごとに印を置く形にしないのは、終わり方が1つ増えたときに
- * 書き忘れた経路だけ同じ計画を2度適用できるからである。
- */
+/** WU-3 (b)。断られた確認だけは計画を使い切らないので、同じ計画にもう一度 Apply を押せる。 */
 export const spentPlan = (run: ApplyRun): boolean =>
   !isRunning(run) && run.progress.outcome?.result !== "rejected";
 
