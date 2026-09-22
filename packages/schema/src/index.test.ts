@@ -10,6 +10,14 @@ describe("配布する JSON Schema", () => {
     expect(JSON.stringify(body)).toBe(JSON.stringify(ManifestSchema));
   });
 
+  it("plan まで待たないと判定できない制約を、書いている最中に読める形で運ぶ", () => {
+    const access = projectSchema("1.2.3").properties.access.properties;
+
+    expect(access.administrators.description).toContain("space administrator");
+    expect(access.members.description).toContain("Login ids");
+    expect(access.teams.description).toContain("team");
+  });
+
   it("draft 2020-12 を宣言する", () => {
     expect(projectSchema("1.2.3").$schema).toBe("https://json-schema.org/draft/2020-12/schema");
   });

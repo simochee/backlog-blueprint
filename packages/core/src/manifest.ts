@@ -250,10 +250,33 @@ const CustomFieldSchema = StrictObject(
   { allOf: CUSTOM_FIELD_CONDITIONS },
 );
 
+/**
+ * `administrators` の説明にだけ Backlog 側の制約を書く。V-B11 はこれを判定できるが、
+ * 判定には `GET /users` の `roleType` が要るので、`plan` まで待たないと言えない。
+ * スキーマの説明はエディタが書いている最中に出せる唯一の地点である。
+ */
 const AccessSchema = StrictObject({
-  teams: Type.Optional(Type.Array(Type.String(), { uniqueItems: true })),
-  members: Type.Optional(Type.Array(Type.String(), { uniqueItems: true })),
-  administrators: Type.Optional(Type.Array(Type.String(), { uniqueItems: true })),
+  teams: Type.Optional(
+    Type.Array(Type.String(), {
+      uniqueItems: true,
+      description:
+        "Names of space teams to add to the project. A team costs one request however many people it holds.",
+    }),
+  ),
+  members: Type.Optional(
+    Type.Array(Type.String(), {
+      uniqueItems: true,
+      description:
+        "Login ids of people to add one by one. Write only those who are in none of the teams above; each one costs a request.",
+    }),
+  ),
+  administrators: Type.Optional(
+    Type.Array(Type.String(), {
+      uniqueItems: true,
+      description:
+        "Login ids of people to give the project administrator role to. Backlog refuses that role to space administrators, so do not write yourself here: you already administer the project without belonging to it.",
+    }),
+  ),
 });
 
 const WebhookEventsSchema = Type.Unsafe<"all" | WebhookEvent[]>({
