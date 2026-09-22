@@ -17,7 +17,7 @@ export const CopyButton = ({ label, text }: CopyButtonProps) => {
   };
 
   return (
-    <Button color="gray" onClick={() => void copy()} type="button" variant="soft">
+    <Button color="gray" onClick={() => void copy()} size="3" type="button" variant="soft">
       {copied ? "Copied" : label}
     </Button>
   );

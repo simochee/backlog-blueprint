@@ -3,6 +3,7 @@ import {
   renderHttpFailure,
   type ResolutionTable,
 } from "@backlog-blueprint/core";
+import { ExternalLinkIcon } from "@radix-ui/react-icons";
 import { Callout, Card, Flex, Link, Progress, Text } from "@radix-ui/themes";
 
 import { CopyButton } from "../components/copy-button";
@@ -62,7 +63,7 @@ export const ApplyStep = ({ run }: ApplyStepProps) => {
         <Callout.Root color="green" size="1" variant="surface">
           <Callout.Text>
             <Link href={projectUrl(run.space, run.projectKey)} rel="noreferrer" target="_blank">
-              Open {run.projectKey} in Backlog
+              Open {run.projectKey} in Backlog <ExternalLinkIcon aria-hidden />
             </Link>
           </Callout.Text>
         </Callout.Root>

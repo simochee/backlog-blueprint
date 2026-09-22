@@ -14,6 +14,7 @@
     "@backlog-blueprint/backlog-client": "workspace:*",
     "@backlog-blueprint/core": "workspace:*",
     "@backlog-blueprint/schema": "workspace:*",
+    "@radix-ui/react-icons": "catalog:",
     "@radix-ui/themes": "catalog:",
     "monaco-editor": "catalog:",
     "monaco-yaml": "catalog:",

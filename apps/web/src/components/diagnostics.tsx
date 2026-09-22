@@ -1,4 +1,5 @@
 import { type Diagnostic } from "@backlog-blueprint/core";
+import { CrossCircledIcon, ExclamationTriangleIcon } from "@radix-ui/react-icons";
 import { Callout, Flex, Text } from "@radix-ui/themes";
 
 import { diagnosticView } from "../view";
@@ -29,6 +30,9 @@ export const DiagnosticList = ({ diagnostics }: DiagnosticListProps) => {
           size="1"
           variant="surface"
         >
+          <Callout.Icon>
+            {diagnostic.severity === "error" ? <CrossCircledIcon /> : <ExclamationTriangleIcon />}
+          </Callout.Icon>
           <Callout.Text>
             <Flex align="start" gap="2">
               <span className="diagnostic-position">{position(diagnostic)}</span>

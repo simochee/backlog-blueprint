@@ -1,4 +1,5 @@
-import { Text } from "@radix-ui/themes";
+import { CheckIcon } from "@radix-ui/react-icons";
+import { Text, VisuallyHidden } from "@radix-ui/themes";
 import { Fragment } from "react";
 
 export type StepperProps = { titles: string[]; reached: number };
@@ -22,7 +23,17 @@ export const Stepper = ({ titles, reached }: StepperProps) => (
       <Fragment key={title}>
         {index === 0 ? null : <span className="stepper-rule" />}
         <span className="stepper-item" data-state={stateOf(index, reached)}>
-          <span className="stepper-bullet">{index + 1}</span>
+          <span className="stepper-bullet">
+            {stateOf(index, reached) === "done" ? (
+              <>
+                <CheckIcon aria-hidden />
+                {/* 数字は読み上げに残す。チェックだけでは何段目かが伝わらない。 */}
+                <VisuallyHidden>{index + 1}</VisuallyHidden>
+              </>
+            ) : (
+              index + 1
+            )}
+          </span>
           <Text color={index <= reached ? undefined : "gray"} size="2" weight="medium">
             {title}
           </Text>

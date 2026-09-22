@@ -3,7 +3,6 @@ import {
   NO_CHANGES,
   renderHttpFailure,
   renderPlanJson,
-  renderWarnings,
   summarize,
   type Action,
   type Diagnostic,
@@ -13,7 +12,7 @@ import { Box, Button, Card, Flex, Grid, Switch, Text } from "@radix-ui/themes";
 import { CopyButton } from "../components/copy-button";
 import { DiagnosticList } from "../components/diagnostics";
 import { type PreparedPlan } from "../plan";
-import { badgedAction, PLAIN } from "../view";
+import { badgedAction } from "../view";
 
 export type PlanStepProps = {
   prepared?: PreparedPlan;
@@ -76,7 +75,11 @@ export const PlanStep = ({
   const { actions } = prepared.plan;
   const summary = summarize(actions);
   const shown = showUnchanged ? actions : actions.filter(({ op }) => op !== "noop");
-  const warnings = renderWarnings(prepared.report.diagnostics, { paint: PLAIN });
+  /**
+   * `renderWarnings` は端末向けの整形で、`Warnings:` の見出しと字下げを自分で持つ。
+   * 画面では重大度が色で出るので、診断の並べ方は 1 箇所（DiagnosticList）に寄せる。
+   */
+  const warnings = prepared.report.diagnostics.filter(({ severity }) => severity === "warning");
 
   return (
     <Flex direction="column" gap="4">
@@ -101,7 +104,7 @@ export const PlanStep = ({
           Show unchanged ({summary.noop})
         </Flex>
       </Text>
-      {warnings === "" ? null : <pre className="mono">{warnings}</pre>}
+      <DiagnosticList diagnostics={warnings} />
       <Grid columns={{ initial: "2", sm: "3", md: "6" }} gap="2">
         <Stat label="To add" value={summary.create} />
         <Stat label="To change" value={summary.update + summary.reorder} />

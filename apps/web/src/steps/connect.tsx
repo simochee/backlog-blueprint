@@ -1,4 +1,5 @@
 import { renderHttpFailure, type Diagnostic } from "@backlog-blueprint/core";
+import { ExternalLinkIcon } from "@radix-ui/react-icons";
 import { Badge, Button, Flex, Grid, Link, Text, TextField } from "@radix-ui/themes";
 
 import { DiagnosticList } from "../components/diagnostics";
@@ -47,7 +48,7 @@ export const ConnectStep = ({
           {apiKeyPage === undefined ? null : (
             <Text size="1">
               <Link href={apiKeyPage} rel="noreferrer" target="_blank">
-                Get an API key on {space.trim()}
+                Get an API key on {space.trim()} <ExternalLinkIcon aria-hidden />
               </Link>
             </Text>
           )}
