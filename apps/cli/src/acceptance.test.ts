@@ -65,7 +65,7 @@ customFields:
     min: 0
 access:
   teams:
-    - 開発チーム
+    - 31 # 開発チーム
   members:
     - yamada
   administrators:
@@ -108,7 +108,7 @@ const space = (options: MockBacklogOptions = {}): MockBacklog =>
   mockBacklog({
     executor: YAMADA,
     spaceUsers: [YAMADA, SUZUKI, TANAKA],
-    spaceTeams: [{ name: "開発チーム", members: ["tanaka"] }],
+    spaceTeams: [{ id: 31, name: "開発チーム", members: ["tanaka"] }],
     ...options,
   });
 

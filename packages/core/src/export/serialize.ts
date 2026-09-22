@@ -1,4 +1,4 @@
-import { stringify } from "yaml";
+import { Document, isScalar, isSeq } from "yaml";
 
 import {
   type Category,
@@ -11,11 +11,21 @@ import {
   type Webhook,
 } from "../manifest";
 import { projectSchemaUrl } from "../schema-url";
+import { escaped } from "./to-manifest";
+
+/** `access` の各要素の行末に付ける名前（EX-8 / WU-23）。キーはマニフェストに書く値 */
+export type AccessLabels = {
+  teams: ReadonlyMap<number, string>;
+  users: ReadonlyMap<string, string>;
+};
 
 export type SerializeOptions = {
   /** 実行中のツールの版。`$schema` の URL に入る（EX-15 / D-2） */
   version: string;
+  accessLabels?: AccessLabels;
 };
+
+export type AccessEntry = { value: string | number; label?: string };
 
 /**
  * `version` / `schema` / `resolveKnownTags` は S1 の `PARSE_OPTIONS` と同じ値でなければ
@@ -167,5 +177,64 @@ const manifestBody = (manifest: ManifestInput): Record<string, unknown> =>
     webhooks: inOrderEach(WEBHOOK_ORDER, manifest.webhooks),
   });
 
-export const serializeManifest = (manifest: ManifestInput, options: SerializeOptions): string =>
-  `# yaml-language-server: $schema=${projectSchemaUrl(options.version)}\n${stringify(manifestBody(manifest), STRINGIFY_OPTIONS)}`;
+type LabelOf = (value: unknown, index: number) => string | undefined;
+
+/**
+ * 名前が値そのものと同じなら付けない。`- yamada # yamada` は何も足さずに行を読みにくくする。
+ */
+const labelEach = (document: Document, path: string[], labelOf: LabelOf): void => {
+  const sequence = document.getIn(path, true);
+
+  if (!isSeq(sequence)) {
+    return;
+  }
+
+  for (const [index, item] of sequence.items.entries()) {
+    if (!isScalar(item)) {
+      continue;
+    }
+
+    const label = labelOf(item.value, index);
+
+    if (label !== undefined && label !== "" && label !== String(item.value)) {
+      item.comment = ` ${label}`;
+    }
+  }
+};
+
+const labelAccess = (document: Document, labels: AccessLabels): void => {
+  labelEach(document, ["access", "teams"], (value) =>
+    typeof value === "number" ? labels.teams.get(value) : undefined,
+  );
+
+  for (const section of ["members", "administrators"]) {
+    labelEach(document, ["access", section], (value) =>
+      typeof value === "string" ? labels.users.get(value) : undefined,
+    );
+  }
+};
+
+export const serializeManifest = (manifest: ManifestInput, options: SerializeOptions): string => {
+  const document = new Document(manifestBody(manifest), STRINGIFY_OPTIONS);
+
+  if (options.accessLabels !== undefined) {
+    labelAccess(document, options.accessLabels);
+  }
+
+  return `# yaml-language-server: $schema=${projectSchemaUrl(options.version)}\n${document.toString(STRINGIFY_OPTIONS)}`;
+};
+
+/**
+ * 系列だけを組み立てて段を足す形にしない。`access` の直下に置いたマニフェストを丸ごと
+ * 書き出してから見出しの2行を落とすのは、段の深さも `indentSeq` も名前のコメントも
+ * `serializeManifest` と同じ経路から出てくるようにするため。系列だけを書き出すと段付けを
+ * 別に持つことになり、STRINGIFY_OPTIONS を変えたときに貼った行だけが export の出力とずれる（WU-23）。
+ */
+export const serializeAccessEntries = (entries: AccessEntry[]): string => {
+  const values = entries.map(({ value }) => (typeof value === "string" ? escaped(value) : value));
+  const document = new Document({ access: { entries: values } }, STRINGIFY_OPTIONS);
+
+  labelEach(document, ["access", "entries"], (_, index) => entries[index]?.label);
+
+  return document.toString(STRINGIFY_OPTIONS).split("\n").slice(2).join("\n");
+};

@@ -117,7 +117,7 @@ const teamMembers = (manifest: Manifest, access: AccessSnapshot): Diagnostic[] =
   const declaredTeams = new Set(manifest.access.teams);
   const joinedThrough = new Map<string, string>();
 
-  for (const team of access.spaceTeams.filter(({ name }) => declaredTeams.has(name))) {
+  for (const team of access.spaceTeams.filter(({ id }) => declaredTeams.has(id))) {
     for (const member of team.members) {
       joinedThrough.set(member.userId, team.name);
     }

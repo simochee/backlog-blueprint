@@ -219,7 +219,7 @@ describe("列挙と位置", () => {
         unknownKey: 1,
         issueTypes: [],
         statuses: statuses(13),
-        access: { teams: ["design", "design"] },
+        access: { teams: [31, 31] },
         settings: { textFormattingRule: "html" },
       }),
     ).toEqual(["V-A1", "V-A3", "V-A21", "V-A9", "V-A7", "V-A13"]);

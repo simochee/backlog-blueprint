@@ -116,7 +116,8 @@ export type MockBacklogOptions = {
   executor?: MockUser;
   rateLimit?: { limit: number; remaining: number; reset: number };
   spaceUsers?: MockUser[];
-  spaceTeams?: { name: string; members?: string[] }[];
+  /** `id` を省けば採番する。マニフェストはチームを ID で書く（A-6）ので、書く側が知るには明示する */
+  spaceTeams?: { id?: number; name: string; members?: string[] }[];
   projects?: MockProjectInput[];
   failures?: MockFailure[];
 };
@@ -338,8 +339,8 @@ export const mockBacklog = (options: MockBacklogOptions = {}): MockBacklog => {
   };
 
   const spaceUsers: MockUser[] = options.spaceUsers ?? [executor];
-  const spaceTeams: MockSpaceTeam[] = (options.spaceTeams ?? []).map(({ name, members }) => ({
-    id: identify(),
+  const spaceTeams: MockSpaceTeam[] = (options.spaceTeams ?? []).map(({ id, name, members }) => ({
+    id: id ?? identify(),
     name,
     members: (members ?? []).flatMap((userId) =>
       spaceUsers.filter((user) => user.userId === userId),

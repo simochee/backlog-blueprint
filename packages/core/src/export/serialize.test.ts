@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { type ManifestInput } from "../manifest";
 import { parseManifestSyntax } from "../validation/syntax-stage";
-import { serializeManifest } from "./serialize";
+import { serializeAccessEntries, serializeManifest } from "./serialize";
 
 const VERSION = "1.2.3";
 
@@ -181,11 +181,11 @@ describe("キーの並び", () => {
 
   it("access は teams・members・administrators の順に並ぶ", () => {
     const yaml = serialize(
-      manifestOf({ access: { administrators: ["yamada"], members: ["suzuki"], teams: ["QA"] } }),
+      manifestOf({ access: { administrators: ["yamada"], members: ["suzuki"], teams: [32] } }),
     );
 
     expect(yaml).toContain(
-      "access:\n  teams:\n    - QA\n  members:\n    - suzuki\n  administrators:\n    - yamada\n",
+      "access:\n  teams:\n    - 32\n  members:\n    - suzuki\n  administrators:\n    - yamada\n",
     );
   });
 });
@@ -314,7 +314,7 @@ describe("書き出した Yaml をこのツールのパーサが読み戻す", (
           items: ["軽微", "重大"],
         },
       ],
-      access: { teams: ["開発チーム"], members: ["*oNejJk6xEn"], administrators: ["yamada"] },
+      access: { teams: [31], members: ["*oNejJk6xEn"], administrators: ["yamada"] },
       webhooks: [
         {
           name: "Slack 通知",
@@ -344,5 +344,90 @@ describe("同じ入力からは同じ出力が出る", () => {
     });
 
     expect(first).toBe(second);
+  });
+});
+
+describe("access の名前のコメント（EX-8）", () => {
+  const labels = {
+    teams: new Map([[31, "開発チーム"]]),
+    users: new Map([
+      ["yamada", "山田 太郎"],
+      ["suzuki", "suzuki"],
+    ]),
+  };
+
+  const exported = (access: ManifestInput["access"]) =>
+    serializeManifest(manifestOf({ access }), { version: VERSION, accessLabels: labels });
+
+  it("チーム ID の行末にチーム名を、ログイン ID の行末に表示名をコメントで付ける", () => {
+    expect(exported({ teams: [31], members: [], administrators: ["yamada"] })).toContain(
+      "access:\n  teams:\n    - 31 # 開発チーム\n  members: []\n  administrators:\n    - yamada # 山田 太郎\n",
+    );
+  });
+
+  it("表示名がログイン ID と同じ人と、名前の分からない要素にはコメントを付けない", () => {
+    expect(exported({ teams: [32], members: ["suzuki"] })).toContain(
+      "  teams:\n    - 32\n  members:\n    - suzuki\n",
+    );
+  });
+
+  it("コメントは読み戻した値に混ざらない", () => {
+    const { parsed } = parseManifestSyntax(exported({ teams: [31], members: ["yamada"] }));
+
+    expect(parsed?.value).toMatchObject({ access: { teams: [31], members: ["yamada"] } });
+  });
+});
+
+describe("access に貼るための系列", () => {
+  it("access の各キーの直下にそのまま貼れる段で、1行に1件ずつ名前のコメント付きで並ぶ", () => {
+    expect(
+      serializeAccessEntries([
+        { value: "yamada", label: "山田 太郎" },
+        { value: "suzuki", label: "鈴木 花子" },
+      ]),
+    ).toBe("    - yamada # 山田 太郎\n    - suzuki # 鈴木 花子\n");
+  });
+
+  it("チームは ID を書き、行末にチーム名を付ける", () => {
+    expect(serializeAccessEntries([{ value: 31, label: "開発チーム" }])).toBe(
+      "    - 31 # 開発チーム\n",
+    );
+  });
+
+  it("export が書き出す access の行と同じ体裁になる", () => {
+    const exported = serializeManifest(manifestOf({ access: { members: ["yamada"] } }), {
+      version: VERSION,
+      accessLabels: { teams: new Map(), users: new Map([["yamada", "山田 太郎"]]) },
+    });
+
+    expect(exported).toContain(
+      `  members:\n${serializeAccessEntries([{ value: "yamada", label: "山田 太郎" }])}`,
+    );
+  });
+
+  it("名前が値と同じか空なら、コメントを付けない", () => {
+    expect(
+      serializeAccessEntries([
+        { value: "suzuki", label: "suzuki" },
+        { value: "tanaka", label: "" },
+        { value: "sato" },
+      ]),
+    ).toBe("    - suzuki\n    - tanaka\n    - sato\n");
+  });
+
+  it("そのままでは文字列として読めない名前は引用され、貼った後も同じ名前として読み戻せる", () => {
+    const names = ["true", "123", "QA: 検証", "- 前置き"];
+    const pasted = `key: PROJ_A\nname: プロジェクトA\naccess:\n  members:\n${serializeAccessEntries(names.map((value) => ({ value, label: "# 名前" })))}`;
+    const { parsed } = parseManifestSyntax(pasted);
+
+    expect(parsed?.value).toMatchObject({ access: { members: names } });
+  });
+
+  it("環境変数の参照に見える名前はエスケープされ、展開されずに残る", () => {
+    expect(serializeAccessEntries([{ value: "${USER}" }])).toBe("    - $${USER}\n");
+  });
+
+  it("1件も渡さなければ何も書き出さない", () => {
+    expect(serializeAccessEntries([])).toBe("");
   });
 });

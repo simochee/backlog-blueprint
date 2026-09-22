@@ -86,7 +86,7 @@ export const createExport = async ({
     project: { exists: true, id: projectId, issueCount },
   };
   const snapshots = await readResourceSnapshots({ projectKey, snapshot, get });
-  const { diagnostics, manifest } = toManifest(snapshots);
+  const { diagnostics, manifest, accessLabels } = toManifest(snapshots);
 
   if (manifest === undefined) {
     return { diagnostics };
@@ -96,7 +96,7 @@ export const createExport = async ({
     diagnostics,
     exported: {
       projectKey,
-      yaml: serializeManifest(manifest, { version }),
+      yaml: serializeManifest(manifest, { version, accessLabels }),
       manifest,
       issueCount,
     },

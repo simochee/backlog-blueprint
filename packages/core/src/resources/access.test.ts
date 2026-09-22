@@ -109,7 +109,7 @@ describe("現状の取得", () => {
 
 describe("チーム経由の参加者", () => {
   it("チーム経由で参加している人は個人として削除されない", async () => {
-    const manifest = fixedManifest({ access: { teams: ["開発チーム"], members: ["suzuki"] } });
+    const manifest = fixedManifest({ access: { teams: [developers.id], members: ["suzuki"] } });
     const current = await accessReconciler.read(
       fixedReadContext({
         ...SPACE_RESPONSES,
@@ -128,7 +128,7 @@ describe("チーム経由の参加者", () => {
 
   it("チーム所属者が members にも書かれていれば個人参加させる", () => {
     const actions = planOf(
-      { teams: ["開発チーム"], members: ["tanaka"] },
+      { teams: [developers.id], members: ["tanaka"] },
       { teams: [joined(developers)] },
     );
 
@@ -176,51 +176,65 @@ describe("管理者", () => {
 describe("フェーズ7の並び", () => {
   it("追加を先に、削除を後に並べる", () => {
     const actions = planOf(
-      { teams: ["QA"], members: ["suzuki"], administrators: ["yamada"] },
+      { teams: [qa.id], members: ["suzuki"], administrators: ["yamada"] },
       { teams: [joined(developers)], members: [tanaka], administrators: [tanaka] },
     );
 
     expect(writesOf(actions)).toEqual([
-      "projectTeams/create/QA",
+      "projectTeams/create/22",
       "projectMembers/create/suzuki",
       "projectMembers/create/yamada",
       "projectAdministrators/create/yamada",
       "projectAdministrators/delete/tanaka",
       "projectMembers/delete/tanaka",
-      "projectTeams/delete/開発チーム",
+      "projectTeams/delete/21",
     ]);
   });
 
   it("一致しているものは noop として残る", () => {
     const actions = planOf(
-      { teams: ["開発チーム"], members: ["suzuki"] },
+      { teams: [developers.id], members: ["suzuki"] },
       { teams: [joined(developers)], members: [suzuki] },
     );
 
-    expect(idsOf(actions)).toEqual(["projectTeams/noop/開発チーム", "projectMembers/noop/suzuki"]);
+    expect(idsOf(actions)).toEqual(["projectTeams/noop/21", "projectMembers/noop/suzuki"]);
     expect(actions.every(({ writeRequest }) => !writeRequest)).toBe(true);
   });
 });
 
 describe("チーム", () => {
   it("チームの追加にはスペースのチーム ID を使う", () => {
-    const actions = planOf({ teams: ["開発チーム"] });
+    const actions = planOf({ teams: [developers.id] });
 
-    expect(paramsOf(actions, "projectTeams/create/開発チーム")).toEqual({ teamId: developers.id });
+    expect(paramsOf(actions, "projectTeams/create/21")).toEqual({ teamId: developers.id });
   });
 
   it("Yaml に無いチームは外す", () => {
     const actions = planOf({}, { teams: [joined(qa)] });
 
-    expect(writesOf(actions)).toEqual(["projectTeams/delete/QA"]);
-    expect(paramsOf(actions, "projectTeams/delete/QA")).toEqual({ teamId: qa.id });
+    expect(writesOf(actions)).toEqual(["projectTeams/delete/22"]);
+    expect(paramsOf(actions, "projectTeams/delete/22")).toEqual({ teamId: qa.id });
+  });
+
+  it("同じ名前のチームが2つあっても、書いた ID のチームだけを追加する", () => {
+    const twin = { id: 23, name: developers.name, members: [] };
+    const actions = planOf({ teams: [twin.id] }, { spaceTeams: [developers, twin] });
+
+    expect(writesOf(actions)).toEqual(["projectTeams/create/23"]);
+    expect(paramsOf(actions, "projectTeams/create/23")).toEqual({ teamId: twin.id });
+  });
+
+  it("計画に出るチームの名前は、書いた ID からスペースの現在の名前を引いたものになる", () => {
+    const actions = planOf({ teams: [developers.id] });
+
+    expect(actions.find(({ id }) => id === "projectTeams/create/21")?.name).toBe("開発チーム");
   });
 });
 
 describe("一致している参加の表し方", () => {
   it("一致しているチーム・個人・管理者には既存の ID が載る", () => {
     const actions = planOf(
-      { teams: ["開発チーム"], members: ["suzuki"], administrators: ["yamada"] },
+      { teams: [developers.id], members: ["suzuki"], administrators: ["yamada"] },
       {
         teams: [joined(developers)],
         members: [suzuki, yamada],
@@ -267,7 +281,7 @@ describe("冪等性（NFR-4）", () => {
   it("適用後の現状に同じマニフェストを当てると全部 noop になる", () => {
     const actions = planOf(
       {
-        teams: ["開発チーム"],
+        teams: [developers.id],
         members: ["suzuki"],
         administrators: ["yamada"],
       },

@@ -357,7 +357,7 @@ describe("参加者", () => {
     });
 
     expect(manifest.access).toEqual({
-      teams: ["開発チーム"],
+      teams: [31],
       members: ["yamada"],
       administrators: ["suzuki"],
     });
@@ -375,6 +375,21 @@ describe("参加者", () => {
     });
 
     expect(manifest.access?.members).toEqual(["yamada"]);
+  });
+
+  it("チームにはプロジェクトの応答のチーム名を、利用者にはスペースの一覧の表示名を、コメント用の名前として渡す", () => {
+    const { accessLabels } = exported({
+      access: {
+        teams: [{ id: 31, name: "開発チーム" }],
+        members: [{ id: 1, userId: "yamada" }],
+        administrators: [],
+        spaceUsers: [{ id: 1, userId: "yamada", roleType: 2, name: "山田 太郎" }],
+        spaceTeams: [],
+      },
+    });
+
+    expect(accessLabels?.teams.get(31)).toBe("開発チーム");
+    expect(accessLabels?.users.get("yamada")).toBe("山田 太郎");
   });
 });
 

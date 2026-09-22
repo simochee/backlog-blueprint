@@ -265,7 +265,7 @@ const loginIdHint = (written: string, users: SpaceUser[]): string => {
 
 const spaceMembers = (manifest: Manifest, access: AccessSnapshot): Diagnostic[] => {
   const userIds = new Set(access.spaceUsers.map(({ userId }) => userId));
-  const teamNames = new Set(access.spaceTeams.map(({ name }) => name));
+  const teamIds = new Set(access.spaceTeams.map(({ id }) => id));
 
   return [
     ...(["members", "administrators"] as const).flatMap((section) =>
@@ -282,15 +282,15 @@ const spaceMembers = (manifest: Manifest, access: AccessSnapshot): Diagnostic[] 
             ],
       ),
     ),
-    ...manifest.access.teams.flatMap((name, index) =>
-      teamNames.has(name)
+    ...manifest.access.teams.flatMap((id, index) =>
+      teamIds.has(id)
         ? []
         : [
             snapshotDiagnostic(
               "V-B5",
               `access/teams/${index}`,
-              `no team named "${name}" exists in this space`,
-              "create the team in the space first. this tool does not create teams",
+              `no team with the id ${id} exists in this space`,
+              "copy the id from the Teams pane of the Web UI, or from export. this tool does not create teams",
             ),
           ],
     ),

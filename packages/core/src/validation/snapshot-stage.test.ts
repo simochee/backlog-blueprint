@@ -130,14 +130,14 @@ describe("access が指す相手の存在（V-B4 / V-B5）", () => {
     );
   });
 
-  it("スペースに無いチーム名を書くと V-B5 で中断する", () => {
-    expect(idsOf({ access: { teams: ["開発チーム"] } })).toEqual(["V-B5"]);
+  it("スペースに無いチーム ID を書くと V-B5 で中断する", () => {
+    expect(idsOf({ access: { teams: [3] } })).toEqual(["V-B5"]);
   });
 
   it("存在するユーザーとチームは通す", () => {
     expect(
       idsOf(
-        { access: { members: ["suzuki"], teams: ["開発チーム"] } },
+        { access: { members: ["suzuki"], teams: [3] } },
         {
           snapshots: {
             access: {
@@ -154,10 +154,7 @@ describe("access が指す相手の存在（V-B4 / V-B5）", () => {
   });
 
   it("居ない相手は1件目で止めずにすべて挙げる", () => {
-    expect(idsOf({ access: { members: ["suzuki"], teams: ["開発チーム"] } })).toEqual([
-      "V-B4",
-      "V-B5",
-    ]);
+    expect(idsOf({ access: { members: ["suzuki"], teams: [3] } })).toEqual(["V-B4", "V-B5"]);
   });
 });
 

@@ -348,7 +348,7 @@ yyyy-MM-dd の String（[Add Custom Field](https://developer.nulab.com/docs/back
 | 課題件数の確認 | `GET /api/v2/issues/count?projectId[]=N` → `{"count": 43}`。全ロール利用可。**完了済みを含む全ステータスを数える**（実測） |
 | 実行者の確認 | `GET /api/v2/users/myself` |
 | スペースのユーザー一覧 | `GET /api/v2/users`（Yaml のユーザー ID → 数値 ID 解決に使う） |
-| スペースのチーム一覧 | `GET /api/v2/teams`（Yaml のチーム名 → teamId 解決に使う） |
+| スペースのチーム一覧 | `GET /api/v2/teams`（Yaml のチーム ID の存在確認（V-B5）と、plan に出すチーム名の取得に使う） |
 | プロジェクトのチーム | `GET` / `POST /api/v2/projects/:key/teams`（`teamId` を指定） |
 
 ## 確認済みであること

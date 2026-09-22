@@ -1,7 +1,7 @@
-export { asRecord, requiredNumber, requiredString } from "./api-response";
+export { asArray, asRecord, optionalString, requiredNumber, requiredString } from "./api-response";
 export { execute } from "./executor";
 export { createExport } from "./export/create-export";
-export { serializeManifest } from "./export/serialize";
+export { serializeAccessEntries, serializeManifest } from "./export/serialize";
 export { toManifest } from "./export/to-manifest";
 export {
   CUSTOM_FIELD_TYPE_IDS,
@@ -103,7 +103,7 @@ export type {
   CreateExportResult,
   ProjectExport,
 } from "./export/create-export";
-export type { SerializeOptions } from "./export/serialize";
+export type { AccessEntry, AccessLabels, SerializeOptions } from "./export/serialize";
 export type { ToManifestResult } from "./export/to-manifest";
 export type { ExecuteContext, ExecutionEvent } from "./execution";
 export type {

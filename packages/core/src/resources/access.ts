@@ -91,8 +91,8 @@ const toSpaceTeams = (value: unknown): SpaceTeam[] =>
  * `noop` から「このリソースは意図的に一致している」を読むので、どのリソースと
  * 一致しているのかを指せないと、名前だけを頼りに引き直すことになる。
  */
-const matched = (kind: AccessKind, name: string, target: number): Action => ({
-  id: `${SECTIONS[kind]}/noop/${name}`,
+const matched = (kind: AccessKind, key: string, name: string, target: number): Action => ({
+  id: `${SECTIONS[kind]}/noop/${key}`,
   phase: PHASE,
   kind,
   op: "noop",
@@ -103,11 +103,12 @@ const matched = (kind: AccessKind, name: string, target: number): Action => ({
 
 const added = (
   kind: AccessKind,
+  key: string,
   name: string,
   path: string,
   params: Record<string, Value>,
 ): Action => ({
-  id: `${SECTIONS[kind]}/create/${name}`,
+  id: `${SECTIONS[kind]}/create/${key}`,
   phase: PHASE,
   kind,
   op: "create",
@@ -118,12 +119,13 @@ const added = (
 
 const removed = (
   kind: AccessKind,
+  key: string,
   name: string,
   path: string,
   params: Record<string, number>,
   target: number,
 ): Action => ({
-  id: `${SECTIONS[kind]}/delete/${name}`,
+  id: `${SECTIONS[kind]}/delete/${key}`,
   phase: PHASE,
   kind,
   op: "delete",
@@ -162,11 +164,6 @@ export const accessReconciler: Reconciler<Access, AccessSnapshot> = {
   plan: (desired, snapshot, { manifest }) => {
     const projectKey = manifest.key;
 
-    const teamId = (name: string): Value =>
-      snapshot.spaceTeams.find((team) => team.name === name)?.id ?? {
-        $ref: { kind: "projectTeam", name },
-      };
-
     const userId = (login: string): Value =>
       snapshot.spaceUsers.find((user) => user.userId === login)?.id ?? {
         $ref: { kind: "projectMember", name: login },
@@ -182,35 +179,40 @@ export const accessReconciler: Reconciler<Access, AccessSnapshot> = {
     const desiredMembers = unique([...desired.members, ...desired.administrators]);
 
     const joinedMembers = new Map(snapshot.members.map((user) => [user.userId, user.id]));
-    const joinedTeams = new Map(snapshot.teams.map((team) => [team.name, team.id]));
+    const joinedTeams = new Set(snapshot.teams.map(({ id }) => id));
+    const teamName = (id: number): string =>
+      snapshot.spaceTeams.find((team) => team.id === id)?.name ?? `#${id}`;
     const grantedAdministrators = new Map(
       snapshot.administrators.map((user) => [user.userId, user.id]),
     );
 
-    const teamsToAdd = desired.teams.map((name) => {
-      const joined = joinedTeams.get(name);
-
-      return joined === undefined
-        ? added("projectTeam", name, teamsPath(projectKey), { teamId: teamId(name) })
-        : matched("projectTeam", name, joined);
-    });
+    /**
+     * チームだけ `Action.id` と表示名を分ける。名前はスペース内で重なりうる（A-6）ので、
+     * 名前で `id` を作ると同名の2チームが同じ Action を指し、中断レポートがどちらまで
+     * 進んだかを言えなくなる。表示は人が読むためにスペースの現在の名前で出す。
+     */
+    const teamsToAdd = desired.teams.map((id) =>
+      joinedTeams.has(id)
+        ? matched("projectTeam", String(id), teamName(id), id)
+        : added("projectTeam", String(id), teamName(id), teamsPath(projectKey), { teamId: id }),
+    );
 
     const membersToAdd = desiredMembers.map((login) => {
       const joined = joinedMembers.get(login);
 
       return joined === undefined
-        ? added("projectMember", login, usersPath(projectKey), { userId: userId(login) })
-        : matched("projectMember", login, joined);
+        ? added("projectMember", login, login, usersPath(projectKey), { userId: userId(login) })
+        : matched("projectMember", login, login, joined);
     });
 
     const administratorsToGrant = desired.administrators.map((login) => {
       const granted = grantedAdministrators.get(login);
 
       return granted === undefined
-        ? added("projectAdministrator", login, administratorsPath(projectKey), {
+        ? added("projectAdministrator", login, login, administratorsPath(projectKey), {
             userId: userId(login),
           })
-        : matched("projectAdministrator", login, granted);
+        : matched("projectAdministrator", login, login, granted);
     });
 
     const administratorsToRevoke = snapshot.administrators
@@ -218,6 +220,7 @@ export const accessReconciler: Reconciler<Access, AccessSnapshot> = {
       .map((user) =>
         removed(
           "projectAdministrator",
+          user.userId,
           user.userId,
           administratorsPath(projectKey),
           { userId: user.id },
@@ -228,13 +231,27 @@ export const accessReconciler: Reconciler<Access, AccessSnapshot> = {
     const membersToRemove = snapshot.members
       .filter((user) => !desiredMembers.includes(user.userId))
       .map((user) =>
-        removed("projectMember", user.userId, usersPath(projectKey), { userId: user.id }, user.id),
+        removed(
+          "projectMember",
+          user.userId,
+          user.userId,
+          usersPath(projectKey),
+          { userId: user.id },
+          user.id,
+        ),
       );
 
     const teamsToRemove = snapshot.teams
-      .filter((team) => !desired.teams.includes(team.name))
+      .filter((team) => !desired.teams.includes(team.id))
       .map((team) =>
-        removed("projectTeam", team.name, teamsPath(projectKey), { teamId: team.id }, team.id),
+        removed(
+          "projectTeam",
+          String(team.id),
+          team.name,
+          teamsPath(projectKey),
+          { teamId: team.id },
+          team.id,
+        ),
       );
 
     return [

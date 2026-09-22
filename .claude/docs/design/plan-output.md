@@ -365,7 +365,7 @@ plan の構造に `result` と実行結果を足したもの。
     "status": 400,
     "errors": [{ "message": "deletedTargetIssueTypeId and substituteIssueTypeId are the same." }]
   },
-  "pending": ["statuses/create/レビュー中", "statuses/reorder", "projectTeams/create/開発チーム", "projectMembers/create/suzuki", "webhooks/create/Slack 通知"],
+  "pending": ["statuses/create/レビュー中", "statuses/reorder", "projectTeams/create/31", "projectMembers/create/suzuki", "webhooks/create/Slack 通知"],
   "actions": ["...", "plan と同じ配列"]
 }
 ```
