@@ -1,0 +1,84 @@
+/**
+ * Radix Themes の色トークンを Catppuccin に差し替える。Latte（明）と Mocha（暗）の対で、
+ * エディタ（@catppuccin/codemirror）と同じフレーバーに揃える。
+ *
+ * グレーは 12 段を 1 対 1 で写している。Catppuccin の中立色は crust / mantle / base /
+ * surface0-2 / overlay0-2 / subtext0-1 / text のちょうど 12 段で、Radix の 1〜12 の役割
+ * （1 が地、9 が実体、11 が副文字、12 が主文字）と並びが一致するため、中間値を作らずに済む。
+ * 作ると、そこだけコントラストの根拠が無い色になる。
+ *
+ * アクセントは mauve。Radix の 12 段すべては持てないので、実際に描画に出る段
+ * （9 実体・10 ホバー・11 文字・a3/a4 の淡い地）だけを差し替え、残りは Radix の violet に
+ * 任せる。中途半端に見えるが、ホバーや押下の状態色は Radix 側がコントラストを検証済みで、
+ * そこを手で作り直す理由が無い。
+ */
+
+.light,
+.light-theme {
+  --gray-1: #dce0e8;
+  --gray-2: #e6e9ef;
+  --gray-3: #eff1f5;
+  --gray-4: #ccd0da;
+  --gray-5: #bcc0cc;
+  --gray-6: #acb0be;
+  --gray-7: #9ca0b0;
+  --gray-8: #8c8fa1;
+  --gray-9: #7c7f93;
+  --gray-10: #6c6f85;
+  --gray-11: #5c5f77;
+  --gray-12: #4c4f69;
+
+  --accent-9: #8839ef;
+  --accent-10: #7a2fd8;
+  --accent-11: #8839ef;
+  --accent-contrast: #eff1f5;
+  --accent-a3: color-mix(in srgb, #8839ef 12%, transparent);
+  --accent-a4: color-mix(in srgb, #8839ef 18%, transparent);
+
+  --green-11: #40a02b;
+  --amber-11: #df8e1d;
+  --red-11: #d20f39;
+  --cyan-11: #179299;
+
+  /**
+   * crust（地）→ mantle（カード）→ base（エディタ）の順に明るくする。Catppuccin の
+   * エディタ配色が base を前提に作られているので、カードを base にすると
+   * エディタが背景に溶けて、どこが編集領域か分からなくなる。
+   */
+  --color-background: #dce0e8;
+  --color-panel-solid: #e6e9ef;
+  --color-overlay: color-mix(in srgb, #4c4f69 25%, transparent);
+}
+
+.dark,
+.dark-theme {
+  --gray-1: #11111b;
+  --gray-2: #181825;
+  --gray-3: #1e1e2e;
+  --gray-4: #313244;
+  --gray-5: #45475a;
+  --gray-6: #585b70;
+  --gray-7: #6c7086;
+  --gray-8: #7f849c;
+  --gray-9: #9399b2;
+  --gray-10: #a6adc8;
+  --gray-11: #bac2de;
+  --gray-12: #cdd6f4;
+
+  --accent-9: #cba6f7;
+  --accent-10: #dbb8ff;
+  --accent-11: #cba6f7;
+  /** mauve は明るいので、その上の文字は地の色で抜く。 */
+  --accent-contrast: #1e1e2e;
+  --accent-a3: color-mix(in srgb, #cba6f7 14%, transparent);
+  --accent-a4: color-mix(in srgb, #cba6f7 20%, transparent);
+
+  --green-11: #a6e3a1;
+  --amber-11: #fab387;
+  --red-11: #f38ba8;
+  --cyan-11: #89dceb;
+
+  --color-background: #11111b;
+  --color-panel-solid: #181825;
+  --color-overlay: color-mix(in srgb, #11111b 60%, transparent);
+}

@@ -1,6 +1,6 @@
 import { projectSchema } from "@backlog-blueprint/schema";
 import { Compartment, EditorState } from "@codemirror/state";
-import { oneDark } from "@codemirror/theme-one-dark";
+import { catppuccinLatte, catppuccinMocha } from "@catppuccin/codemirror";
 import { basicSetup, EditorView } from "codemirror";
 import { yamlSchema } from "codemirror-json-schema/yaml";
 import { useEffect, useRef, type DragEvent } from "react";
@@ -59,7 +59,7 @@ export const ManifestEditor = ({ id, value, onChange, onFileDropped }: ManifestE
         extensions: [
           basicSetup,
           yamlSchema(SCHEMA),
-          theme.current.of(startedDark.current ? oneDark : []),
+          theme.current.of(startedDark.current ? catppuccinMocha : catppuccinLatte),
           /** ラベルは器の div に結び付かないので、編集領域そのものに持たせる。 */
           EditorView.contentAttributes.of({ "aria-label": "Manifest" }),
           EditorView.updateListener.of((update) => {
@@ -82,7 +82,7 @@ export const ManifestEditor = ({ id, value, onChange, onFileDropped }: ManifestE
 
   useEffect(() => {
     view.current?.dispatch({
-      effects: theme.current.reconfigure(appearance === "dark" ? oneDark : []),
+      effects: theme.current.reconfigure(appearance === "dark" ? catppuccinMocha : catppuccinLatte),
     });
   }, [appearance]);
 

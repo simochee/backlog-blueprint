@@ -1,8 +1,9 @@
 /**
- * Radix のスタイルを先に読む。後勝ちなので、逆にすると styles.css の等幅指定が
- * テーマ側の指定に上書きされ、計画の桁が崩れる。
+ * 読む順がそのまま優先順。Radix の既定色を Catppuccin が上書きし、最後に自前の
+ * 等幅パネルとステッパーが乗る。逆にすると計画の桁が Radix 側の指定で崩れる。
  */
 import "@radix-ui/themes/styles.css";
+import "./catppuccin.css";
 import "./styles.css";
 
 import { StrictMode } from "react";
