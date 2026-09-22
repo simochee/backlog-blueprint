@@ -188,6 +188,9 @@ access:
     - ${QA_TEAM_ID} # QA_TEAM_ID=31
 ```
 
+The published schema accepts `${NAME}` wherever the check depends on the value, so an editor does
+not flag a reference that is valid once expanded. `validate` and `plan` check the expanded value.
+
 An undefined variable is an error — except under `validate`, where it is only a warning, so that a
 CI job can check the manifest without those values. To write the characters literally, escape the
 expansion as `$${NAME}`.
