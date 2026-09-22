@@ -95,6 +95,14 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
+}
+
+/**
+ * 伸び方は横並びの器の都合なので、器の側に置く。.field 自身に
+ * `flex: 1 1 16rem` を持たせると、縦並びの .environment の中では
+ * flex-basis が高さに効き、入力欄ひとつが 16rem の高さを占める。
+ */
+.field-row > .field {
   flex: 1 1 16rem;
 }
 
