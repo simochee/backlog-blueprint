@@ -22,7 +22,9 @@ adopt it:
   issue, `plan` and `apply` stop before changing anything. A project that is already in use is out
   of scope, and there is no way to opt out of that check.
 - **It keeps no state.** There is no state file and no drift detection. Each run reads the space as
-  it is now and computes what to do from the manifest alone.
+  it is now and computes what to do from the manifest alone. `export` writes down what a project
+  looks like *right now*, as a starting point for a template; it is not a way to watch a project for
+  drift, and the tool never compares two manifests.
 
 The internal design documents call the per-resource modules *reconcilers*, and `plan` / `apply` will
 look familiar to anyone who has used Terraform. Only the vocabulary is borrowed: nothing watches the
@@ -30,7 +32,6 @@ project after `apply` returns.
 
 These are deliberately out of scope as well:
 
-- generating a manifest from an existing project
 - a form-based editor for the YAML
 - Git repositories, which the Backlog API cannot create
 - issues and wiki content
@@ -166,11 +167,12 @@ that decides how long a run takes, and [Writing a manifest](docs/manifest.md) ex
 
 ## Commands
 
-| Command    | Reaches Backlog | API key  | Purpose                       |
-| ---------- | --------------- | -------- | ----------------------------- |
-| `validate` | never           | not used | Check the manifest on its own |
-| `plan`     | reads only      | required | Show what `apply` would do    |
-| `apply`    | reads + writes  | required | Carry the plan out            |
+| Command        | Reaches Backlog | API key  | Purpose                               |
+| -------------- | --------------- | -------- | ------------------------------------- |
+| `validate`     | never           | not used | Check the manifest on its own         |
+| `plan`         | reads only      | required | Show what `apply` would do            |
+| `apply`        | reads + writes  | required | Carry the plan out                    |
+| `export <key>` | reads only      | required | Write an existing project out as YAML |
 
 The difference between `validate` and `plan` is one thing only: whether Backlog is consulted.
 `validate` is for the editor loop and for pull request checks in a CI job that holds neither an API
@@ -182,17 +184,17 @@ not only the first.
 
 ### Options
 
-| Option               | Environment     | Default | Applies to | Meaning                                     |
-| -------------------- | --------------- | ------- | ---------- | ------------------------------------------- |
-| `-f, --file <path>`  |                 |         | all        | The manifest, or `-` to read standard input |
-| `--space <domain>`   | `BACKLOG_SPACE` |         | all        | For example `example.backlog.com`           |
-| `--output <format>`  |                 | `text`  | all        | `text` or `json`                            |
-| `--no-color`         | `NO_COLOR`      |         | all        | Disable colored output                      |
-| `--show-unchanged`   |                 |         | `plan`     | Also list the resources that already match  |
-| `-y, --auto-approve` |                 |         | `apply`    | Skip the confirmation prompt                |
+| Option               | Environment     | Default | Applies to                | Meaning                                     |
+| -------------------- | --------------- | ------- | ------------------------- | ------------------------------------------- |
+| `-f, --file <path>`  |                 |         | `validate` `plan` `apply` | The manifest, or `-` to read standard input |
+| `--space <domain>`   | `BACKLOG_SPACE` |         | all                       | For example `example.backlog.com`           |
+| `--output <format>`  |                 | `text`  | `validate` `plan` `apply` | `text` or `json`                            |
+| `--no-color`         | `NO_COLOR`      |         | all                       | Disable colored output                      |
+| `--show-unchanged`   |                 |         | `plan`                    | Also list the resources that already match  |
+| `-y, --auto-approve` |                 |         | `apply`                   | Skip the confirmation prompt                |
 
-`-f` may be given only once. One manifest is one project, and one command applies one manifest; to
-process several, loop in the shell.
+`-f` may be given only once, and `export` takes exactly one project key. One manifest is one
+project, and one command handles one project; to process several, loop in the shell.
 
 With `--output json`, standard output carries nothing but the JSON document, so it can be piped
 straight into `jq`. Progress, warnings, errors, and the confirmation prompt go to standard error.
@@ -203,14 +205,41 @@ than waiting for an answer nobody will type.
 
 ### Exit codes
 
-| Code | `validate`                             | `plan`          | `apply`                         |
-| ---- | -------------------------------------- | --------------- | ------------------------------- |
-| 0    | passed                                 | no changes      | applied                         |
-| 1    | validation error, or any other failure | error           | error, including an aborted run |
-| 2    | —                                      | changes to make | —                               |
+| Code | `validate`                             | `plan`          | `apply`                         | `export` |
+| ---- | -------------------------------------- | --------------- | ------------------------------- | -------- |
+| 0    | passed                                 | no changes      | applied                         | written  |
+| 1    | validation error, or any other failure | error           | error, including an aborted run | error    |
+| 2    | —                                      | changes to make | —                               | —        |
 
 `plan` returning 2 is what makes it useful in CI: it separates "this manifest matches the space"
 from "this manifest would change something" without parsing the output.
+
+### Starting from a project you already have
+
+`export` reads a project and writes it out as a manifest, so an organization's template can begin
+from a project that already works rather than from a blank file.
+
+```
+$ backlog-blueprint export PROJ_A > projects/standard.yaml
+```
+
+Standard output carries the YAML and nothing else, so redirecting it gives you the file; everything
+else goes to standard error. Nothing is written at all unless every read succeeded, so a failed run
+never leaves you with half a manifest.
+
+Two things are worth knowing before you use the result.
+
+- **Webhook URLs are left out.** Each one becomes `${WEBHOOK_URL_1}`, `${WEBHOOK_URL_2}` and so on,
+  and `export` prints which webhook each variable belongs to. A URL registered in Backlog is not in
+  your repository, and `export` is not the thing that should put it there. Set the variables before
+  you run `plan`; `validate` does not need them.
+- **The project it came from can have issues.** `export` only reads, so any project can be a
+  template. Applying that manifest back to the same project is another matter: `plan` and `apply`
+  still refuse a project that holds issues. Change `key` and `name` first, which is what you would
+  do to reuse a template anyway.
+
+`export` is not a way to detect drift. It writes what a project looks like at that moment; nothing
+watches it afterwards, and the tool never compares two manifests.
 
 ### When `apply` stops partway
 
