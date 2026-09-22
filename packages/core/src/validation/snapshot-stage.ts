@@ -1,7 +1,7 @@
 import { type Diagnostic } from "../diagnostic";
 import { type Manifest, type Status } from "../manifest";
 import { type ResourceSnapshots } from "../plan";
-import { type AccessSnapshot } from "../resources/access";
+import { type AccessSnapshot, type SpaceUser } from "../resources/access";
 import { type ProjectSnapshot } from "../resources/project";
 import {
   DEFAULT_STATUSES_EN,
@@ -235,6 +235,34 @@ export const unconfirmedIssueCount = (projectKey: string, detail: string): Diagn
     "only projects whose issue count is confirmed to be zero can be targeted",
   );
 
+/**
+ * 「存在しない」で終わらせない。実際に取り違えられるのは表示名かメールアドレスで、
+ * どちらもスペースの一覧に載っている。照合できる材料を持っているのに黙ると、
+ * 読み手は Backlog を開いて自分で突き合わせることになる。
+ *
+ * 表示名は一意でないので、複数一致したときに1人へ決めつけない。
+ */
+const loginIdHint = (written: string, users: SpaceUser[]): string => {
+  const byEmail = users.filter((user) => user.mailAddress?.toLowerCase() === written.toLowerCase());
+  const [kind, found] =
+    byEmail.length > 0
+      ? (["email address", byEmail] as const)
+      : (["display name", users.filter((user) => user.name === written)] as const);
+  const [only] = found;
+
+  if (found.length === 1 && only !== undefined) {
+    return `that is the ${kind} of "${only.userId}"; write the login id instead`;
+  }
+
+  if (found.length > 1) {
+    const candidates = found.map((user) => `"${user.userId}"`).join(", ");
+
+    return `${found.length} users share that ${kind} (${candidates}); write one of their login ids`;
+  }
+
+  return "write the login id shown in Backlog, not an email address or a display name";
+};
+
 const spaceMembers = (manifest: Manifest, access: AccessSnapshot): Diagnostic[] => {
   const userIds = new Set(access.spaceUsers.map(({ userId }) => userId));
   const teamNames = new Set(access.spaceTeams.map(({ name }) => name));
@@ -249,7 +277,7 @@ const spaceMembers = (manifest: Manifest, access: AccessSnapshot): Diagnostic[] 
                 "V-B4",
                 `access/${section}/${index}`,
                 `no user with the id "${userId}" exists in this space`,
-                "write the user id used to sign in, not the display name",
+                loginIdHint(userId, access.spaceUsers),
               ),
             ],
       ),

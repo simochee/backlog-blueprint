@@ -1,5 +1,5 @@
 import { type Action } from "../action";
-import { asArray, asRecord, requiredNumber, requiredString } from "../api-response";
+import { asArray, asRecord, optionalString, requiredNumber, requiredString } from "../api-response";
 import { type Access } from "../manifest";
 import { type Reconciler } from "../reconciler";
 import { type Value } from "../value";
@@ -9,8 +9,16 @@ export type AccessUser = { id: number; userId: string };
 /**
  * `roleType` はスペース全体の権限で、`GET /users` だけが返す（API 制約「権限」）。
  * プロジェクト単位の取得には現れないので、`AccessUser` とは別の型にする。
+ *
+ * `name` と `mailAddress` を持つのは V-B4 が「書かれた値は誰の表示名／メールアドレスか」
+ * を言えるようにするためだけで、計画にも送信にも載らない。取り込みを `optionalString` に
+ * するのは、ヒントのための項目が欠けていることで読み取りを落としたくないため。
  */
-export type SpaceUser = AccessUser & { roleType: number };
+export type SpaceUser = AccessUser & {
+  roleType: number;
+  name?: string;
+  mailAddress?: string;
+};
 
 export type AccessTeam = { id: number; name: string };
 
@@ -60,6 +68,8 @@ const toSpaceUsers = (value: unknown): SpaceUser[] =>
   asArray(value).map((item) => ({
     ...toUser(item),
     roleType: requiredNumber(asRecord(item), "roleType"),
+    name: optionalString(asRecord(item), "name"),
+    mailAddress: optionalString(asRecord(item), "mailAddress"),
   }));
 
 const toTeam = (value: unknown): AccessTeam => {

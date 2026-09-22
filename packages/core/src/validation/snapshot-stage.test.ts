@@ -35,6 +35,28 @@ const idsOf = (
   overrides: { snapshot?: Partial<Snapshot>; snapshots?: Partial<ResourceSnapshots> } = {},
 ) => validate(manifest, overrides).map(({ id }) => id);
 
+const SPACE_USERS = [
+  { id: 9, userId: "suzuki", roleType: 2, name: "鈴木", mailAddress: "suzuki@example.com" },
+  { id: 10, userId: "tanaka", roleType: 2, name: "田中", mailAddress: "tanaka@example.com" },
+  { id: 11, userId: "tanaka2", roleType: 2, name: "田中", mailAddress: "tanaka2@example.com" },
+];
+
+const hintFor = (written: string) =>
+  validate(
+    { access: { members: [written] } },
+    {
+      snapshots: {
+        access: {
+          teams: [],
+          members: [],
+          administrators: [],
+          spaceUsers: SPACE_USERS,
+          spaceTeams: [],
+        },
+      },
+    },
+  )[0]?.hint;
+
 describe("対象プロジェクトの課題件数（V-B3）", () => {
   it("課題が1件あるプロジェクトは V-B3 で中断する", () => {
     expect(idsOf({}, { snapshot: { project: { exists: true, id: 100, issueCount: 1 } } })).toEqual([
@@ -76,6 +98,36 @@ describe("access が指す相手の存在（V-B4 / V-B5）", () => {
 
   it("管理者に書いたユーザー ID もスペースの利用者として確かめる", () => {
     expect(idsOf({ access: { administrators: ["suzuki"] } })).toEqual(["V-B4"]);
+  });
+
+  it("メールアドレスを書いた場合は、その持ち主のログイン ID を名指す", () => {
+    expect(hintFor("suzuki@example.com")).toBe(
+      'that is the email address of "suzuki"; write the login id instead',
+    );
+  });
+
+  it("メールアドレスの大文字小文字は問わない", () => {
+    expect(hintFor("Suzuki@Example.COM")).toBe(
+      'that is the email address of "suzuki"; write the login id instead',
+    );
+  });
+
+  it("表示名を書いた場合も、その持ち主のログイン ID を名指す", () => {
+    expect(hintFor("鈴木")).toBe(
+      'that is the display name of "suzuki"; write the login id instead',
+    );
+  });
+
+  it("表示名が複数人で重なっているときは1人に決めつけず候補を挙げる", () => {
+    expect(hintFor("田中")).toBe(
+      '2 users share that display name ("tanaka", "tanaka2"); write one of their login ids',
+    );
+  });
+
+  it("誰の表示名でもメールアドレスでもない値には、何を書くべきかだけを言う", () => {
+    expect(hintFor("nobody@example.com")).toBe(
+      "write the login id shown in Backlog, not an email address or a display name",
+    );
   });
 
   it("スペースに無いチーム名を書くと V-B5 で中断する", () => {
