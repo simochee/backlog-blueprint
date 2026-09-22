@@ -1,13 +1,11 @@
-import { ManifestSchema } from "@backlog-blueprint/core";
+/**
+ * 配布 URL を組み立て直さない。`export` が書き出す `$schema` のコメント行と
+ * ここが入れる `$id` は同じ URL でなければならず（EX-15）、2箇所で組み立てると
+ * 版の入れ方が食い違ったまま両方とも「正しく見える」状態になる。
+ */
+import { ManifestSchema, projectSchemaPath, projectSchemaUrl } from "@backlog-blueprint/core";
 
 const DIALECT = "https://json-schema.org/draft/2020-12/schema";
-
-const DISTRIBUTION_ORIGIN = "https://simochee.github.io/backlog-blueprint";
-
-export const projectSchemaPath = (version: string): string => `schema/${version}/project.json`;
-
-export const projectSchemaUrl = (version: string): string =>
-  `${DISTRIBUTION_ORIGIN}/${projectSchemaPath(version)}`;
 
 export const projectSchema = (version: string) => ({
   $schema: DIALECT,

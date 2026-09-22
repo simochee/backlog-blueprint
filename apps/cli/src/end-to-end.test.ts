@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createBacklogClient } from "@backlog-blueprint/backlog-client";
+import { createExport } from "@backlog-blueprint/core";
 import { fixedSpaceResponses } from "@backlog-blueprint/test-utils";
 
 import { type Deps } from "./commands";
@@ -84,6 +85,7 @@ const cliWith = (text: string, responses: Record<string, unknown> = {}) => {
     io,
     output: createOutput(),
     buildPlan,
+    createExport,
     createClient: ({ space, apiKey }) =>
       createBacklogClient({ space, apiKey, fetch: fetch as never }),
   };

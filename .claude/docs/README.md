@@ -18,6 +18,7 @@ Claude Code とのやり取りの中で確定した設計・調査情報を置�
 | [design/plan-output.md](design/plan-output.md) | 機能設計。plan の人間向け出力と `--output json` の構造 |
 | [design/cli-and-web-ui.md](design/cli-and-web-ui.md) | 機能設計。CLI のコマンド体系・入出力と、Web UI の画面構成 |
 | [design/validation-pipeline.md](design/validation-pipeline.md) | 機能設計。V-A* / V-B* を7つの実行ステージに割り付けたもの |
+| [design/export.md](design/export.md) | 機能設計。既存プロジェクトをマニフェストとして書き出す写像と、スコープ外だった決定を覆した理由 |
 
 読む順序。要求 → 要件 → 機能設計の順に具体化していく。
 
@@ -26,7 +27,8 @@ requirement-design ─▶ requirements-definition ─┬─▶ manifest-schema
                                                ├─▶ core-reconciler
                                                ├─▶ plan-output
                                                ├─▶ cli-and-web-ui
-                                               └─▶ validation-pipeline
+                                               ├─▶ validation-pipeline
+                                               └─▶ export
        backlog-api-constraints が全体を縛る
 ```
 
@@ -55,5 +57,6 @@ requirement-design ─▶ requirements-definition ─┬─▶ manifest-schema
 | `PO` | plan-output | 出力形式 |
 | `CL` / `WU` | cli-and-web-ui | CLI / Web UI |
 | `VG` / `VP` / `DG` | validation-pipeline | ゲート / コマンド別構成 / 診断 |
+| `EX` | export | 書き出しの写像・出力・受け入れ |
 
 `S1`〜`S7` は validation-pipeline の検証ステージ名で、決定 ID ではない。

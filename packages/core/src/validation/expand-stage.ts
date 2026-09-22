@@ -18,7 +18,13 @@ const envSentinel = (name: string): string => `${SENTINEL_PREFIX}${name}${SENTIN
 export const hasEnvSentinel = (value: unknown): boolean =>
   typeof value === "string" && value.includes(SENTINEL_PREFIX);
 
-const REFERENCE_PATTERN = /\$\$\{([^}]+)\}|\$\{([^}]+)\}/g;
+/**
+ * 正規表現そのものを共有しない。書き出し（EX-5）は S2 が参照と見なすものだけを
+ * 同じ規則で見つける必要があるが、`g` 付きの `RegExp` は `lastIndex` を持ち、
+ * `exec` / `test` と混ざると2回目の呼び出しだけ結果が変わる。呼ぶたびに作れば、
+ * 使う側がどのメソッドを選んでも状態が残らない。
+ */
+export const envReferencePattern = (): RegExp => /\$\$\{([^}]+)\}|\$\{([^}]+)\}/g;
 
 export type Environment = Record<string, string | undefined>;
 
@@ -29,7 +35,7 @@ const expandString = (value: string, env: Environment): StringExpansion => {
   let expanded = false;
 
   const text = value.replaceAll(
-    REFERENCE_PATTERN,
+    envReferencePattern(),
     (match: string, escaped: string | undefined, name: string | undefined) => {
       if (escaped !== undefined) {
         return `\${${escaped}}`;

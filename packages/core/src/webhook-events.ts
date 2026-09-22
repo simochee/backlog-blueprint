@@ -43,3 +43,15 @@ export const WEBHOOK_EVENTS = [
 export type WebhookEventName = (typeof WEBHOOK_EVENTS)[number]["name"];
 
 export type WebhookEvent = WebhookEventName | number;
+
+/**
+ * `toSorted` に置き換えない。基底の tsconfig が `lib: ES2022` を置いているため
+ * （NFR-5）、ES2023 のメソッドは型検査で落ちる。複製済みの配列を並べ替えるので
+ * 破壊的でもない。
+ */
+export const ascendingEventIds = (ids: number[]): number[] => {
+  const unique = [...new Set(ids)];
+
+  // oxlint-disable-next-line unicorn/no-array-sort
+  return unique.sort((left, right) => left - right);
+};

@@ -14,9 +14,10 @@ CLI と Web UI は「入出力の違い」だけを担う（要件定義 §7）�
 backlog-blueprint <command> [options]
 
 Commands:
-  validate   Validate a manifest without contacting Backlog
-  plan       Show what apply would do (read-only)
-  apply      Apply the manifest to Backlog
+  validate       Validate a manifest without contacting Backlog
+  plan           Show what apply would do (read-only)
+  apply          Apply the manifest to Backlog
+  export <key>   Write an existing project out as a manifest (read-only)
 ```
 
 | コマンド | ネットワーク | API キー | 走る検証 |
@@ -24,6 +25,7 @@ Commands:
 | `validate` | 使わない | 不要 | S1〜S4（[検証パイプライン](validation-pipeline.md)） |
 | `plan` | GET のみ | 必要 | S1〜S7 |
 | `apply` | GET + 更新系 | 必要 | S1〜S7 → 確認 → 実行 |
+| `export` | GET のみ | 必要 | S5（[EX-2](export.md#ex-2-実行者はスペース管理者であることを要求する)）と、**自分が組み上げたマニフェストに当てる S3 / S4**（[検証パイプライン §4](validation-pipeline.md#export-は自分の出力に-s3--s4-を当てる)）。マニフェストを入力に取らないので S1・S2 は走らず、S6 は `read()` だけ、S7 は走らない |
 
 ### CL-1: `validate` を追加する
 
@@ -48,22 +50,28 @@ Commands:
 
 ### 1.2 オプション
 
-共通。
+接続に関するもの。全コマンドが持つ。
 
 | オプション | 環境変数 | 既定 | 内容 |
 | --- | --- | --- | --- |
-| `-f, --file <path>` | — | **必須** | マニフェストのパス。`-` で標準入力 |
 | `--space <domain>` | `BACKLOG_SPACE` | — | `example.backlog.com` / `example.backlog.jp` |
-| `--output <format>` | — | `text` | `text` / `json` |
 | `--no-color` | `NO_COLOR` | — | 色を付けない |
 | `-h, --help` / `-V, --version` | — | — | |
 
+マニフェストを入力に取るもの（`validate` / `plan` / `apply`）。
+
+| オプション | 既定 | 内容 |
+| --- | --- | --- |
+| `-f, --file <path>` | **必須** | マニフェストのパス。`-` で標準入力 |
+| `--output <format>` | `text` | `text` / `json` |
+
 コマンド固有。
 
-| コマンド | オプション | 内容 |
+| コマンド | 引数・オプション | 内容 |
 | --- | --- | --- |
 | `plan` | `--show-unchanged` | `noop` の Action も表示する |
 | `apply` | `-y, --auto-approve` | 確認プロンプトを省略する |
+| `export` | `<key>` | 書き出すプロジェクトのキー。**必須・1つ**（CL-7） |
 
 API キーは `BACKLOG_API_KEY` からのみ受け取る。
 
@@ -88,6 +96,76 @@ NFR-3（API キーをログ・出力・エラーに出さない）を守って�
 プロジェクト境界をまたいだ部分適用が生まれる。中断レポート（FR-4.4）が
 「どのプロジェクトのどこまで」を表現する必要が出て、構造が一段複雑になる。
 シェルのループで回せば済む話に、その複雑さを払う理由がない。
+
+`export` は位置引数で同じ不変条件を守る（CL-7）。
+
+### CL-7: `export` は位置引数1つ。`-f` も `--output` も持たない
+
+| 決定 | 内容 |
+| --- | --- |
+| CL-7 | `export <key>` はプロジェクトキーを**位置引数**で1つだけ受け取る。`-f` / `--output` / `--show-unchanged` / `-y` は定義しない。持つのは `--space` と `--no-color` だけ |
+
+**キーの形（`^[A-Z0-9_]+$`）を判定するのは CLI ではなく core の `createExport` である**
+（[EX-3](export.md#ex-3-プロジェクトの存在は要求するが課題の有無は見ない)）。CLI が担うのは
+commander が見る引数の形——位置引数が1つか、未知のオプションが無いか——までで、
+プロジェクトキーという値そのものの規則は S3 の `key` と同じものであり、置き場所も同じでよい。
+
+**CL-3 の不変条件は「1回の実行で扱うプロジェクトは1つ」であって、「`-f` というフラグ」ではない。**
+`-f` がオプションなのは、マニフェストが**ファイルパス**であり `-` で標準入力も表すからで、
+値の性質がオプション向きだからである。`export` の対象は動作を変える修飾子ではなく**主語**なので、
+位置引数にする。`export A B` は commander が拒むので、CL-3 と同じ約束を同じ強さで守る。
+
+`--output json` を持たない理由は、**`export` の出力がマニフェストそのもの**だからである。
+マニフェストの形式は Yaml と決まっており（要件定義 §2.1）、`plan` の JSON のような
+「同じ内容の別の見せ方」にはあたらない。
+
+`-o <path>` のような出力先のオプションも持たない。シェルのリダイレクトと同じことを
+2通りで書けるようにするだけで、既存ファイルを上書きしてよいかの判断（`--force` が要るか）が
+新たに生まれる。
+
+**採らなかった案: `export -f <既存の yaml>` で実状を書き戻す。** コメントや並びを保てる可能性はあるが、
+「書き出し」ではなく「差分の取り込み」の導線になり、非スコープの境界が曖昧になる。
+
+### CL-8: `export` の標準出力は Yaml だけ
+
+| 決定 | 内容 |
+| --- | --- |
+| CL-8 | stdout には Yaml しか書かない。stderr には、課題件数の案内（1件以上のときだけ）→ Webhook URL の案内（1件以上のときだけ）の順に出す。警告は無い |
+
+`--no-color` は stderr にだけ効く。stdout は Yaml なので色を付ける経路がそもそも無い。
+
+警告が無いのは、`export` が S6 / S7 を走らせないためである
+（V-A15 も V-A16 も判定に計画が要る）。発生源が無いところに節を用意しない。
+
+```
+$ backlog-blueprint export PROJ_A > projects/PROJ_A.yaml
+NOTE  PROJ_A holds 43 issues, so plan and apply will refuse it as a target (V-B3)
+  → to use this manifest as a template, change key and name before you apply it
+
+NOTE  2 webhook URLs were left out of the manifest and replaced with ${WEBHOOK_URL_n}:
+    WEBHOOK_URL_1  "Slack 通知"
+    WEBHOOK_URL_2  "監査ログ"
+  → set each variable to the URL shown on that webhook's page in Backlog before running plan. validate does not need them
+```
+
+行頭は既存の `ERROR` / `!` と同じく語のあとに2スペース。案内どうしの間は空行1つ。
+1件のときは単数形にする（`holds 1 issue` /
+`1 webhook URL was left out ... replaced with ${WEBHOOK_URL_1}:`）。
+
+`→` の行の末尾にピリオドを置かないのは既存の `hint` に揃えるためである。
+
+### CL-9: `export` の終了コードは 0 と 1 だけ
+
+| 決定 | 内容 |
+| --- | --- |
+| CL-9 | 0 が「書き出した」、1 が「エラー」。2 は使わない。診断の集計行は `N export errors. Nothing has been written.` |
+
+`plan` の 2（差分あり）に対応するものが `export` に無い。書き出すか、書き出さないかの2つしかない。
+
+集計行が `Nothing has been applied.` ではないのは、`export` が適用しないためである。
+要件定義 §5.3 が `validate` と `plan` でその行を添えないと決めたのと同じ理由で、
+**言う相手のいない文を出さない。** `export` は「書き出さなかった」ことを言う必要があるので、
+そこだけ差し替える（EX-17 が stdout を空に保つので、この行は事実を述べている）。
 
 ### 1.3 標準出力と標準エラー出力
 
@@ -133,11 +211,11 @@ CI で `--auto-approve` を付け忘れたとき、マニフェストの内容�
 
 ### 1.5 終了コード
 
-| コード | `validate` | `plan` | `apply` |
-| --- | --- | --- | --- |
-| 0 | 検証を通過 | 差分なし | 成功 |
-| 1 | 検証違反、その他のエラー | エラー | エラー（中断を含む） |
-| 2 | （未使用） | 差分あり | （未使用） |
+| コード | `validate` | `plan` | `apply` | `export` |
+| --- | --- | --- | --- | --- |
+| 0 | 検証を通過 | 差分なし | 成功 | 書き出した |
+| 1 | 検証違反、その他のエラー | エラー | エラー（中断を含む） | エラー |
+| 2 | （未使用） | 差分あり | （未使用） | （未使用） |
 
 確認プロンプトで拒否した場合（`--output json` の `result` が `rejected`）は **1** を返す。
 表に無いが、0 を返すと「成功」と区別できなくなる。適用していないことは `result` が示す。
@@ -332,6 +410,9 @@ Web UI 側で特別な分岐は要らない。
 | CL-4 | 既定で確認プロンプト | 確認なしで即実行。破壊的操作に対する最後の砦が無くなる |
 | CL-5 | `yes` の全文入力 | `y` 1文字。Enter 連打で通る |
 | CL-6 | 非 TTY では確認なしだとエラー | 非 TTY では自動承認。CI で気付かず適用されるのが最悪 |
+| CL-7 | `export` は位置引数1つ | `-f` に揃える（対象は修飾子ではなく主語）／`-o` で出力先を受ける（リダイレクトと二重）／`-f` で既存 Yaml を書き戻す（差分取り込みの導線になる） |
+| CL-8 | stdout は Yaml だけ | 案内も stdout に混ぜる。`> file` がそのまま壊れる |
+| CL-9 | 終了コードは 0 / 1 | `plan` に揃えて 2 を持つ。対応する状態が `export` に無い |
 | — | 削除を含むときだけ確認、は採らない | 「いつ止まるか」がマニフェスト次第になり、挙動が非決定的に見える |
 | WU-1 | ルーティングなしの単一ページ | ステップごとの URL。状態がメモリのみなので復元できず、URL が嘘になる |
 | WU-3 | 入力変更で計画を破棄 | 古い計画のまま apply を許す。「plan で見たものが apply される」が壊れる |

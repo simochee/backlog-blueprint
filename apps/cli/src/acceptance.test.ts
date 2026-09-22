@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createBacklogClient } from "@backlog-blueprint/backlog-client";
-import { NO_CHANGES } from "@backlog-blueprint/core";
+import { createExport, NO_CHANGES } from "@backlog-blueprint/core";
 import {
   mockBacklog,
   withoutWritePacing,
@@ -155,6 +155,7 @@ const cliOn = (
     io,
     output: createOutput(),
     buildPlan,
+    createExport,
     createClient: ({ space: domain, apiKey }) =>
       createBacklogClient({ space: domain, apiKey, fetch: backlog.fetch as never }),
   };
@@ -181,6 +182,21 @@ const apply = (
     code: withoutWritePacing(() => run(["apply", "-f", "-", "--auto-approve", ...argv])),
   };
 };
+
+const exportOf = (backlog: MockBacklog, projectKey = "PROJ_A") => {
+  const { io, run } = cliOn(backlog, "", ENVIRONMENT);
+
+  return { io, code: run(["export", projectKey, "--no-color"]) };
+};
+
+/** export は `hookUrl` を位置で採番した変数にするので、読み戻す側はその名前で値を渡す（EX-4） */
+const WITH_WEBHOOK_URL = { ...ENVIRONMENT, WEBHOOK_URL_1: SLACK_WEBHOOK_URL };
+
+const asProjectB = (yaml: string): string =>
+  yaml.replace("key: PROJ_A", "key: PROJ_B").replace("name: プロジェクトA", "name: プロジェクトB");
+
+const asProjectA = (yaml: string): string =>
+  yaml.replace("key: PROJ_B", "key: PROJ_A").replace("name: プロジェクトB", "name: プロジェクトA");
 
 const json = (text: string): Record<string, unknown> => JSON.parse(text) as Record<string, unknown>;
 
@@ -494,5 +510,72 @@ describe("plan と apply は同じ Action[] を見る", () => {
 
     expect(backlog.writes).toHaveLength(writes.length);
     expect(writes.length).toBeGreaterThan(0);
+  });
+});
+
+describe("export の受け入れ基準", () => {
+  it("課題0件のプロジェクトを export し、案内された環境変数を設定してその出力を plan すると「差分なし」になり、終了コードが 0 になる", async () => {
+    const backlog = space();
+
+    await expect(apply(backlog, MANIFEST).code).resolves.toBe(0);
+
+    const exported = exportOf(backlog);
+
+    await expect(exported.code).resolves.toBe(0);
+    expect(exported.io.stderr).toContain(`WEBHOOK_URL_1  "Slack 通知"`);
+
+    const { io, run } = cliOn(backlog, exported.io.stdout, WITH_WEBHOOK_URL);
+
+    await expect(run(["plan", "-f", "-", "--no-color"])).resolves.toBe(0);
+    expect(io.stdout).toContain(NO_CHANGES);
+  });
+
+  it("課題が1件以上あるプロジェクトの export は成功し、課題件数が標準エラー出力に出る。その出力を同じプロジェクトに plan すると V-B3 で中断する", async () => {
+    const backlog = space({
+      projects: [{ key: "PROJ_A", name: "プロジェクトA", issueCount: 43 }],
+    });
+    const exported = exportOf(backlog);
+
+    await expect(exported.code).resolves.toBe(0);
+    expect(exported.io.stderr).toContain("PROJ_A holds 43 issues");
+
+    const { io, run } = cliOn(backlog, exported.io.stdout, WITH_WEBHOOK_URL);
+
+    await expect(run(["plan", "-f", "-", "--no-color"])).resolves.toBe(1);
+    expect(io.stderr).toContain("V-B3");
+  });
+
+  it("export の標準出力と標準エラー出力のどこにも、Webhook の URL と API キーが現れない", async () => {
+    const backlog = space();
+
+    await expect(apply(backlog, MANIFEST).code).resolves.toBe(0);
+
+    const { io, code } = exportOf(backlog);
+
+    await expect(code).resolves.toBe(0);
+    expect(io.stdout).toContain("hookUrl: ${WEBHOOK_URL_1}");
+    for (const stream of [io.stdout, io.stderr]) {
+      expect(stream).not.toContain(SLACK_WEBHOOK_URL);
+      expect(stream).not.toContain(API_KEY);
+    }
+  });
+
+  it("export した Yaml の key と name を書き換えて未作成のキーに apply し、できたプロジェクトを export すると、key と name 以外が元の出力と一致する", async () => {
+    const backlog = space();
+
+    await expect(apply(backlog, MANIFEST).code).resolves.toBe(0);
+
+    const first = exportOf(backlog);
+
+    await expect(first.code).resolves.toBe(0);
+
+    const template = asProjectB(first.io.stdout);
+
+    await expect(apply(backlog, template, [], WITH_WEBHOOK_URL).code).resolves.toBe(0);
+
+    const second = exportOf(backlog, "PROJ_B");
+
+    await expect(second.code).resolves.toBe(0);
+    expect(asProjectA(second.io.stdout)).toBe(first.io.stdout);
   });
 });

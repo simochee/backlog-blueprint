@@ -64,7 +64,7 @@ export const matchDefaultStatuses = (names: readonly string[]): ExistingStatus[]
 const defaultStatuses = (desired: Status[]): ExistingStatus[] =>
   matchDefaultStatuses(desired.map(({ name }) => name)) ?? DEFAULT_STATUSES_JA;
 
-const isDefaultStatus = ({ id }: ExistingStatus): boolean => id <= LAST_DEFAULT_STATUS_ID;
+export const isDefaultStatus = ({ id }: ExistingStatus): boolean => id <= LAST_DEFAULT_STATUS_ID;
 
 const statusesPath = (key: string): string => `/api/v2/projects/${key}/statuses`;
 

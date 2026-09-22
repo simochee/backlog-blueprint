@@ -21,6 +21,7 @@ import { type Io } from "./io";
 import { readManifest } from "./manifest-source";
 import {
   type BuildPlan,
+  type CreateExport,
   type DiagnosticsOptions,
   type Output,
   type OutputContext,
@@ -38,21 +39,22 @@ import { TOOL } from "./version";
  */
 export type ColorOptions = { stdout: boolean; stderr: boolean };
 
-export type CommonOptions = {
-  file: string;
-  space?: string;
-  output: "text" | "json";
-  color: ColorOptions;
-};
+/** 全コマンドが持つ。`export` はこれだけを持つ（CL-7）。 */
+export type ConnectionOptions = { space?: string; color: ColorOptions };
+
+export type CommonOptions = ConnectionOptions & { file: string; output: "text" | "json" };
 
 export type PlanOptions = CommonOptions & { showUnchanged: boolean };
 
 export type ApplyOptions = CommonOptions & { autoApprove: boolean };
 
+export type ExportOptions = ConnectionOptions & { key: string };
+
 export type Deps = {
   io: Io;
   output: Output;
   buildPlan: BuildPlan;
+  createExport: CreateExport;
   createClient: (credentials: Credentials) => BacklogClient;
 };
 
@@ -74,9 +76,9 @@ type Prepared =
       manifest: Manifest;
     };
 
-const bodyRender = ({ color }: CommonOptions): RenderOptions => ({ color: color.stdout });
+const bodyRender = ({ color }: ConnectionOptions): RenderOptions => ({ color: color.stdout });
 
-const noticeRender = ({ color }: CommonOptions): RenderOptions => ({ color: color.stderr });
+const noticeRender = ({ color }: ConnectionOptions): RenderOptions => ({ color: color.stderr });
 
 const applyNotice = (options: CommonOptions): DiagnosticsOptions => ({
   ...noticeRender(options),
@@ -305,4 +307,50 @@ export const runApply = async (options: ApplyOptions, deps: Deps): Promise<numbe
   );
 
   return outcome.result === "succeeded" ? EXIT_SUCCESS : EXIT_ERROR;
+};
+
+const exportNotice = (options: ConnectionOptions): DiagnosticsOptions => ({
+  ...noticeRender(options),
+  nothingWritten: true,
+});
+
+export const runExport = async (options: ExportOptions, deps: Deps): Promise<number> => {
+  const { io, output } = deps;
+  const credentials = resolveCredentials(options.space, io);
+
+  if (isCredentialsError(credentials)) {
+    io.err(credentials.error);
+
+    return EXIT_ERROR;
+  }
+
+  const client = deps.createClient(credentials);
+  const { diagnostics, exported } = await deps.createExport({
+    projectKey: options.key,
+    get: client.get,
+    version: TOOL.version,
+  });
+
+  if (exported === undefined || hasError(diagnostics)) {
+    io.err(output.diagnostics(diagnostics, exportNotice(options)));
+
+    return EXIT_ERROR;
+  }
+
+  io.out(exported.yaml);
+
+  const notes = output.exportNotes(
+    {
+      projectKey: exported.projectKey,
+      issueCount: exported.issueCount,
+      webhookVariables: exported.webhookVariables,
+    },
+    noticeRender(options),
+  );
+
+  if (notes !== "") {
+    io.err(notes);
+  }
+
+  return EXIT_SUCCESS;
 };

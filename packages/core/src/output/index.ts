@@ -1,6 +1,7 @@
 export { actionLine, changeLines } from "./action-line";
 export { colored, painter, plain, styleOf } from "./color";
 export { displayPath, renderDiagnostics, renderWarnings } from "./diagnostics";
+export { renderExportNotes } from "./export";
 export {
   applyJson,
   planJson,
@@ -28,6 +29,7 @@ export type { LineVariant } from "./action-line";
 export type { ActionFailure, ApplyOptions, ApplyOutcome } from "./apply";
 export type { Paint, Style } from "./color";
 export type { DiagnosticOptions } from "./diagnostics";
+export type { ExportNotesInput } from "./export";
 export type { ActionJson, ApplyJson, FailedJson, PlanJson, ValidateJson } from "./json";
 export type { PlanReport, ResultingOrder, Summary, ValidateReport } from "./report";
 export type { ProgressLine, ProgressOutcome, TextOptions } from "./text";

@@ -1,6 +1,14 @@
 import { type Op } from "../resource";
 
-export type Style = "create" | "update" | "delete" | "noop" | "refresh" | "warning" | "error";
+export type Style =
+  | "create"
+  | "update"
+  | "delete"
+  | "noop"
+  | "refresh"
+  | "warning"
+  | "error"
+  | "note";
 
 /**
  * TTY かどうかも `NO_COLOR` も見ない。`process` を読めない（NFR-5）以上、
@@ -16,6 +24,7 @@ const CODES: Record<Style, string> = {
   refresh: "36",
   warning: "33",
   error: "31",
+  note: "36",
 };
 
 /** `"["` と書かない。oxfmt が生の制御文字に畳んでソースに埋め込む（実測） */
