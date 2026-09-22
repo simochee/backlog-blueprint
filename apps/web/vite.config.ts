@@ -35,7 +35,20 @@ const BASE = "/backlog-blueprint/";
 
 export default defineConfig({
   base: BASE,
+  define: { __SCHEMA_VERSION__: JSON.stringify(cliPackage.version) },
   plugins: [react(), schemaArtifact()],
+  resolve: {
+    alias: {
+      /**
+       * monaco-yaml が使う monaco-worker-manager は、monaco-editor が exports マップを
+       * 持つ前の path を参照している。0.56 のマップは `"./*": "./esm/vs/*.js"` なので、
+       * その path は `esm/vs` が二重になって解決できない。
+       * monaco-editor を古い版に留める案は採らない。他人の古い import 1つのために
+       * エディタ本体を凍結することになる。
+       */
+      "monaco-editor/esm/vs/editor/editor.worker.js": "monaco-editor/editor/editor.worker.js",
+    },
+  },
   test: {
     environment: "happy-dom",
     setupFiles: ["./src/test-setup.ts"],

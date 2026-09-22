@@ -13,6 +13,41 @@ let respond: (path: string) => Promise<unknown>;
 
 let deliver: (request: ResolvedHttpRequest) => Promise<unknown>;
 
+/**
+ * Monaco は happy-dom では動かない。レイアウトの測定に実ブラウザの API を使うので、
+ * 読み込んだだけで落ちる。ここで確かめたいのはステッパーの挙動なので、入力の口と
+ * ファイルの受け口だけを持つ textarea に差し替える。エディタ自体の結線は
+ * manifest-editor.tsx の Why-not コメントが守る範囲であり、テストの対象にしない。
+ */
+vi.mock("./components/manifest-editor", () => ({
+  ManifestEditor: ({
+    id,
+    value,
+    onChange,
+    onFileDropped,
+  }: {
+    id: string;
+    value: string;
+    onChange: (text: string) => void;
+    onFileDropped: (name: string, text: string) => void;
+  }) => (
+    <textarea
+      id={id}
+      onChange={(event) => onChange(event.target.value)}
+      onDrop={(event) => {
+        event.preventDefault();
+
+        const [file] = event.dataTransfer.files;
+
+        if (file !== undefined) {
+          void file.text().then((text) => onFileDropped(file.name, text));
+        }
+      }}
+      value={value}
+    />
+  ),
+}));
+
 vi.mock("@backlog-blueprint/backlog-client", () => ({
   createBacklogClient: () => ({
     get: (path: string) => respond(path),
@@ -61,7 +96,11 @@ const startApp = async (responses: Record<string, unknown> = {}): Promise<UserEv
   return user;
 };
 
-const manifestField = (): HTMLElement => screen.getByLabelText(/^Manifest/);
+/**
+ * 待ってから掴む。エディタは遅延読み込みなので（manifest.tsx）、接続した直後には
+ * まだ DOM に無い。
+ */
+const manifestField = async (): Promise<HTMLElement> => screen.findByLabelText(/^Manifest/);
 
 const button = (name: string): HTMLElement => screen.getByRole("button", { name });
 
@@ -72,7 +111,7 @@ const connect = async (user: UserEvent): Promise<void> => {
 };
 
 const writeManifest = async (user: UserEvent, text: string): Promise<void> => {
-  await user.click(manifestField());
+  await user.click(await manifestField());
   await user.paste(text);
 };
 
@@ -181,12 +220,12 @@ describe("マニフェストの受け取り方", () => {
     await connect(user);
     await screen.findByText(/Signed in as yamada/);
 
-    fireEvent.drop(manifestField(), {
+    fireEvent.drop(await manifestField(), {
       dataTransfer: { files: [new File([MANIFEST], "project.yml", { type: "text/yaml" })] },
     });
 
-    await waitFor(() => {
-      expect(manifestField()).toHaveValue(MANIFEST);
+    await waitFor(async () => {
+      expect(await manifestField()).toHaveValue(MANIFEST);
     });
   });
 });
@@ -228,7 +267,7 @@ describe("確認ダイアログ", () => {
 
     await reach(user);
     await user.click(button("Apply"));
-    await user.type(manifestField(), "#");
+    await user.type(await manifestField(), "#");
 
     expect(screen.queryByRole("dialog")).toBeNull();
   });
@@ -238,7 +277,7 @@ describe("確認ダイアログ", () => {
 
     await reach(user);
     await user.click(button("Apply"));
-    await user.type(manifestField(), "#");
+    await user.type(await manifestField(), "#");
     await plan(user);
 
     expect(screen.queryByRole("dialog")).toBeNull();

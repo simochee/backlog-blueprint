@@ -13,12 +13,14 @@
   "dependencies": {
     "@backlog-blueprint/backlog-client": "workspace:*",
     "@backlog-blueprint/core": "workspace:*",
+    "@backlog-blueprint/schema": "workspace:*",
     "@radix-ui/themes": "catalog:",
+    "monaco-editor": "catalog:",
+    "monaco-yaml": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:"
   },
   "devDependencies": {
-    "@backlog-blueprint/schema": "workspace:*",
     "@backlog-blueprint/test-utils": "workspace:*",
     "@backlog-blueprint/tsconfigs": "workspace:*",
     "@testing-library/jest-dom": "catalog:",

@@ -1,9 +1,19 @@
-import { Box, Button, Flex, Grid, Text, TextArea, TextField } from "@radix-ui/themes";
-import { type DragEvent } from "react";
+import { Box, Button, Flex, Grid, Text, TextField } from "@radix-ui/themes";
+import { lazy, Suspense } from "react";
 
 import { DiagnosticList } from "../components/diagnostics";
 import { environmentValue, setEnvironmentValue } from "../secrets";
 import { type ManifestValidation } from "../validation";
+
+/**
+ * Monaco は束ねると本体の数倍になる。この段はスペースに繋がるまで現れないので、
+ * 最初の読み込みに載せない。接続前の画面が Monaco を待つ理由が無い。
+ */
+const ManifestEditor = lazy(async () => {
+  const loaded = await import("../components/manifest-editor");
+
+  return { default: loaded.ManifestEditor };
+});
 
 export type ManifestStepProps = {
   text: string;
@@ -18,17 +28,6 @@ export type ManifestStepProps = {
   canPlan: boolean;
   planning: boolean;
   onPlan: () => void;
-};
-
-const readDroppedFile = async (
-  event: DragEvent<HTMLTextAreaElement>,
-  onFileDropped: (name: string, text: string) => void,
-): Promise<void> => {
-  const [file] = event.dataTransfer.files;
-
-  if (file !== undefined) {
-    onFileDropped(file.name, await file.text());
-  }
 };
 
 export const ManifestStep = ({
@@ -47,18 +46,14 @@ export const ManifestStep = ({
         <Text as="label" htmlFor="manifest" size="2" weight="medium">
           Manifest (paste, or drop a file here)
         </Text>
-        <TextArea
-          className="manifest-input"
-          id="manifest"
-          onChange={(event) => onTextChange(event.target.value)}
-          onDragOver={(event) => event.preventDefault()}
-          onDrop={(event) => {
-            event.preventDefault();
-            void readDroppedFile(event, onFileDropped);
-          }}
-          spellCheck={false}
-          value={text}
-        />
+        <Suspense fallback={<div className="manifest-editor" />}>
+          <ManifestEditor
+            id="manifest"
+            onChange={onTextChange}
+            onFileDropped={onFileDropped}
+            value={text}
+          />
+        </Suspense>
       </Flex>
       <Flex direction="column" gap="3">
         <Text size="2" weight="medium">
