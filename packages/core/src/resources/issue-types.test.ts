@@ -1,12 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  fixedPlanContext,
-  fixedReadContext,
-  fixedSnapshot,
-  secretPaths,
-} from "../../../test-utils/src/index";
-import { Secret } from "../secret";
+import { fixedPlanContext, fixedReadContext, fixedSnapshot } from "../../../test-utils/src/index";
 import { type IssueType } from "../manifest";
 import {
   DEFAULT_ISSUE_TYPE_SLOTS,
@@ -318,23 +312,22 @@ describe("未作成のプロジェクト", () => {
   });
 });
 
-describe("環境変数から展開した値", () => {
-  it("課題テンプレートが ${ENV} 由来なら計画に実値が現れない", () => {
+describe("文字列値の出力", () => {
+  it("課題テンプレートが マニフェストに指定すると計画に実値が現れる", () => {
     const actions = issueTypesReconciler.plan(
       [{ name: "バグ", color: "#990000", templateDescription: "社外秘の手順" }],
       { source: "project", issueTypes: [] },
-      fixedPlanContext({ isSecret: secretPaths("issueTypes/0/templateDescription") }),
+      fixedPlanContext(),
     );
 
-    expect(actions[0]?.request?.params.templateDescription).toBeInstanceOf(Secret);
-    expect(JSON.stringify(actions)).not.toContain("社外秘の手順");
+    expect(actions[0]?.request?.params.templateDescription).toBe("社外秘の手順");
   });
 
-  it("課題種別の名前は同定名なので ${ENV} 由来でもリクエストにも差分にも平文で出る", () => {
+  it("課題種別の名前はマニフェストに指定するとリクエストにも差分にも平文で出る", () => {
     const actions = issueTypesReconciler.plan(
       [{ name: "社外秘の課題種別", color: "#990000" }],
       { source: "project", issueTypes: [] },
-      fixedPlanContext({ isSecret: secretPaths("issueTypes/0/name") }),
+      fixedPlanContext(),
     );
 
     expect(actions[0]?.request?.params.name).toBe("社外秘の課題種別");
@@ -348,7 +341,7 @@ describe("環境変数から展開した値", () => {
 });
 
 describe("冪等性（NFR-4）", () => {
-  it("${ENV} 由来の課題テンプレートが現状と同じなら2回目は noop になる", () => {
+  it("マニフェストに指定した課題テンプレートが現状と同じなら2回目は noop になる", () => {
     const actions = issueTypesReconciler.plan(
       [{ name: "バグ", color: "#990000", templateDescription: "社外秘の手順" }],
       {
@@ -357,7 +350,7 @@ describe("冪等性（NFR-4）", () => {
           { id: 101, name: "バグ", color: "#990000", templateDescription: "社外秘の手順" },
         ],
       },
-      fixedPlanContext({ isSecret: secretPaths("issueTypes/0/templateDescription") }),
+      fixedPlanContext(),
     );
 
     expect(actions.map(({ op }) => op)).toEqual(["noop"]);

@@ -16,7 +16,6 @@ import { environmentValue } from "./secrets";
 export type ManifestValidation = {
   diagnostics: Diagnostic[];
   names: string[];
-  expandedPaths: Set<string>;
   manifest?: Manifest;
 };
 
@@ -44,7 +43,6 @@ export const validateInBrowser = ({ text, valueOf }: ValidateInput): ManifestVal
     return {
       diagnostics: orderDiagnostics(syntax.diagnostics),
       names: [],
-      expandedPaths: new Set(),
     };
   }
 
@@ -64,17 +62,16 @@ export const validateInBrowser = ({ text, valueOf }: ValidateInput): ManifestVal
   return {
     diagnostics: orderDiagnostics(diagnostics),
     names,
-    expandedPaths: validation.expandedPaths,
     ...(validation.manifest === undefined ? {} : { manifest: validation.manifest }),
   };
 };
 
-const EMPTY: ManifestValidation = { diagnostics: [], names: [], expandedPaths: new Set() };
+const EMPTY: ManifestValidation = { diagnostics: [], names: [] };
 
 let memo: Derived<ManifestValidation> | undefined;
 
 /**
- * 環境変数の値はモジュールにしか無い（§2.4）ので、描画からは見えない依存になる。印が
+ * 環境変数の入力値はモジュールに置くためので、描画からは見えない依存になる。印が
  * その値の代わりに変わるので、印を引数に取れば「同じ印なら同じ結果」が関数の外から言える。
  * `useMemo` に任せない — React Compiler は書いた依存配列を採らず、式が触っている
  * ものから依存を引き直すので、本文が読んでいない版の違いを落としてしまう。

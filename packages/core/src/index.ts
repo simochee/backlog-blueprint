@@ -69,7 +69,6 @@ export {
 export { webhooksReconciler } from "./resources/webhooks";
 export { declaredOrder, FIXED_ORDER_SECTIONS, resultingOrder } from "./resulting-order";
 export { projectSchemaPath, projectSchemaUrl, SCHEMA_DISTRIBUTION_ORIGIN } from "./schema-url";
-export { Secret, sealChanges, sealFields, sealer } from "./secret";
 export { authenticateExecutor } from "./validation/auth-stage";
 export { expandEnvironment, hasEnvSentinel, UNRESOLVED_ENV_ID } from "./validation/expand-stage";
 export { blocksNextStage, hasError, orderDiagnostics } from "./validation/gate";
@@ -105,7 +104,7 @@ export type {
   ProjectExport,
 } from "./export/create-export";
 export type { SerializeOptions } from "./export/serialize";
-export type { ToManifestResult, WebhookVariable } from "./export/to-manifest";
+export type { ToManifestResult } from "./export/to-manifest";
 export type { ExecuteContext, ExecutionEvent } from "./execution";
 export type {
   Access,
@@ -172,7 +171,6 @@ export type { ProjectDesired, ProjectSettingsSnapshot, ProjectSnapshot } from ".
 export type { ExistingStatus, StatusesSnapshot } from "./resources/statuses";
 export type { ExistingWebhook, WebhooksSnapshot } from "./resources/webhooks";
 export type { FixedOrderSection, ResourceOrder } from "./resulting-order";
-export type { Seal } from "./secret";
 export type { AuthStageResult } from "./validation/auth-stage";
 export type { RateLimit, Snapshot } from "./snapshot";
 export type { Environment, ExpandOptions, ExpandStageResult } from "./validation/expand-stage";

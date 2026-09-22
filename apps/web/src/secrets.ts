@@ -1,7 +1,7 @@
 import { type Environment } from "@backlog-blueprint/core";
 
 /**
- * 画面が秘匿値そのものを見ずに済むだけの事実を載せる。React Compiler は描画中に
+ * 画面が入力値を直接読まずに済むだけの事実を載せる。React Compiler は描画中に
  * 読んだモジュール変数を依存に数えないので、`hasApiKey()` のような関数呼び出しで
  * 渡すと、値が変わっても結果が使い回される。購読の返り値に載っていれば依存になる。
  */
@@ -12,7 +12,7 @@ export type SecretRevisions = {
 };
 
 /**
- * 秘匿値を React の state に載せない（§2.4 / FR-7.4）。state に置くと値が props として
+ * API キーを React の state に載せない（§2.4 / FR-7.4）。state に置くと値が props として
  * 画面の各所へ流れ、どこにも表示されないことを目視で確かめる仕事が残る。
  * モジュールスコープに閉じ、外に出すのは「何回書き換わったか」だけにする。
  */

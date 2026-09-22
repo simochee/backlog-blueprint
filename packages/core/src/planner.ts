@@ -152,12 +152,6 @@ export type Plan = {
 export type BuildPlanOptions = {
   manifest: Manifest;
   get: ReadContext["get"];
-  /**
-   * 既定値を持たせない（E-6 / FR-3.6）。「渡し忘れたら何も包まない」を許すと、
-   * 秘匿値が計画にそのまま載る経路が黙って開く。S2 が返す `expandedPaths` を
-   * そのまま述語にして渡す。
-   */
-  isSecret: PlanContext["isSecret"];
 };
 
 export type CreatePlanOptions = {
@@ -177,11 +171,7 @@ export type CreatePlanResult = { diagnostics: Diagnostic[]; plan?: Plan };
  * S5 から S7 まで（検証パイプライン §4 の `plan` / `apply`）。S1〜S4 を通った
  * マニフェストを受け取る。
  */
-export const buildPlan = async ({
-  manifest,
-  get,
-  isSecret,
-}: BuildPlanOptions): Promise<CreatePlanResult> => {
+export const buildPlan = async ({ manifest, get }: BuildPlanOptions): Promise<CreatePlanResult> => {
   const diagnostics: Diagnostic[] = [];
   const auth = await authenticateExecutor(get);
 
@@ -215,7 +205,7 @@ export const buildPlan = async ({
    * にも現れないので、ここで登録しないと適用の実行時に未解決参照で中断する。
    */
   const resolutions = seedResolutions(snapshots);
-  const actions = planActions(manifest, snapshots, { manifest, snapshot, isSecret });
+  const actions = planActions(manifest, snapshots, { manifest, snapshot });
   const order = resultingOrder(manifest, snapshots, actions);
 
   diagnostics.push(...validatePlan({ manifest, snapshot, snapshots, actions, order }));
@@ -247,7 +237,6 @@ export const createPlan = async ({
   const built = await buildPlan({
     manifest,
     get,
-    isSecret: (path) => validation.expandedPaths.has(path),
   });
 
   return {

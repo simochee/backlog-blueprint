@@ -1,11 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  fixedPlanContext,
-  fixedReadContext,
-  fixedSnapshot,
-  secretPaths,
-} from "../../../test-utils/src/index";
+import { fixedPlanContext, fixedReadContext, fixedSnapshot } from "../../../test-utils/src/index";
 import { type Status } from "../manifest";
 import {
   DEFAULT_STATUSES_EN,
@@ -236,12 +231,12 @@ describe("表示順", () => {
   });
 });
 
-describe("環境変数から展開した値", () => {
-  it("ステータス名は同定名なので ${ENV} 由来でもリクエストにも差分にも平文で出る", () => {
+describe("文字列値の出力", () => {
+  it("ステータス名はマニフェストに指定するとリクエストにも差分にも平文で出る", () => {
     const [create] = statusesReconciler.plan(
       [{ name: "社外秘ステータス", color: "#3b9dbd" }],
       { source: "project", statuses: [] },
-      fixedPlanContext({ isSecret: secretPaths("statuses/0/name") }),
+      fixedPlanContext(),
     );
 
     expect(create?.request?.params.name).toBe("社外秘ステータス");
@@ -255,7 +250,7 @@ describe("環境変数から展開した値", () => {
 });
 
 describe("冪等性", () => {
-  it("${ENV} 由来の色が現状と同じなら2回目は noop になる", () => {
+  it("マニフェストに指定した色が現状と同じなら2回目は noop になる", () => {
     const desired: Status[] = [
       ...defaults.slice(0, 2),
       { name: "レビュー中", color: "#3b9dbd" },
@@ -272,7 +267,7 @@ describe("冪等性", () => {
     const actions = statusesReconciler.plan(
       desired,
       { source: "project", statuses: applied },
-      fixedPlanContext({ isSecret: secretPaths("statuses/2/color") }),
+      fixedPlanContext(),
     );
 
     expect(actions.every(({ op }) => op === "noop")).toBe(true);

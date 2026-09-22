@@ -28,11 +28,10 @@ export const envReferencePattern = (): RegExp => /\$\$\{([^}]+)\}|\$\{([^}]+)\}/
 
 export type Environment = Record<string, string | undefined>;
 
-type StringExpansion = { text: string; expanded: boolean; unresolved: string[] };
+type StringExpansion = { text: string; unresolved: string[] };
 
 const expandString = (value: string, env: Environment): StringExpansion => {
   const unresolved = new Set<string>();
-  let expanded = false;
 
   const text = value.replaceAll(
     envReferencePattern(),
@@ -53,19 +52,16 @@ const expandString = (value: string, env: Environment): StringExpansion => {
         return envSentinel(name);
       }
 
-      expanded = true;
-
       return resolved;
     },
   );
 
-  return { text, expanded, unresolved: [...unresolved] };
+  return { text, unresolved: [...unresolved] };
 };
 
 export type ExpandStageResult = {
   diagnostics: Diagnostic[];
   parsed: ParsedDocument;
-  expandedPaths: Set<string>;
   unresolvedPaths: Set<string>;
 };
 
@@ -76,16 +72,11 @@ export const expandEnvironment = (
   { env, severity }: ExpandOptions,
 ): ExpandStageResult => {
   const diagnostics: Diagnostic[] = [];
-  const expandedPaths = new Set<string>();
   const unresolvedPaths = new Set<string>();
 
   const walk = (value: unknown, path: string): unknown => {
     if (typeof value === "string") {
-      const { text, expanded, unresolved } = expandString(value, env);
-
-      if (expanded) {
-        expandedPaths.add(path);
-      }
+      const { text, unresolved } = expandString(value, env);
 
       for (const name of unresolved) {
         unresolvedPaths.add(path);
@@ -119,7 +110,6 @@ export const expandEnvironment = (
   return {
     diagnostics,
     parsed: { value: walk(parsed.value, ROOT_PATH), source: parsed.source },
-    expandedPaths,
     unresolvedPaths,
   };
 };

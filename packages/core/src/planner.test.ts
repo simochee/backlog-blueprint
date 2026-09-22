@@ -7,7 +7,6 @@ import {
   httpFailure,
   recordingGet,
   recordingSend,
-  secretPaths,
 } from "../../test-utils/src/index";
 import { buildPlan, createPlan } from "./planner";
 import { schemaStage } from "./validation/schema-stage";
@@ -193,20 +192,18 @@ describe("検証済みのマニフェストからの組み立て", () => {
     const { plan: created } = await buildPlan({
       manifest: fixedManifest(declared),
       get: fixedGet(fixedSpaceResponses()),
-      isSecret: secretPaths(),
     });
 
     expect(created?.actions.map(({ id }) => id)).toContain("issueTypes/create/タスク");
   });
 
-  it("${ENV} 由来の値は計画に平文で載らない", async () => {
+  it("文字列値は計画に平文で載る", async () => {
     const { plan: created } = await buildPlan({
       manifest: fixedManifest({ ...declared, webhooks: [webhook] }),
       get: fixedGet(fixedSpaceResponses()),
-      isSecret: secretPaths("webhooks/0/hookUrl"),
     });
     const hook = created?.actions.find(({ kind }) => kind === "webhook");
 
-    expect(JSON.stringify(hook?.request?.params)).not.toContain("hooks.example");
+    expect(hook?.request?.params.hookUrl).toBe("https://hooks.example/T0/B0");
   });
 });

@@ -17,12 +17,6 @@ export type ReadContext = {
 export type PlanContext = {
   manifest: Manifest;
   snapshot: Snapshot;
-  /**
-   * 包む対象を reconciler 側で列挙しない（E-4 / E-6）。キー名で列挙する形にすると
-   * 対象の追加漏れがそのまま漏洩になるので、`${ENV}` 由来かどうかは S2 が集めた
-   * path の集合にだけ聞く。
-   */
-  isSecret: (path: string) => boolean;
 };
 
 /**

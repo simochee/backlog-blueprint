@@ -1,7 +1,6 @@
 import { type Action, type Change } from "../action";
 import { type Webhook } from "../manifest";
 import { type Reconciler } from "../reconciler";
-import { Secret, sealChanges, sealer, type Seal } from "../secret";
 import { type Value } from "../value";
 import { ascendingEventIds, WEBHOOK_EVENTS, type WebhookEvent } from "../webhook-events";
 import {
@@ -18,8 +17,7 @@ export type ExistingWebhook = {
   id: number;
   name: string;
   description?: string;
-  /** 登録済みの URL は Backlog 側にしか無く、plan は CI ログに出る（§6.4 / PO-3） */
-  hookUrl: Secret;
+  hookUrl: string;
   allEvent: boolean;
   activityTypeIds: number[];
 };
@@ -35,8 +33,6 @@ const EVENT_IDS_BY_NAME: ReadonlyMap<string, number> = new Map(
 const collectionPath = (projectKey: string) => `/api/v2/projects/${projectKey}/webhooks`;
 
 const memberPath = (projectKey: string, id: number) => `${collectionPath(projectKey)}/${id}`;
-
-const basePath = (index: number) => `webhooks/${index}`;
 
 /**
  * 名前を落とすのは、S3 が未知の名前を既に弾いているため（W-4 前半）。
@@ -62,11 +58,9 @@ const desiredEvents = (events: Webhook["events"]) =>
 const existingEvents = ({ allEvent, activityTypeIds }: ExistingWebhook) =>
   allEvent ? ALL_EVENTS : activityTypeIdsOf(activityTypeIds);
 
-const revealed = (value: Value | null) => (value instanceof Secret ? value.reveal() : value);
-
 const sameValue = (before: Value | null, after: Value | null) => {
-  const left = revealed(before);
-  const right = revealed(after);
+  const left = before;
+  const right = after;
 
   if (Array.isArray(left) && Array.isArray(right)) {
     return left.length === right.length && left.every((item, index) => item === right[index]);
@@ -99,16 +93,13 @@ const changesOf = (desired: Webhook, existing: ExistingWebhook | undefined): Cha
   },
 ];
 
-const paramsOf = (desired: Webhook, index: number, seal: Seal): Record<string, Value> => {
+const paramsOf = (desired: Webhook): Record<string, Value> => {
   const events = desiredEvents(desired.events);
-  const path = (field: string) => `${basePath(index)}/${field}`;
 
   return {
-    name: seal(path("name"), desired.name),
-    ...(desired.description === undefined
-      ? {}
-      : { description: seal(path("description"), desired.description) }),
-    hookUrl: seal(path("hookUrl"), desired.hookUrl),
+    name: desired.name,
+    ...(desired.description === undefined ? {} : { description: desired.description }),
+    hookUrl: desired.hookUrl,
     allEvent: events === ALL_EVENTS,
     ...(events === ALL_EVENTS ? {} : { activityTypeIds: events }),
   };
@@ -130,23 +121,22 @@ export const webhooksReconciler: Reconciler<Webhook[], WebhooksSnapshot> = {
         id: requiredNumber(webhook, "id"),
         name: requiredString(webhook, "name"),
         description: optionalString(webhook, "description"),
-        hookUrl: new Secret(requiredString(webhook, "hookUrl")),
+        hookUrl: requiredString(webhook, "hookUrl"),
         allEvent: requiredBoolean(webhook, "allEvent"),
         activityTypeIds: numbers(webhook, "activityTypeIds"),
       };
     });
   },
 
-  plan: (desired, snapshot, { manifest, isSecret }) => {
-    const seal = sealer(isSecret);
+  plan: (desired, snapshot, { manifest }) => {
     const creates: Action[] = [];
     const updates: Action[] = [];
     const kept = new Set<number>();
 
-    for (const [index, webhook] of desired.entries()) {
+    for (const webhook of desired) {
       const existing = snapshot.find(({ name }) => name === webhook.name);
       const declared = changesOf(webhook, existing);
-      const changes = sealChanges(declared, basePath(index), seal);
+      const changes = declared;
 
       if (existing === undefined) {
         creates.push({
@@ -158,7 +148,7 @@ export const webhooksReconciler: Reconciler<Webhook[], WebhooksSnapshot> = {
           request: {
             method: "POST",
             path: collectionPath(manifest.key),
-            params: paramsOf(webhook, index, seal),
+            params: paramsOf(webhook),
           },
           provides: [{ kind: "webhook", name: webhook.name }],
           changes,
@@ -194,7 +184,7 @@ export const webhooksReconciler: Reconciler<Webhook[], WebhooksSnapshot> = {
         request: {
           method: "PATCH",
           path: memberPath(manifest.key, existing.id),
-          params: paramsOf(webhook, index, seal),
+          params: paramsOf(webhook),
         },
         changes,
         writeRequest: true,

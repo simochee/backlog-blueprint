@@ -79,7 +79,7 @@ const withWebhook = (hookUrl: string): string =>
   `${MANIFEST}webhooks:\n  - name: notify\n    hookUrl: ${hookUrl}\n    events:\n      - issueCreated\n`;
 
 /**
- * モジュールスコープに閉じた秘匿値と送信層（§2.4）は、テストのあいだも1つしかない。
+ * モジュールスコープに閉じた API キーと送信層（§2.4）は、テストのあいだも1つしかない。
  * 読み込み直さないと、前のテストが打った API キーと開いた接続が次のテストに残る。
  */
 const startApp = async (responses: Record<string, unknown> = {}): Promise<UserEvent> => {
@@ -276,9 +276,9 @@ describe("マニフェストの受け取り方", () => {
   });
 });
 
-describe("秘匿値の置き場所", () => {
-  it("秘匿値が現れるのは type=password の入力欄だけで、計画には出ない", async () => {
-    const hookUrl = "https://hooks.example.com/must-never-be-rendered";
+describe("入力値の表示", () => {
+  it("環境変数の値は計画に表示され、API キーは表示されない", async () => {
+    const hookUrl = "https://hooks.example.com/from-environment";
     const user = await startApp();
 
     await connect(user);
@@ -292,12 +292,9 @@ describe("秘匿値の置き場所", () => {
     await user.click(screen.getByRole("button", { name: "Done" }));
     await plan(user);
 
-    expect(screen.getByText(/webhook .+ hookUrl \*\*\*/)).toBeInTheDocument();
+    expect(screen.getByText(new RegExp(hookUrl))).toBeInTheDocument();
     expect(document.body.textContent).not.toContain(API_KEY);
-    expect(document.body.textContent).not.toContain(hookUrl);
     expect(carrying(API_KEY)).toStrictEqual(["INPUT:password"]);
-    /** 畳めば入力欄ごと消えるので、秘匿値は DOM のどこにも残らない。 */
-    expect(carrying(hookUrl)).toStrictEqual([]);
   });
 });
 

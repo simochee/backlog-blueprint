@@ -167,8 +167,7 @@ the count.
 ## Values from the environment
 
 Any string value may contain `${NAME}`, which is replaced with the environment variable of that
-name. It exists so that webhook URLs and anything else you would rather not commit can stay out of
-the file.
+name. Use it for values that vary between environments, including names and template text.
 
 ```yaml
 webhooks:
@@ -177,23 +176,13 @@ webhooks:
 ```
 
 An undefined variable is an error — except under `validate`, where it is only a warning, so that a
-CI job without access to your secrets can still check the manifest. To write the characters
-literally, escape the expansion as `$${NAME}`.
+CI job can check the manifest without those values. To write the characters literally, escape the
+expansion as `$${NAME}`.
 
-Values that came from the environment are masked everywhere the tool prints anything: `plan` shows
-`hookUrl ***`, and so do progress lines, errors and the JSON output.
-
-**Names are the exception.** A project `key`, any resource `name` or `oldname`, an entry in
-`access`, and a name in `applicableIssueTypes` are printed as they are even when they came from an
-environment variable. These are how the tool refers to a resource: they appear in the plan, in the
-identifiers the JSON output uses, and in the report you get if `apply` stops partway. Masking them
-would leave that report unable to say which resource it had reached — and the same value would
-still be visible in the surrounding request, so it would be masking in name only.
-
-`validate` warns when a name comes from the environment. It is a warning rather than an error
-because giving a category or milestone a different name per environment is a reasonable thing to
-do. The project's display name — the top-level `name` — is not an identifier, so it is masked like
-any other value and the warning does not apply to it.
+Expanded values appear in `plan` and its JSON output like values written directly in YAML. The tool
+cannot determine whether a manifest value is sensitive. Keep values you do not want in output out
+of the manifest you plan or export. The API key is handled separately and does not appear in plan
+or apply output.
 
 In the browser there is no environment, so the Web UI reads the names out of your manifest and asks
 you to fill them in.
@@ -275,16 +264,15 @@ about to edit. `settings` is the exception, because a scalar key that is not wri
 what Backlog has" rather than "remove it": only the keys Backlog reported are written, and if it
 reported none, the key is left out altogether instead of appearing as `settings: {}`.
 
-Three things are deliberately absent from the result. There is no `oldname` anywhere, because
-`oldname` is a hint about where a resource came from and a project can only tell you where it is
-now. Whether a milestone is archived is not written, and neither is the archived flag of the project
-itself, since the manifest has no key for either; an archived milestone comes out as an ordinary
-one, and a template applied to a new project creates everything unarchived. And no webhook URL is
-written. Each one becomes `${WEBHOOK_URL_1}`, `${WEBHOOK_URL_2}` and so on, numbered by the
-webhook's position in the list, with the mapping from variable to webhook name printed on standard
-error. A URL that lives in Backlog is not in your repository, and `export` is not the thing that
-should put it there. Set those variables and the manifest is complete: `plan` against the project it
-came from reports no changes.
+`oldname` is absent because it is a hint about where a resource came from and a project can only
+tell you where it is now. Whether a milestone is archived is not written, and neither is the
+archived flag of the project itself, since the manifest has no key for either. An archived
+milestone comes out as an ordinary one, and a template applied to a new project creates
+everything unarchived.
+
+Webhook URLs are written as Backlog returns them. Replace any of them with `${NAME}` yourself if
+you want to supply a different value for each environment. With no edits, `plan` against the
+project it came from reports no changes.
 
 Someone who belongs to one of the project's teams **and** joined it individually is written under
 `members` as well. `plan` will point that membership out as a repetition — it costs one more

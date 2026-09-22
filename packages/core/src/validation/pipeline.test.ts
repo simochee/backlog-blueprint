@@ -158,15 +158,14 @@ webhooks:
   });
 });
 
-describe("展開した値の経路", () => {
-  it("展開できた path が結果に載る", () => {
+describe("展開した値", () => {
+  it("展開後の値がマニフェストに載る", () => {
     const result = validateManifest({
       text: `${MANIFEST}webhooks:\n  - name: 通知\n    hookUrl: \${SLACK_URL}\n    events: all\n`,
       schemaStage: acceptingSchemaStage,
       env: { SLACK_URL: "https://hooks.example/abc" },
     });
 
-    expect([...result.expandedPaths]).toEqual(["webhooks/0/hookUrl"]);
     expect(result.manifest?.webhooks[0]?.hookUrl).toBe("https://hooks.example/abc");
   });
 });

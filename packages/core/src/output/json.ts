@@ -74,11 +74,7 @@ export type ApplyJson = PlanJson & {
   pending: ActionId[];
 };
 
-/**
- * `Secret` を自前でマスクしない。`toJSON()` が `"***"` を返すので、値を持ち回る
- * だけでマスクされる（PO-4）。未解決の `Ref` も潰さずそのまま載せる（PO-5）。
- * `changes` を差分のある項目だけに絞らないのは PO-11。
- */
+/** 未解決の `Ref` はそのまま載せる（PO-5）。`changes` は全項目を含む（PO-11）。 */
 const actionJson = ({
   id,
   phase,

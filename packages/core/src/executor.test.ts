@@ -12,7 +12,6 @@ import { execute } from "./executor";
 import { DEFAULT_ISSUE_TYPE_SLOTS, issueTypesReconciler } from "./resources/issue-types";
 import { projectReconciler } from "./resources/project";
 import { type ResolutionTable } from "./resolution";
-import { Secret } from "./secret";
 
 class ApiError extends Error {
   readonly status: number;
@@ -409,10 +408,10 @@ describe("解決表への登録", () => {
   });
 });
 
-describe("秘匿値の扱い", () => {
-  it("Executor は Secret を実値に戻さないまま送信層へ渡す", async () => {
+describe("Webhook URL の送信", () => {
+  it("Executor は計画の文字列値を送信層へ渡す", async () => {
     const { ctx, sent } = harness();
-    const hookUrl = new Secret("https://hooks.example.test/T000/B000");
+    const hookUrl = "https://hooks.example.test/T000/B000";
     const request: HttpRequest = {
       method: "POST",
       path: "/api/v2/projects/PROJ/webhooks",
@@ -422,7 +421,6 @@ describe("秘匿値の扱い", () => {
     await run([anAction({ kind: "webhook", request })], ctx);
 
     expect(sent[0]?.params["hookUrl"]).toBe(hookUrl);
-    expect(String(sent[0]?.params["hookUrl"])).toBe("***");
   });
 });
 

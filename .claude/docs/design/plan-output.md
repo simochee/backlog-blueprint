@@ -28,7 +28,7 @@ Blueprint: PROJ_A (example.backlog.com)
   ~ statusOrder    未対応, 処理中, レビュー中, 処理済み, 完了
   + projectTeam    "開発チーム"
   + projectMember  "suzuki"
-  + webhook        "Slack 通知"   hookUrl ***
+  + webhook        "Slack 通知"   hookUrl "https://hooks.example.com/T000/B000"
 
 Warnings:
   ! [V-A16] access.members: "suzuki" already belongs to team "開発チーム"
@@ -112,7 +112,7 @@ Project does not exist and will be created.
 | リソース名 | 利用者が Backlog 上で付けた名前はそのまま出す（翻訳しない。要件定義 §5.3） |
 | 余った既定の枠 | 新規プロジェクトで余った既定課題種別の削除は `- issueType  (unused default)` と描く。`Action.name` は位置を表す数字だが、それを利用者に見せる意味が無い（[core §4.1](core-reconciler.md#41-フェーズと-read)） |
 | ツールのメッセージ | 英語のみ（NFR-9） |
-| マスク | `Secret`（`${ENV}` 由来）は `***`。Yaml に直接書かれた値は出す（E-4 / E-5） |
+| 値 | `${ENV}` 由来も含めて変更前後の実値を出す（E-8）。API キーは計画に含めない（NFR-3） |
 | 色 | **書き出す先のストリームが TTY のときだけ**。本文は stdout、診断・進捗・警告は stderr（[§1.3](cli-and-web-ui.md#13-標準出力と標準エラー出力)）なので、**2つを別々に判定する**。`--no-color` と環境変数 `NO_COLOR` はどちらも無効化する |
 | 警告 | 本体の後に `Warnings:` セクションでまとめる。検証 ID を必ず付ける |
 
@@ -236,7 +236,7 @@ Warnings:
 | PO-11 | `Action.changes` は**リクエストに載る全フィールド**を持つ。値が変わらない項目も含める | 「何を送るか」を JSON が完全に表すため（PO-3 と同じ理由）。人間向け出力が変わった項目だけを描くのは**描画側の絞り込み**であって、データを間引いているのではない |
 | PO-12 | 参照を持つフィールド（`applicableIssueTypes` / ステータスの表示順）の `changes` は、ID や `Ref` ではなく**名前**で表す | `changes` は人間が読む差分である。`request.params` が ID や `Ref` を持つのとは形が違ってよい |
 | PO-3 | `request`（実際に飛ぶ HTTP リクエスト）を含める | 「何が起きるか」の最も正確な表現。PR コメントに貼るだけでなく、監査・不具合報告にそのまま使える |
-| PO-4 | `Secret` は `"***"` にシリアライズされる | `Secret.toJSON()` がマスクを返すので、`request.params` に載っていても漏れない（NFR-3 / AC-10） |
+| PO-4 | `request.params` の値をそのまま JSON に出す | `Action` に API キーを含めない（NFR-3 / AC-10） |
 | PO-5 | 未解決の `Ref` はそのまま `{"$ref":{...}}` として出す | 適用前に ID が存在しないという事実を、偽の値で埋めずに表現する |
 | PO-6 | `formatVersion` は整数。**破壊的変更のときだけ**上げる | キーの追加は上げない。消費側は未知のキーを無視する前提で書けばよい |
 | PO-7 | stdout には JSON **だけ**を書く | `\| jq` が素通しで動く。進捗・警告・ログは stderr（[CLI 仕様](cli-and-web-ui.md#13-標準出力と標準エラー出力)） |

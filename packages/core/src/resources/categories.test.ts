@@ -1,11 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  fixedPlanContext,
-  fixedReadContext,
-  fixedSnapshot,
-  secretPaths,
-} from "../../../test-utils/src/index";
+import { fixedPlanContext, fixedReadContext, fixedSnapshot } from "../../../test-utils/src/index";
 import { type Category } from "../manifest";
 import { categoriesReconciler, type CategoriesSnapshot } from "./categories";
 
@@ -160,12 +155,12 @@ describe("カテゴリーの oldname", () => {
   });
 });
 
-describe("環境変数から展開した値", () => {
-  it("カテゴリー名は同定名なので ${ENV} 由来でもリクエストにも差分にも平文で出る", () => {
+describe("文字列値の出力", () => {
+  it("カテゴリー名はマニフェストに指定するとリクエストにも差分にも平文で出る", () => {
     const [action] = categoriesReconciler.plan(
       [{ name: "社外秘カテゴリー" }],
       [],
-      fixedPlanContext({ isSecret: secretPaths("categories/0/name") }),
+      fixedPlanContext(),
     );
 
     expect(action?.request?.params.name).toBe("社外秘カテゴリー");
@@ -175,11 +170,11 @@ describe("環境変数から展開した値", () => {
 });
 
 describe("冪等性（NFR-4）", () => {
-  it("${ENV} 由来のカテゴリー名が現状と同じなら2回目は noop になる", () => {
+  it("マニフェストに指定したカテゴリー名が現状と同じなら2回目は noop になる", () => {
     const actions = categoriesReconciler.plan(
       [{ name: "社外秘カテゴリー" }],
       [{ id: 11, name: "社外秘カテゴリー" }],
-      fixedPlanContext({ isSecret: secretPaths("categories/0/name") }),
+      fixedPlanContext(),
     );
 
     expect(actions.map(({ op }) => op)).toEqual(["noop"]);

@@ -1,12 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  fixedPlanContext,
-  fixedReadContext,
-  fixedSnapshot,
-  secretPaths,
-} from "../../../test-utils/src/index";
-import { Secret } from "../secret";
+import { fixedPlanContext, fixedReadContext, fixedSnapshot } from "../../../test-utils/src/index";
 import { type Milestone } from "../manifest";
 import { milestonesReconciler, type MilestonesSnapshot } from "./milestones";
 
@@ -252,23 +246,22 @@ describe("マイルストーンの oldname", () => {
   });
 });
 
-describe("環境変数から展開した値", () => {
-  it("説明が ${ENV} 由来なら計画に実値が現れない", () => {
+describe("文字列値の出力", () => {
+  it("説明が マニフェストに指定すると計画に実値が現れる", () => {
     const actions = milestonesReconciler.plan(
       [{ name: "v1.0", description: "社外秘の説明" }],
       [],
-      fixedPlanContext({ isSecret: secretPaths("milestones/0/description") }),
+      fixedPlanContext(),
     );
 
-    expect(actions[0]?.request?.params.description).toBeInstanceOf(Secret);
-    expect(JSON.stringify(actions)).not.toContain("社外秘の説明");
+    expect(actions[0]?.request?.params.description).toBe("社外秘の説明");
   });
 
-  it("マイルストーン名は同定名なので ${ENV} 由来でもリクエストにも差分にも平文で出る", () => {
+  it("マイルストーン名はマニフェストに指定するとリクエストにも差分にも平文で出る", () => {
     const actions = milestonesReconciler.plan(
       [{ name: "社外秘マイルストーン" }],
       [],
-      fixedPlanContext({ isSecret: secretPaths("milestones/0/name") }),
+      fixedPlanContext(),
     );
 
     expect(actions[0]?.request?.params.name).toBe("社外秘マイルストーン");
@@ -280,11 +273,11 @@ describe("環境変数から展開した値", () => {
 });
 
 describe("冪等性（NFR-4）", () => {
-  it("${ENV} 由来の説明が現状と同じなら2回目は noop になる", () => {
+  it("マニフェストに指定した説明が現状と同じなら2回目は noop になる", () => {
     const actions = milestonesReconciler.plan(
       [{ name: "v1.0", description: "社外秘の説明" }],
       [{ id: 21, name: "v1.0", description: "社外秘の説明" }],
-      fixedPlanContext({ isSecret: secretPaths("milestones/0/description") }),
+      fixedPlanContext(),
     );
 
     expect(actions.map(({ op }) => op)).toEqual(["noop"]);

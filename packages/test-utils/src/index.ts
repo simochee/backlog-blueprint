@@ -8,7 +8,6 @@
 import {
   DEFAULT_STATUSES_JA,
   normalizeManifest,
-  Secret,
   type ExecuteContext,
   type HttpFailure,
   type Manifest,
@@ -179,7 +178,7 @@ export const exportableResourceSnapshots = (
       id: 41,
       name: "Slack 通知",
       description: "課題の追加・更新を Slack に流す",
-      hookUrl: new Secret(EXPORTABLE_WEBHOOK_URL),
+      hookUrl: EXPORTABLE_WEBHOOK_URL,
       allEvent: false,
       activityTypeIds: [1, 2],
     },
@@ -250,20 +249,8 @@ export const fixedReadContext = (
 export const fixedPlanContext = (overrides: Partial<PlanContext> = {}): PlanContext => ({
   manifest: fixedManifest(),
   snapshot: fixedSnapshot(),
-  isSecret: () => false,
   ...overrides,
 });
-
-/**
- * 展開された path を集合で受ける。`${ENV}` 由来かどうかを述語で書かせると、
- * テストごとに「どの path が秘匿か」の表現が変わり、S2 が返す `expandedPaths`
- * （E-6）と同じ形で書けているかが読み取れなくなる。
- */
-export const secretPaths = (...paths: string[]): PlanContext["isSecret"] => {
-  const expanded = new Set(paths);
-
-  return (path) => expanded.has(path);
-};
 
 export { mockBacklog, withoutWritePacing } from "./mock-backlog";
 export type {

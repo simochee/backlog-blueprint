@@ -5,9 +5,7 @@ import {
   fixedPlanContext,
   fixedReadContext,
   fixedSnapshot,
-  secretPaths,
 } from "../../../test-utils/src/index";
-import { Secret } from "../secret";
 import { projectReconciler, type ProjectSnapshot } from "./project";
 
 const missingProject = fixedSnapshot({ project: { exists: false } });
@@ -163,35 +161,30 @@ describe("settings", () => {
   });
 });
 
-describe("環境変数から展開した値", () => {
-  it("プロジェクト名が ${ENV} 由来なら計画に実値が現れない", () => {
+describe("文字列値の出力", () => {
+  it("プロジェクト名が マニフェストに指定すると計画に実値が現れる", () => {
     const actions = projectReconciler.plan(
       desired({ name: "極秘プロジェクト" }),
       { exists: false },
-      fixedPlanContext({ isSecret: secretPaths("name") }),
+      fixedPlanContext(),
     );
 
-    expect(actions[0]?.request?.params.name).toBeInstanceOf(Secret);
-    expect(JSON.stringify(actions)).not.toContain("極秘プロジェクト");
+    expect(actions[0]?.request?.params.name).toBe("極秘プロジェクト");
   });
 
-  it("基本設定の値が ${ENV} 由来ならその値だけが包まれる", () => {
+  it("基本設定の値が マニフェストに指定するとその値が送られる", () => {
     const actions = projectReconciler.plan(
       desired({ name: "プロジェクトA", settings: { textFormattingRule: "markdown" } }),
       existing(),
-      fixedPlanContext({ isSecret: secretPaths("settings/textFormattingRule") }),
+      fixedPlanContext(),
     );
 
-    expect(actions[0]?.request?.params.textFormattingRule).toBeInstanceOf(Secret);
+    expect(actions[0]?.request?.params.textFormattingRule).toBe("markdown");
     expect(actions[0]?.request?.params.name).toBe("プロジェクトA");
   });
 
-  it("プロジェクトキーは同定名なので ${ENV} 由来でもリクエストにも差分にも平文で出る", () => {
-    const actions = projectReconciler.plan(
-      desired(),
-      { exists: false },
-      fixedPlanContext({ isSecret: secretPaths("key") }),
-    );
+  it("プロジェクトキーはマニフェストに指定するとリクエストにも差分にも平文で出る", () => {
+    const actions = projectReconciler.plan(desired(), { exists: false }, fixedPlanContext());
 
     expect(actions[0]?.request?.params.key).toBe("PROJ_A");
     expect(actions[0]?.changes).toContainEqual({ field: "key", before: null, after: "PROJ_A" });
@@ -228,21 +221,21 @@ describe("送るものと前後差分の対応（PO-11）", () => {
 });
 
 describe("冪等性（NFR-4）", () => {
-  it("${ENV} 由来のプロジェクト名が現状と同じなら2回目は何も起きない", () => {
+  it("マニフェストに指定したプロジェクト名が現状と同じなら2回目は何も起きない", () => {
     const actions = projectReconciler.plan(
       desired({ name: "極秘プロジェクト" }),
       existing({ name: "極秘プロジェクト" }),
-      fixedPlanContext({ isSecret: secretPaths("name") }),
+      fixedPlanContext(),
     );
 
     expect(actions.map(({ op }) => op)).toEqual(["noop"]);
   });
 
-  it("${ENV} 由来の基本設定が現状と同じなら2回目は何も起きない", () => {
+  it("マニフェストに指定した基本設定が現状と同じなら2回目は何も起きない", () => {
     const actions = projectReconciler.plan(
       desired({ settings: { textFormattingRule: "markdown" } }),
       existing({ settings: { textFormattingRule: "markdown" } }),
-      fixedPlanContext({ isSecret: secretPaths("settings/textFormattingRule") }),
+      fixedPlanContext(),
     );
 
     expect(actions.map(({ op }) => op)).toEqual(["noop"]);

@@ -7,7 +7,6 @@ import {
   type ExecutionEvent,
   type ExportNotesInput,
   type Manifest,
-  type PlanContext,
   type ReadContext,
   type ResolutionTable,
   type ResultingOrder,
@@ -56,7 +55,6 @@ export type PlanOutcome = { diagnostics: Diagnostic[]; plan?: PlanResult };
 export type BuildPlan = (input: {
   manifest: Manifest;
   get: ReadContext["get"];
-  isSecret: PlanContext["isSecret"];
 }) => Promise<PlanOutcome>;
 
 export type CreateExport = (input: CreateExportOptions) => Promise<CreateExportResult>;

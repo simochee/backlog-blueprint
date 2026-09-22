@@ -23,30 +23,6 @@ const namedResources = (manifest: Manifest): NamedResource[] => [
 
 const pathOf = (...segments: (string | number)[]): string => segments.join("/");
 
-/**
- * トップレベルの `name`（プロジェクト名）は数えない。V-A25 が警告する根拠は
- * 同定名が解決表のキーと `Action.id` を兼ねて `Secret` にできないこと（E-7）で、
- * プロジェクトを指すキーは `key` である。プロジェクト名は `request.params` と
- * `changes` にしか載らないので包める（V-A22 が同じ理由で対象外にしている）。
- */
-const identifyingNames = (manifest: Manifest, resources: NamedResource[]): string[] => [
-  "key",
-  ...resources.flatMap(({ key, items }) =>
-    items.flatMap((item, index) => [
-      pathOf(key, index, "name"),
-      ...(item.oldname === undefined ? [] : [pathOf(key, index, "oldname")]),
-    ]),
-  ),
-  ...(["teams", "members", "administrators"] as const).flatMap((key) =>
-    manifest.access[key].map((_, index) => pathOf("access", key, index)),
-  ),
-  ...manifest.customFields.flatMap((field, index) =>
-    (field.applicableIssueTypes ?? []).map((_, reference) =>
-      pathOf("customFields", index, "applicableIssueTypes", reference),
-    ),
-  ),
-];
-
 const exceeds = (min: number | string, max: number | string): boolean => {
   if (typeof min === "number" && typeof max === "number") {
     return min > max;
@@ -59,11 +35,7 @@ const exceeds = (min: number | string, max: number | string): boolean => {
   return false;
 };
 
-export const validateStaticSemantics = (
-  manifest: Manifest,
-  source: SourceMap,
-  expandedPaths: ReadonlySet<string>,
-): Diagnostic[] => {
+export const validateStaticSemantics = (manifest: Manifest, source: SourceMap): Diagnostic[] => {
   const diagnostics: Diagnostic[] = [];
 
   const push =
@@ -227,19 +199,6 @@ export const validateStaticSemantics = (
       checkBrace(pathOf(key, index, "name"), "name", item.name);
       checkBrace(pathOf(key, index, "oldname"), "oldname", item.oldname);
     }
-  }
-
-  for (const path of identifyingNames(manifest, resources)) {
-    if (!expandedPaths.has(path)) {
-      continue;
-    }
-
-    warn(
-      "V-A25",
-      path,
-      "this name comes from an environment variable and is printed as written",
-      "names identify resources: they are the keys of the reference table and part of the action id, so plan and the interrupted-apply report cannot mask them. write the name in the manifest, or keep secret values out of names",
-    );
   }
 
   for (const [index, webhook] of manifest.webhooks.entries()) {

@@ -122,14 +122,14 @@ describe("plan の機械向け出力", () => {
     ]);
   });
 
-  it("実際に飛ぶリクエストを含め、環境変数由来の値は伏せる", () => {
+  it("実際に飛ぶリクエストと値を含む", () => {
     const webhook = parsed(renderPlanJson(walkthroughReport()));
     const actions = webhook["actions"] as { id: string; request?: { params: unknown } }[];
     const created = actions.find(({ id }) => id === "webhooks/create/Slack 通知");
 
     expect(created?.request?.params).toEqual({
       name: "Slack 通知",
-      hookUrl: "***",
+      hookUrl: "https://hooks.example.com/T000/B000",
       allEvent: false,
       activityTypeIds: [1, 2],
     });

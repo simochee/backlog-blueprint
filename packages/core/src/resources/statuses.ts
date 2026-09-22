@@ -1,7 +1,6 @@
 import { type Action, type Change } from "../action";
 import { type Status } from "../manifest";
 import { type Reconciler } from "../reconciler";
-import { sealChanges, sealFields, sealer } from "../secret";
 import { type IdOrRef, type Ref, type Value } from "../value";
 import { asArrayOf, asRecord, requiredNumber, requiredString } from "../api-response";
 
@@ -69,8 +68,6 @@ export const isDefaultStatus = ({ id }: ExistingStatus): boolean => id <= LAST_D
 const statusesPath = (key: string): string => `/api/v2/projects/${key}/statuses`;
 
 const statusRef = (name: string): Ref => ({ $ref: { kind: "status", name } });
-
-const basePath = (index: number): string => `statuses/${index}`;
 
 const sameOrder = (left: string[], right: string[]): boolean =>
   left.length === right.length && left.every((name, index) => name === right[index]);
@@ -146,7 +143,6 @@ export const statusesReconciler: Reconciler<Status[], StatusesSnapshot> = {
 
   plan(desired, statusesSnapshot, ctx) {
     const { key } = ctx.manifest;
-    const seal = sealer(ctx.isSecret);
     const snapshot =
       statusesSnapshot.source === "project" ? statusesSnapshot.statuses : defaultStatuses(desired);
     const byName = new Map(snapshot.map((status) => [status.name, status]));
@@ -157,7 +153,7 @@ export const statusesReconciler: Reconciler<Status[], StatusesSnapshot> = {
     const creates: Action[] = [];
     const updates: Action[] = [];
 
-    for (const [index, item] of desired.entries()) {
+    for (const item of desired) {
       const sameName = byName.get(item.name);
 
       if (sameName !== undefined) {
@@ -187,9 +183,9 @@ export const statusesReconciler: Reconciler<Status[], StatusesSnapshot> = {
                 request: {
                   method: "PATCH",
                   path: `${statusesPath(key)}/${sameName.id}`,
-                  params: sealFields(declaredFields(item), basePath(index), seal),
+                  params: declaredFields(item),
                 },
-                changes: sealChanges(changes, basePath(index), seal),
+                changes,
                 writeRequest: true,
               },
         );
@@ -216,9 +212,9 @@ export const statusesReconciler: Reconciler<Status[], StatusesSnapshot> = {
           request: {
             method: "PATCH",
             path: `${statusesPath(key)}/${renamed.id}`,
-            params: sealFields(declaredFields(item), basePath(index), seal),
+            params: declaredFields(item),
           },
-          changes: sealChanges(changesOf(item, renamed), basePath(index), seal),
+          changes: changesOf(item, renamed),
           notes: [{ type: "renamed", from: renamed.name }],
           provides: [{ kind: "status", name: item.name }],
           writeRequest: true,
@@ -239,10 +235,10 @@ export const statusesReconciler: Reconciler<Status[], StatusesSnapshot> = {
         request: {
           method: "POST",
           path: statusesPath(key),
-          params: sealFields(declaredFields(item), basePath(index), seal),
+          params: declaredFields(item),
         },
         provides: [{ kind: "status", name: item.name }],
-        changes: sealChanges(changesOf(item, undefined), basePath(index), seal),
+        changes: changesOf(item, undefined),
         writeRequest: true,
       });
     }

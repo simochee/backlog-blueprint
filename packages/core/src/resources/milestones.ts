@@ -1,7 +1,6 @@
 import { type Action, type Change } from "../action";
 import { type Milestone } from "../manifest";
 import { type Reconciler } from "../reconciler";
-import { sealChanges, sealer } from "../secret";
 import {
   asArrayOf,
   asRecord,
@@ -27,8 +26,6 @@ const FIELDS = ["name", "description", "startDate", "releaseDueDate"] as const;
 const collectionPath = (projectKey: string) => `/api/v2/projects/${projectKey}/versions`;
 
 const memberPath = (projectKey: string, id: number) => `${collectionPath(projectKey)}/${id}`;
-
-const basePath = (index: number) => `milestones/${index}`;
 
 /**
  * 応答の日付をそのまま持たない。時刻付きで返ってきた場合に、同じ日付でも
@@ -77,20 +74,15 @@ export const milestonesReconciler: Reconciler<Milestone[], MilestonesSnapshot> =
     });
   },
 
-  plan: (desired, snapshot, { manifest, isSecret }) => {
-    const seal = sealer(isSecret);
+  plan: (desired, snapshot, { manifest }) => {
     const creates: Action[] = [];
     const updates: Action[] = [];
     const kept = new Set<number>();
 
-    for (const [index, milestone] of desired.entries()) {
+    for (const milestone of desired) {
       const existing = findExisting(snapshot, milestone);
-      /**
-       * 一致の判定は包む前の値で行う。`Secret` は `===` で一致しないので、包んだ値を
-       * 比べると `${ENV}` を書いたマイルストーンが毎回 update になり NFR-4 が崩れる。
-       */
       const declared = changesOf(milestone, existing);
-      const changes = sealChanges(declared, basePath(index), seal);
+      const changes = declared;
 
       if (existing === undefined) {
         creates.push({

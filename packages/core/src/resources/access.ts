@@ -159,11 +159,6 @@ export const accessReconciler: Reconciler<Access, AccessSnapshot> = {
     return { teams: [], members: [], administrators: [], spaceUsers, spaceTeams };
   },
 
-  /**
-   * `isSecret` を引かない。`access` の各要素は同定名なので、`${ENV}` 由来でも
-   * 包まない（E-7）。ここで包むと、解決表のキーにも `Action.id` にも使えなくなる。
-   * `${ENV}` で書かれていたら V-A25 が警告する。
-   */
   plan: (desired, snapshot, { manifest }) => {
     const projectKey = manifest.key;
 

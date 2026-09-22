@@ -42,13 +42,13 @@ describe("貼り付けられたマニフェストをブラウザの中で検証�
     ]);
   });
 
-  it("値を入れた path は秘匿値として扱われる", () => {
+  it("値を入れた path は通常の文字列として扱われる", () => {
     const result = validateInBrowser({
       text: MANIFEST,
       valueOf: entered({ SLACK_WEBHOOK_URL: "https://hooks.example/abc" }),
     });
 
-    expect(result.expandedPaths.has("webhooks/0/hookUrl")).toBe(true);
+    expect(result.manifest?.webhooks[0]?.hookUrl).toBe("https://hooks.example/abc");
   });
 
   it("入力欄を作るべき名前を返す", () => {

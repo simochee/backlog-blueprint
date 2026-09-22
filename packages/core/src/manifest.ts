@@ -618,13 +618,6 @@ export const normalizeManifest = (manifest: ManifestInput) => ({
   webhooks: orEmpty(manifest.webhooks),
 });
 
-/**
- * 文字列のフィールドを `string | Secret` に広げない（E-6）。`${ENV}` 由来かどうかは
- * 展開された path の集合として S2 が別に返し、`Secret` で包むのは `Action` を
- * 組み立てるときだけである。ここに `Secret` を混ぜると、10色パレットの enum も
- * `minLength` もパターンも `reveal()` を経由することになり、
- * 「`reveal()` は送信の直前だけ」という不変条件が崩れる。
- */
 export type Manifest = ReturnType<typeof normalizeManifest>;
 
 export type Access = Manifest["access"];

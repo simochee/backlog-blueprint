@@ -11,11 +11,6 @@ type HttpRequestOf<ParamValue> = {
 
 export type HttpRequest = HttpRequestOf<Value>;
 
-/**
- * Secret を剥がした型にしない。§2.4 が `reveal()` を呼ぶのは HTTP 送信の直前だけと
- * 定めており、直前にあたるのは本文を組み立てる層である。ここで実値にすると、
- * Executor から送信層までの区間を生値が裸で流れ、その区間の例外やログに載る。
- */
 export type ResolvedHttpRequest = HttpRequestOf<ResolvedValue>;
 
 export type Change = { field: string; before: Value | null; after: Value | null };
