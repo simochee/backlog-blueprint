@@ -260,3 +260,44 @@ The two forms are checked differently, for that reason. A name the tool does not
 error, because a name can only be a typo. A number it does not recognize is a warning, because it
 might be a typo or might be the new event you are reaching for. In the plan, numbers are shown with
 their names where the tool knows them.
+
+## Starting from an existing project
+
+`export <KEY>` writes a project out as a manifest, in the key order the schema defines, so what you
+get back reads like a file you would have written by hand. It describes the project as it is at
+that moment and nothing else: there is no comparison with a file you already have, and no state
+kept between runs.
+
+Every list key is written even when it is empty. `categories: []` says that the project has no
+categories, whereas a missing key would leave you wondering whether the tool had simply not looked
+— and since an absent list means deletion, that is not a question to leave open in a file you are
+about to edit. `settings` is the exception, because a scalar key that is not written means "keep
+what Backlog has" rather than "remove it": only the keys Backlog reported are written, and if it
+reported none, the key is left out altogether instead of appearing as `settings: {}`.
+
+Three things are deliberately absent from the result. There is no `oldname` anywhere, because
+`oldname` is a hint about where a resource came from and a project can only tell you where it is
+now. Archived milestones and the archived flag of the project itself are not written, since the
+manifest has no way to say them; a template applied to a new project creates everything unarchived.
+And no webhook URL is written. Each one becomes `${WEBHOOK_URL_1}`, `${WEBHOOK_URL_2}` and so on,
+numbered by the webhook's position in the list, with the mapping from variable to webhook name
+printed on standard error. A URL that lives in Backlog is not in your repository, and `export` is
+not the thing that should put it there. Set those variables and the manifest is complete: `plan`
+against the project it came from reports no changes.
+
+Someone who belongs to one of the project's teams **and** joined it individually is written under
+`members` as well. `plan` will point that membership out as a repetition — it costs one more
+request — but it is not one the tool can drop for you. Removing the line would not remove the
+repetition; it would make the manifest say that this person is not an individual member, and the
+next `apply` would take their individual membership away.
+
+A project can be in a state no manifest can describe: two categories with the same name, a name
+containing `}`, a status whose color is not one of the ten, a webhook subscribed to nothing. When
+that happens `export` writes nothing at all and lists every such problem at once, so you fix them in
+Backlog and run it again rather than discovering them one at a time. Writing the file anyway would
+mean handing you something the same tool's own `validate` rejects.
+
+One edit is always yours to make. The `key` and `name` that come out point at the project you
+exported, so a manifest used as a template has to be given new ones before it is applied — which is
+also what stops you from applying it back onto a project that is already in use, since `plan` and
+`apply` still refuse a project that holds issues.
