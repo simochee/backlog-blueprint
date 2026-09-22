@@ -134,17 +134,20 @@ NFR-3（API キーをログ・出力・エラーに出さない）を守って�
 
 ```
 $ backlog-blueprint export PROJ_A > projects/PROJ_A.yaml
-NOTE  PROJ_A holds 43 issues, so plan and apply will refuse it as a target (V-B3).
-  → to use this manifest as a template, change key and name before you apply it.
+NOTE  PROJ_A holds 43 issues, so plan and apply will refuse it as a target (V-B3)
+  → to use this manifest as a template, change key and name before you apply it
+
 NOTE  2 webhook URLs were left out of the manifest and replaced with ${WEBHOOK_URL_n}:
     WEBHOOK_URL_1  "Slack 通知"
     WEBHOOK_URL_2  "監査ログ"
-  → set each variable to the URL shown on that webhook's page in Backlog before running plan.
-    validate does not need them.
+  → set each variable to the URL shown on that webhook's page in Backlog before running plan. validate does not need them
 ```
 
-行頭は既存の `ERROR` / `!` と同じく語のあとに2スペース。1件のときは単数形にする
-（`1 webhook URL was left out ... replaced with ${WEBHOOK_URL_1}:`）。
+行頭は既存の `ERROR` / `!` と同じく語のあとに2スペース。案内どうしの間は空行1つ。
+1件のときは単数形にする（`holds 1 issue` /
+`1 webhook URL was left out ... replaced with ${WEBHOOK_URL_1}:`）。
+
+`→` の行の末尾にピリオドを置かないのは既存の `hint` に揃えるためである。
 
 ### CL-9: `export` の終了コードは 0 と 1 だけ
 

@@ -48,6 +48,8 @@ export const STATUS_COLORS = [
   "#393939",
 ] as const;
 
+export const TEXT_FORMATTING_RULES = ["backlog", "markdown"] as const;
+
 export const CUSTOM_FIELD_TYPE_IDS = {
   text: 1,
   textArea: 2,
@@ -93,6 +95,71 @@ const TYPE_SPECIFIC_CUSTOM_FIELD_KEYS = [
   "allowAddItem",
 ] as const;
 
+export type TypeSpecificCustomFieldKey = (typeof TYPE_SPECIFIC_CUSTOM_FIELD_KEYS)[number];
+
+type ForbiddenKeys = readonly TypeSpecificCustomFieldKey[];
+
+const LIST_FORBIDDEN_KEYS = [
+  "min",
+  "max",
+  "unit",
+  "initialValue",
+  "initialDate",
+  "initialValueType",
+  "initialShift",
+] as const satisfies ForbiddenKeys;
+
+const NUMBER_FORBIDDEN_KEYS = [
+  "items",
+  "allowInput",
+  "allowAddItem",
+  "initialDate",
+  "initialValueType",
+  "initialShift",
+] as const satisfies ForbiddenKeys;
+
+const DATE_FORBIDDEN_KEYS = [
+  "items",
+  "allowInput",
+  "allowAddItem",
+  "unit",
+  "initialValue",
+] as const satisfies ForbiddenKeys;
+
+const FORBIDDEN_KEYS_BY_TYPE = {
+  text: TYPE_SPECIFIC_CUSTOM_FIELD_KEYS,
+  textArea: TYPE_SPECIFIC_CUSTOM_FIELD_KEYS,
+  number: NUMBER_FORBIDDEN_KEYS,
+  date: DATE_FORBIDDEN_KEYS,
+  singleList: LIST_FORBIDDEN_KEYS,
+  multipleList: LIST_FORBIDDEN_KEYS,
+  checkBox: LIST_FORBIDDEN_KEYS,
+  radio: LIST_FORBIDDEN_KEYS,
+} as const satisfies Record<CustomFieldType, ForbiddenKeys>;
+
+const FORBIDDEN_KEYS_BY_INITIAL_VALUE_TYPE = {
+  today: ["initialDate", "initialShift"],
+  todayPlusShift: ["initialDate"],
+  specifiedDate: ["initialShift"],
+} as const satisfies Record<InitialValueType, ForbiddenKeys>;
+
+/**
+ * 書き出し（EX-11）が型ごとの許可キーを自前の表で持たない形にするための入口。
+ * 条件表と射影が別々の表を引くと、M-1 が「手書きの JSON Schema と実行時バリデータを
+ * 二重に持つと必ずズレる」として退けた形に戻る。
+ */
+export const typeSpecificCustomFieldKeys = (
+  type: CustomFieldType,
+  initialValueType: InitialValueType | undefined,
+): TypeSpecificCustomFieldKey[] => {
+  const forbidden: ForbiddenKeys = [
+    ...FORBIDDEN_KEYS_BY_TYPE[type],
+    ...FORBIDDEN_KEYS_BY_INITIAL_VALUE_TYPE[initialValueType ?? "today"],
+  ];
+
+  return TYPE_SPECIFIC_CUSTOM_FIELD_KEYS.filter((key) => !forbidden.includes(key));
+};
+
 const forbid = (...keys: readonly string[]): Record<string, false> =>
   Object.fromEntries(keys.map((key) => [key, false]));
 
@@ -121,15 +188,7 @@ const CUSTOM_FIELD_CONDITIONS = [
       properties: {
         // `type` は `minItems` と併記する。Ajv の strict モードが単独の `minItems` を拒む。
         items: { type: "array", minItems: 1 },
-        ...forbid(
-          "min",
-          "max",
-          "unit",
-          "initialValue",
-          "initialDate",
-          "initialValueType",
-          "initialShift",
-        ),
+        ...forbid(...LIST_FORBIDDEN_KEYS),
       },
     },
   },
@@ -138,14 +197,7 @@ const CUSTOM_FIELD_CONDITIONS = [
     then: {
       properties: {
         ...NUMBER_RANGE,
-        ...forbid(
-          "items",
-          "allowInput",
-          "allowAddItem",
-          "initialDate",
-          "initialValueType",
-          "initialShift",
-        ),
+        ...forbid(...NUMBER_FORBIDDEN_KEYS),
       },
     },
   },
@@ -154,7 +206,7 @@ const CUSTOM_FIELD_CONDITIONS = [
     then: {
       properties: {
         ...DATE_RANGE,
-        ...forbid("items", "allowInput", "allowAddItem", "unit", "initialValue"),
+        ...forbid(...DATE_FORBIDDEN_KEYS),
       },
     },
   },
@@ -163,18 +215,24 @@ const CUSTOM_FIELD_CONDITIONS = [
       properties: { initialValueType: { const: "specifiedDate" } },
       required: ["initialValueType"],
     },
-    then: { required: ["initialDate"], properties: forbid("initialShift") },
+    then: {
+      required: ["initialDate"],
+      properties: forbid(...FORBIDDEN_KEYS_BY_INITIAL_VALUE_TYPE.specifiedDate),
+    },
   },
   {
     if: {
       properties: { initialValueType: { const: "todayPlusShift" } },
       required: ["initialValueType"],
     },
-    then: { required: ["initialShift"], properties: forbid("initialDate") },
+    then: {
+      required: ["initialShift"],
+      properties: forbid(...FORBIDDEN_KEYS_BY_INITIAL_VALUE_TYPE.todayPlusShift),
+    },
   },
   {
     if: { properties: { initialValueType: { const: "today" } }, required: ["initialValueType"] },
-    then: { properties: forbid("initialDate", "initialShift") },
+    then: { properties: forbid(...FORBIDDEN_KEYS_BY_INITIAL_VALUE_TYPE.today) },
   },
   {
     if: { properties: { type: { enum: ["text", "textArea"] } }, required: ["type"] },
@@ -190,7 +248,7 @@ const CUSTOM_FIELD_CONDITIONS = [
 const SettingsSchema = StrictObject(
   {
     textFormattingRule: Type.Optional(
-      StringEnum(["backlog", "markdown"], {
+      StringEnum(TEXT_FORMATTING_RULES, {
         description: "The markup syntax for issue and wiki text.",
       }),
     ),
@@ -527,6 +585,10 @@ export const ManifestSchema = StrictObject({
 });
 
 export type Settings = Static<typeof SettingsSchema>;
+
+/** 射影（EX-10）が14個のキーを並べ直さずに済むよう、スキーマの並びをそのまま渡す */
+export const SETTINGS_KEYS = Object.keys(SettingsSchema.properties) as (keyof Settings)[];
+
 export type IssueType = Static<typeof IssueTypeSchema>;
 export type Status = Static<typeof StatusSchema>;
 export type Category = Static<typeof CategorySchema>;
