@@ -191,3 +191,53 @@ describe("スキーマステージの配線", () => {
     expect(diagnostics.every(({ id }) => id === "V-A21")).toBe(true);
   });
 });
+
+describe("真偽値・数値の欄に書いた環境変数（E-10）", () => {
+  const TEXT = `key: PROJ_A
+name: プロジェクトA
+settings:
+  chartEnabled: \${CHART}
+issueTypes:
+  - name: タスク
+    color: "#7ea800"
+access:
+  teams:
+    - \${QA_TEAM}
+`;
+
+  it("解決した値が型の表記どおりなら、そのままスキーマ検証を通る", () => {
+    const result = validateManifest({
+      text: TEXT,
+      schemaStage,
+      env: { CHART: "false", QA_TEAM: "31" },
+    });
+
+    expect(result.diagnostics).toEqual([]);
+    expect(result.manifest).toMatchObject({
+      settings: { chartEnabled: false },
+      access: { teams: [31] },
+    });
+  });
+
+  it("解決した値が型に合わなければ、その行のスキーマ違反として報告される", () => {
+    const result = validateManifest({
+      text: TEXT,
+      schemaStage,
+      env: { CHART: "yes", QA_TEAM: "31" },
+    });
+
+    expect(result.diagnostics).toEqual([
+      expect.objectContaining({ stage: "schema", path: "settings/chartEnabled", line: 4 }),
+    ]);
+  });
+
+  it("未解決の参照は、真偽値・数値の欄でも V-A4 としてだけ報告される", () => {
+    const result = validateManifest({
+      text: TEXT,
+      schemaStage,
+      unresolvedEnvSeverity: "warning",
+    });
+
+    expect(result.diagnostics.map(({ id }) => id)).toEqual(["V-A4", "V-A4"]);
+  });
+});

@@ -1,4 +1,6 @@
 import { type Diagnostic } from "../diagnostic";
+import { ManifestSchema } from "../manifest";
+import { admittedTypes, descend, schemaCursor, type SchemaCursor } from "./schema-cursor";
 import { ROOT_PATH, childPath, type ParsedDocument } from "./source-map";
 
 export const UNRESOLVED_ENV_ID = "V-A4";
@@ -59,6 +61,31 @@ const expandString = (value: string, env: Environment): StringExpansion => {
   return { text, unresolved: [...unresolved] };
 };
 
+const WHOLE_REFERENCE = /^\$\{[^}]+\}$/;
+
+const JSON_NUMBER = /^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$/;
+
+/**
+ * 解決した値を YAML として読み直さない（E-10）。`#e30000` はコメントとして `null` になり、
+ * 文字列の欄に渡した `123` まで数値になる。変換するのは、その位置のスキーマが
+ * 受け付ける型の JSON 表記だけである。
+ */
+const coerceWholeReference = (text: string, cursor: SchemaCursor): unknown => {
+  const types = admittedTypes(cursor);
+
+  if (types.has("boolean") && (text === "true" || text === "false")) {
+    return text === "true";
+  }
+
+  if ((types.has("number") || types.has("integer")) && JSON_NUMBER.test(text)) {
+    const number = Number(text);
+
+    return Number.isFinite(number) ? number : text;
+  }
+
+  return text;
+};
+
 export type ExpandStageResult = {
   diagnostics: Diagnostic[];
   parsed: ParsedDocument;
@@ -74,7 +101,7 @@ export const expandEnvironment = (
   const diagnostics: Diagnostic[] = [];
   const unresolvedPaths = new Set<string>();
 
-  const walk = (value: unknown, path: string): unknown => {
+  const walk = (value: unknown, path: string, cursor: SchemaCursor): unknown => {
     if (typeof value === "string") {
       const { text, unresolved } = expandString(value, env);
 
@@ -91,16 +118,21 @@ export const expandEnvironment = (
         });
       }
 
-      return text;
+      return unresolved.length === 0 && WHOLE_REFERENCE.test(value)
+        ? coerceWholeReference(text, cursor)
+        : text;
     }
 
     if (Array.isArray(value)) {
-      return value.map((item, index) => walk(item, childPath(path, index)));
+      return value.map((item, index) => walk(item, childPath(path, index), descend(cursor, index)));
     }
 
     if (typeof value === "object" && value !== null) {
       return Object.fromEntries(
-        Object.entries(value).map(([key, item]) => [key, walk(item, childPath(path, key))]),
+        Object.entries(value).map(([key, item]) => [
+          key,
+          walk(item, childPath(path, key), descend(cursor, key)),
+        ]),
       );
     }
 
@@ -109,7 +141,10 @@ export const expandEnvironment = (
 
   return {
     diagnostics,
-    parsed: { value: walk(parsed.value, ROOT_PATH), source: parsed.source },
+    parsed: {
+      value: walk(parsed.value, ROOT_PATH, schemaCursor(ManifestSchema)),
+      source: parsed.source,
+    },
     unresolvedPaths,
   };
 };

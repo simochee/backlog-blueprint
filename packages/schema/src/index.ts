@@ -5,12 +5,16 @@
  */
 import { ManifestSchema, projectSchemaPath, projectSchemaUrl } from "@backlog-blueprint/core";
 
+import { acceptEnvReferences } from "./accept-env-references";
+
+export { isEnvReferenceBranch } from "./accept-env-references";
+
 const DIALECT = "https://json-schema.org/draft/2020-12/schema";
 
 export const projectSchema = (version: string) => ({
   $schema: DIALECT,
   $id: projectSchemaUrl(version),
-  ...ManifestSchema,
+  ...acceptEnvReferences(ManifestSchema),
 });
 
 export type SchemaArtifact = { path: string; contents: string };

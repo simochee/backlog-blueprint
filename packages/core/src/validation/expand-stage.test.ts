@@ -102,3 +102,72 @@ describe("解決できない環境変数", () => {
     expect(hasEnvSentinel((parsed.value as { name: string }).name)).toBe(false);
   });
 });
+
+describe("真偽値・数値を受け付ける欄への展開（E-10）", () => {
+  const valueOf = (text: string, env: Environment) => expand(text, env).parsed.value;
+
+  it("値全体が1つの参照なら、真偽値の欄では真偽値になる", () => {
+    expect(valueOf("settings:\n  chartEnabled: ${CHART}\n", { CHART: "true" })).toEqual({
+      settings: { chartEnabled: true },
+    });
+  });
+
+  it("値全体が1つの参照なら、整数の欄では数値になる", () => {
+    expect(valueOf("access:\n  teams:\n    - ${QA_TEAM}\n", { QA_TEAM: "31" })).toEqual({
+      access: { teams: [31] },
+    });
+  });
+
+  it("文字列の欄では、数値に見える値も文字列のまま残る", () => {
+    expect(valueOf("name: ${NAME}\n", { NAME: "123" })).toEqual({ name: "123" });
+  });
+
+  it("ほかの文字と並べた参照は変換されない", () => {
+    expect(
+      valueOf("settings:\n  chartEnabled: ${CHART}${SUFFIX}\n", { CHART: "tr", SUFFIX: "ue" }),
+    ).toEqual({
+      settings: { chartEnabled: "true" },
+    });
+  });
+
+  it("$$ でエスケープしたリテラルは変換されない", () => {
+    expect(valueOf("settings:\n  chartEnabled: $${CHART}\n", { CHART: "true" })).toEqual({
+      settings: { chartEnabled: "${CHART}" },
+    });
+  });
+
+  it("JSON の表記でない値は変換されず、文字列のまま型の検証に渡る", () => {
+    expect(valueOf("settings:\n  chartEnabled: ${CHART}\n", { CHART: "yes" })).toEqual({
+      settings: { chartEnabled: "yes" },
+    });
+    expect(valueOf("access:\n  teams:\n    - ${QA_TEAM}\n", { QA_TEAM: "0x1F" })).toEqual({
+      access: { teams: ["0x1F"] },
+    });
+  });
+
+  it("数値として表せない大きさの値は、文字列のまま型の検証に渡る", () => {
+    expect(
+      valueOf("customFields:\n  - name: 見積\n    type: number\n    initialValue: ${INITIAL}\n", {
+        INITIAL: "1e400",
+      }),
+    ).toMatchObject({ customFields: [{ initialValue: "1e400" }] });
+  });
+
+  it("カスタム属性の範囲は、数値なら数値に、日付なら文字列のままになる", () => {
+    const text =
+      "customFields:\n  - name: 見積\n    type: number\n    min: ${MIN}\n    max: ${MAX}\n";
+
+    expect(valueOf(text, { MIN: "-1.5", MAX: "2026-12-31" })).toMatchObject({
+      customFields: [{ min: -1.5, max: "2026-12-31" }],
+    });
+  });
+
+  it("Webhook のイベントは、数値なら ID に、名前なら文字列のままになる", () => {
+    const text =
+      "webhooks:\n  - name: 通知\n    hookUrl: https://hooks.example\n    events:\n      - ${ID}\n      - ${EVENT}\n";
+
+    expect(valueOf(text, { ID: "12", EVENT: "issueCreated" })).toMatchObject({
+      webhooks: [{ events: [12, "issueCreated"] }],
+    });
+  });
+});
