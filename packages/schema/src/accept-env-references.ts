@@ -9,6 +9,11 @@ const ENV_REFERENCE = {
   pattern: String.raw`(?:^|[^$])\$\{[^}]+\}`,
 };
 
+export const isEnvReferenceBranch = (schema: unknown): boolean =>
+  typeof schema === "object" &&
+  schema !== null &&
+  (schema as SchemaNode).pattern === ENV_REFERENCE.pattern;
+
 const SCALAR_KEYWORDS = ["pattern", "enum", "const"];
 
 const NON_STRING_SCALAR_TYPES = new Set(["boolean", "number", "integer"]);

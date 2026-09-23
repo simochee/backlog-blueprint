@@ -1,18 +1,10 @@
-import { projectSchema } from "@backlog-blueprint/schema";
 import { Compartment, EditorState } from "@codemirror/state";
 import { catppuccinLatte, catppuccinMocha } from "@catppuccin/codemirror";
 import { basicSetup, EditorView } from "codemirror";
-import { yamlSchema } from "codemirror-json-schema/yaml";
 import { useEffect, useRef, type DragEvent } from "react";
 
 import { useAppearance } from "../appearance";
-
-/**
- * スキーマは走っているコードからその場で渡す。公開 URL を読ませると版がずれうるし、
- * 開くたびに通信が要る。`codemirror-json-schema` は draft-07 の型で受けるので、
- * 型の口だけ合わせる（中身は同じ JSON Schema の構造である）。
- */
-const SCHEMA = projectSchema(__SCHEMA_VERSION__) as Parameters<typeof yamlSchema>[0];
+import { manifestSchemaExtensions } from "../manifest-schema";
 
 export type ManifestEditorProps = {
   id: string;
@@ -63,7 +55,7 @@ export const ManifestEditor = ({ id, value, onChange, onFileDropped }: ManifestE
         doc: value,
         extensions: [
           basicSetup,
-          yamlSchema(SCHEMA),
+          manifestSchemaExtensions(),
           theme.current.of(startedDark.current ? catppuccinMocha : catppuccinLatte),
           /** ラベルは器の div に結び付かないので、編集領域そのものに持たせる。 */
           EditorView.contentAttributes.of({ "aria-label": "Manifest" }),

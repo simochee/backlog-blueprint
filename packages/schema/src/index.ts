@@ -7,6 +7,8 @@ import { ManifestSchema, projectSchemaPath, projectSchemaUrl } from "@backlog-bl
 
 import { acceptEnvReferences } from "./accept-env-references";
 
+export { isEnvReferenceBranch } from "./accept-env-references";
+
 const DIALECT = "https://json-schema.org/draft/2020-12/schema";
 
 export const projectSchema = (version: string) => ({

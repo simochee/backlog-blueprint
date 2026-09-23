@@ -50,5 +50,11 @@ export default defineConfig({
   test: {
     environment: "happy-dom",
     setupFiles: ["./src/test-setup.ts"],
+    /**
+     * codemirror-json-schema の ESM は拡張子の無い相対 import で書かれていて、
+     * 外部モジュールのまま Node に読ませると解決できない。ブラウザ向けのビルドは
+     * Vite が束ねるので困らず、テストだけがこれを要る。
+     */
+    server: { deps: { inline: ["codemirror-json-schema"] } },
   },
 });

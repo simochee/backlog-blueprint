@@ -2,15 +2,9 @@ import { ManifestSchema, projectSchemaPath, projectSchemaUrl } from "@backlog-bl
 import { Ajv2020 } from "ajv/dist/2020.js";
 import { describe, expect, it } from "vitest";
 
-import { projectSchema, projectSchemaArtifact } from "./index";
+import { isEnvReferenceBranch, projectSchema, projectSchemaArtifact } from "./index";
 
 type Node = Record<string, unknown>;
-
-const isReferenceBranch = (value: unknown): boolean =>
-  typeof value === "object" &&
-  value !== null &&
-  "pattern" in value &&
-  String((value as Node).pattern).includes(String.raw`\$\{`);
 
 const withoutReferenceBranches = (value: unknown): unknown => {
   if (Array.isArray(value)) {
@@ -22,7 +16,7 @@ const withoutReferenceBranches = (value: unknown): unknown => {
 
   const node = value as Node;
 
-  if (Array.isArray(node.anyOf) && node.anyOf.length === 2 && isReferenceBranch(node.anyOf[1])) {
+  if (Array.isArray(node.anyOf) && node.anyOf.length === 2 && isEnvReferenceBranch(node.anyOf[1])) {
     return withoutReferenceBranches(node.anyOf[0]);
   }
 
@@ -34,7 +28,7 @@ const withoutReferenceBranches = (value: unknown): unknown => {
 const at = (schema: unknown, ...keys: string[]): Node =>
   keys.reduce<Node>((node, key) => node[key] as Node, schema as Node);
 
-const validatePublished = new Ajv2020({ allErrors: true, strict: false }).compile(
+const validatePublished = new Ajv2020({ allErrors: true, strict: true }).compile(
   projectSchema("1.2.3"),
 );
 
