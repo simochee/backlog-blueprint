@@ -50,4 +50,37 @@ describe("マニフェスト入力欄の検証（E-9）", () => {
     expect(message).toContain("boolean");
     expect(message).not.toContain("does not match any schema");
   });
+
+  it("数値型のカスタム属性の範囲に書いた文字列は、数値でないこととして報告される", () => {
+    const [message] = messages(
+      `${HEADER}customFields:\n  - name: 見積\n    type: number\n    min: abc\n`,
+    );
+
+    expect(message).toContain("number");
+    expect(message).not.toContain("does not match any schema");
+  });
+
+  it("日付型のカスタム属性の範囲は、日付の形式の違反として報告される", () => {
+    const [message] = messages(
+      `${HEADER}customFields:\n  - name: 期日\n    type: date\n    min: 2026/01/01\n`,
+    );
+
+    expect(message).toContain(String.raw`\d{4}`);
+    expect(message).not.toContain("does not match any schema");
+  });
+
+  it("Webhook のイベントの誤りは、書ける形として all を挙げて報告される", () => {
+    const [message] = messages(
+      `${HEADER}webhooks:\n  - name: 通知\n    hookUrl: https://hooks.example\n    events: alll\n`,
+    );
+
+    expect(message).toContain("`all`");
+    expect(message).not.toContain("undefined");
+  });
+
+  it("違反の報告は、どのキーの値かを含む", () => {
+    const [message] = messages("key: proj_a\nname: プロジェクトA\n");
+
+    expect(message).toContain("key");
+  });
 });
