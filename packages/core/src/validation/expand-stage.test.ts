@@ -145,6 +145,14 @@ describe("真偽値・数値を受け付ける欄への展開（E-10）", () => 
     });
   });
 
+  it("数値として表せない大きさの値は、文字列のまま型の検証に渡る", () => {
+    expect(
+      valueOf("customFields:\n  - name: 見積\n    type: number\n    initialValue: ${INITIAL}\n", {
+        INITIAL: "1e400",
+      }),
+    ).toMatchObject({ customFields: [{ initialValue: "1e400" }] });
+  });
+
   it("カスタム属性の範囲は、数値なら数値に、日付なら文字列のままになる", () => {
     const text =
       "customFields:\n  - name: 見積\n    type: number\n    min: ${MIN}\n    max: ${MAX}\n";

@@ -78,7 +78,9 @@ const coerceWholeReference = (text: string, cursor: SchemaCursor): unknown => {
   }
 
   if ((types.has("number") || types.has("integer")) && JSON_NUMBER.test(text)) {
-    return Number(text);
+    const number = Number(text);
+
+    return Number.isFinite(number) ? number : text;
   }
 
   return text;
