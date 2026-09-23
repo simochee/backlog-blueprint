@@ -708,6 +708,56 @@ describe("Output パネル", () => {
     expect(divider.compareDocumentPosition(result) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
+  it("計画だけの項目には、Plan / Apply のアンカーを出さない", async () => {
+    const user = await startApp();
+
+    await reach(user);
+
+    expect(within(region("Output")).queryByRole("navigation", { name: "Sections" })).toBeNull();
+  });
+
+  it("適用した項目の見出しには Plan / Apply のアンカーが出て、初めは Plan を読んでいることを示す", async () => {
+    const user = await startApp();
+
+    await reach(user);
+    await apply(user);
+    await within(region("Output")).findByText(/Apply complete/);
+
+    const sections = within(region("Output")).getByRole("navigation", { name: "Sections" });
+
+    expect(within(sections).getByRole("button", { name: "Jump to plan" })).toHaveAttribute(
+      "aria-current",
+      "location",
+    );
+    expect(within(sections).getByRole("button", { name: "Jump to apply" })).not.toHaveAttribute(
+      "aria-current",
+    );
+  });
+
+  it("アンカーを押すと、今読んでいる部分としてその部分が示される", async () => {
+    const user = await startApp();
+
+    await reach(user);
+    await apply(user);
+    await within(region("Output")).findByText(/Apply complete/);
+
+    const sections = within(region("Output")).getByRole("navigation", { name: "Sections" });
+
+    await user.click(within(sections).getByRole("button", { name: "Jump to apply" }));
+
+    expect(within(sections).getByRole("button", { name: "Jump to apply" })).toHaveAttribute(
+      "aria-current",
+      "location",
+    );
+
+    await user.click(within(sections).getByRole("button", { name: "Jump to plan" }));
+
+    expect(within(sections).getByRole("button", { name: "Jump to plan" })).toHaveAttribute(
+      "aria-current",
+      "location",
+    );
+  });
+
   it("畳んでおいても、Plan を押すと開いてその結果を出す", async () => {
     const user = await startApp();
 

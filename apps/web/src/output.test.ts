@@ -6,6 +6,7 @@ import {
   applicableEntry,
   entryLabel,
   isOutdated,
+  sectionAt,
   type ApplyContext,
   type NewEntry,
   type OutputEntry,
@@ -141,5 +142,32 @@ describe("計画が古くなったか", () => {
 
     expect(first === undefined ? undefined : isOutdated(first, STAMP)).toBe(false);
     expect(first === undefined ? undefined : isOutdated(first, "edited")).toBe(true);
+  });
+});
+
+const APPLY_START = 400;
+
+const position = (scrollTop: number) => ({ scrollTop, clientHeight: 300, scrollHeight: 1000 });
+
+describe("読んでいる部分", () => {
+  it("Apply の区切りが上端に届くまでは Plan", () => {
+    expect(sectionAt(position(0), APPLY_START)).toBe("plan");
+    expect(sectionAt(position(399), APPLY_START)).toBe("plan");
+  });
+
+  it("Apply の区切りが上端に届いたら Apply", () => {
+    expect(sectionAt(position(400), APPLY_START)).toBe("apply");
+  });
+
+  it("適用のログが短くて区切りが上端まで上がらなくても、最後までスクロールすれば Apply", () => {
+    expect(sectionAt(position(700), 850)).toBe("apply");
+  });
+
+  it("スクロールしなくても全部見えているときは Plan", () => {
+    expect(sectionAt({ scrollTop: 0, clientHeight: 300, scrollHeight: 300 }, 200)).toBe("plan");
+  });
+
+  it("適用していない項目は常に Plan", () => {
+    expect(sectionAt(position(700), undefined)).toBe("plan");
   });
 });

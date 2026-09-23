@@ -85,3 +85,25 @@ const TIME = new Intl.DateTimeFormat("en-GB", {
 
 export const entryLabel = ({ startedAt, projectKey }: OutputEntry, run?: ApplyRun): string =>
   [TIME.format(startedAt), projectKey, runStatus(run)].filter(Boolean).join(" · ");
+
+export type Section = "plan" | "apply";
+
+export type ScrollPosition = { scrollTop: number; clientHeight: number; scrollHeight: number };
+
+/**
+ * WU-42。`applyStart` は Apply へ飛んだときに止まる位置。最後までスクロールしたら Apply に
+ * する — 適用のログが短いと区切りが上端まで上がりきらない。スクロールできない長さ（`scrollTop`
+ * が 0 のまま）なら両方が見えているので、先頭の Plan にしておく。
+ */
+export const sectionAt = (
+  { scrollTop, clientHeight, scrollHeight }: ScrollPosition,
+  applyStart: number | undefined,
+): Section => {
+  if (applyStart === undefined) {
+    return "plan";
+  }
+
+  const atEnd = scrollTop > 0 && scrollTop + clientHeight >= scrollHeight - 1;
+
+  return atEnd || scrollTop >= applyStart ? "apply" : "plan";
+};

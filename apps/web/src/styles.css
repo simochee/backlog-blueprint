@@ -212,11 +212,23 @@ body {
   white-space: nowrap;
 }
 
+/**
+ * `position: relative` は外さない。Apply の区切りの `offsetTop` をこの器から測るため
+ * （WU-42）。外すと、ページの先頭からの距離になり、飛ぶ先も現在地もずれる。
+ */
 .output-body {
+  position: relative;
   flex: 1;
   min-height: 0;
   overflow: auto;
   padding: var(--space-3);
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .output-body {
+    scroll-behavior: auto;
+  }
 }
 
 /* 線を文字の両側に引く。文字の背面に1本引く形だと、パネルの地の色で線を隠す必要がある。 */
