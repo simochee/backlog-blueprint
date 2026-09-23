@@ -1,8 +1,8 @@
 type SchemaNode = Record<string, unknown>;
 
 /**
- * 1つの値の位置に当たりうるスキーマのノード。`anyOf` / `oneOf` の枝と `allOf` の
- * `then` はどれが効くかが値によって決まるので、1つに絞らずすべて持ち歩く。
+ * 枝を1つに絞らない。どの `anyOf` / `oneOf` の枝や `then` が効くかは値を検証しないと決まらず、
+ * 展開はスキーマ検証（S3）より前に走る。
  */
 export type SchemaCursor = readonly SchemaNode[];
 
@@ -13,8 +13,9 @@ const nodesIn = (value: unknown): SchemaNode[] =>
   Array.isArray(value) ? value.filter(isNode) : [];
 
 /**
- * `if` はたどらない（E-10）。`if` は判別に使う条件であって、その位置の値が取りうる型を
- * 述べていない。`if` の `const: "number"` を拾うと、`type` の欄が数値を受け付けることになる。
+ * `if` はたどらない（E-10）。`if` は枝を選ぶための条件で、その位置に書ける値を述べていない。
+ * 今の `if` は `type` を持たないので結果は同じだが、`if` に型を書いた時点で判別条件が
+ * 変換の根拠に紛れ込む。
  */
 const alternativesOf = (node: SchemaNode): SchemaNode[] => [
   node,

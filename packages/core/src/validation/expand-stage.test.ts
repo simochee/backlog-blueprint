@@ -170,10 +170,4 @@ describe("真偽値・数値を受け付ける欄への展開（E-10）", () => 
       webhooks: [{ events: [12, "issueCreated"] }],
     });
   });
-
-  it("判別条件（if）が挙げる値は、その欄が受け付ける型として扱われない", () => {
-    const text = "customFields:\n  - name: 見積\n    type: ${TYPE}\n";
-
-    expect(valueOf(text, { TYPE: "1" })).toMatchObject({ customFields: [{ type: "1" }] });
-  });
 });
