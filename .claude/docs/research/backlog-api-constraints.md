@@ -117,6 +117,11 @@ plan の段階で所要時間を見積もって提示し、apply 中は進捗を
 | 課題種別 削除 | All permissions | [Delete Issue Type](https://developer.nulab.com/docs/backlog/api/2/delete-issue-type/) |
 | カスタム属性 追加 | Administrator / Project Administrator | [Add Custom Field](https://developer.nulab.com/docs/backlog/api/2/add-custom-field/) |
 | プロジェクトへチーム追加 | Administrator / Project Administrator | [Add Project Team](https://developer.nulab.com/docs/backlog/api/2/add-project-team/) |
+| プロジェクト管理者の付与 | **Administrator** | [プロジェクトメンバー・チーム](#プロジェクトメンバーチーム)の記録 |
+| プロジェクト管理者の解除 | `要検証`。記録が無い | — |
+
+**解除の必要権限が記録に無いので、V-B2 は解除を数えない。** Administrator だけの操作だった場合、
+一般ユーザーの計画で解除があると、V-B2 を黙って通り、apply の途中で拒否される。
 
 `GET /api/v2/users/myself` で実行者情報を取得できる（全ロール可）。
 

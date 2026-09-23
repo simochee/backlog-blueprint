@@ -249,7 +249,7 @@ const spaceMembers = (manifest: Manifest, access: AccessSnapshot): Diagnostic[] 
                 "V-B4",
                 `access/${section}/${index}`,
                 `no user with the id ${id} exists in this space`,
-                "copy the numeric user id from the Users pane of the Web UI, or from export. a login id or an email address is not accepted",
+                "copy the numeric user id from the Users pane of the Web UI, or from export",
               ),
             ],
       ),

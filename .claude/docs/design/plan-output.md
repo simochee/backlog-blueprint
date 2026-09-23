@@ -31,7 +31,7 @@ Blueprint: PROJ_A (example.backlog.com)
   + webhook        "Slack 通知"   hookUrl "https://hooks.example.com/T000/B000"
 
 Warnings:
-  ! [V-A16] access.members: "鈴木 花子" already belongs to team "開発チーム"
+  ! [V-A16] access.members: "鈴木 花子" (12) already joins the project through the team "開発チーム"
 
 Plan: 4 to add, 3 to change, 1 to destroy, 5 unchanged.
 Write requests: 8 (estimated 8s)
@@ -193,8 +193,8 @@ Warnings:
       "severity": "warning",
       "stage": "plan",
       "path": "access/members/0",
-      "message": "\"鈴木 花子\" already belongs to team \"開発チーム\"",
-      "hint": "Remove it from access.members to save one write request."
+      "message": "\"鈴木 花子\" (12) already joins the project through the team \"開発チーム\"",
+      "hint": "remove 12 from access.members to save one request. leaving it there also works"
     }
   ],
   "actions": [
