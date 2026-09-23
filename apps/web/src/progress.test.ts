@@ -5,8 +5,6 @@ import {
   foldExecutionEvent,
   idleProgress,
   isRunning,
-  rejectedProgress,
-  spentPlan,
   type ApplyProgress,
   type ApplyRun,
 } from "./progress";
@@ -146,32 +144,12 @@ describe("実行中かどうかは記録そのものから読む", () => {
     expect(isRunning(run(applying))).toBe(true);
   });
 
-  it("完了・中断・拒否のいずれも実行中ではない", () => {
+  it("完了・中断のいずれも実行中ではない", () => {
     expect(isRunning(run(succeeded))).toBe(false);
     expect(isRunning(run(abortedRun))).toBe(false);
-    expect(isRunning(run(rejectedProgress))).toBe(false);
   });
 
   it("送信そのものが失敗したときも実行中ではない", () => {
     expect(isRunning(run(applying, new TypeError("Failed to fetch")))).toBe(false);
-  });
-});
-
-describe("計画を使い切ったかどうか", () => {
-  it("完了と中断はその計画を使い切る", () => {
-    expect(spentPlan(run(succeeded))).toBe(true);
-    expect(spentPlan(run(abortedRun))).toBe(true);
-  });
-
-  it("送信そのものが失敗したときも使い切る", () => {
-    expect(spentPlan(run(applying, new TypeError("Failed to fetch")))).toBe(true);
-  });
-
-  it("断られた確認は使い切らない", () => {
-    expect(spentPlan(run(rejectedProgress))).toBe(false);
-  });
-
-  it("走っている途中の計画はまだ使い切っていない", () => {
-    expect(spentPlan(run(applying))).toBe(false);
   });
 });

@@ -19,7 +19,7 @@ import { type ReactNode, useState } from "react";
 
 import { matchesFilter, type DirectoryEntry, type DirectoryKind } from "../directory";
 import { type Directory } from "../use-directory";
-import { StepBoundary } from "./boundary";
+import { SectionBoundary } from "./boundary";
 import { CopyButton, CopyIconButton } from "./copy-button";
 
 /**
@@ -245,7 +245,7 @@ export const DirectoryPane = ({ kind, open, directory, onClose, onReload }: Dire
         <Text color="gray" size="2">
           {description}
         </Text>
-        <StepBoundary>
+        <SectionBoundary>
           <TextField.Root
             aria-label={`Filter ${noun}`}
             onChange={(event) => setFilter(event.target.value)}
@@ -285,7 +285,7 @@ export const DirectoryPane = ({ kind, open, directory, onClose, onReload }: Dire
               text={() => yamlOf(chosen)}
             />
           </Flex>
-        </StepBoundary>
+        </SectionBoundary>
       </Flex>
     </aside>
   );

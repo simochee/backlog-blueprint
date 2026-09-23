@@ -2,11 +2,11 @@ import { renderApplyResult, renderHttpFailure } from "@backlog-blueprint/core";
 import { ExternalLinkIcon } from "@radix-ui/react-icons";
 import { Callout, Card, Flex, Link, Progress, Text } from "@radix-ui/themes";
 
-import { CopyButton } from "../components/copy-button";
 import { projectUrl } from "../plan";
 import { isRunning, type ApplyProgress, type ApplyRun } from "../progress";
+import { CopyButton } from "./copy-button";
 
-export type ApplyStepProps = { run: ApplyRun };
+export type ApplyResultProps = { run: ApplyRun };
 
 const resultText = ({ progress, resolutions }: ApplyRun): string => {
   const { outcome } = progress;
@@ -17,7 +17,7 @@ const resultText = ({ progress, resolutions }: ApplyRun): string => {
 const percent = ({ completed, total }: ApplyProgress): number =>
   total === 0 ? 0 : Math.round((completed / total) * 100);
 
-export const ApplyStep = ({ run }: ApplyStepProps) => {
+export const ApplyResult = ({ run }: ApplyResultProps) => {
   const { progress, failure } = run;
   const text = resultText(run);
   const succeeded = progress.outcome?.result === "succeeded";

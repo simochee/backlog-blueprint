@@ -21,8 +21,6 @@ export type ApplyProgress = {
 
 export const idleProgress: ApplyProgress = { total: 0, completed: 0, lines: [], applied: [] };
 
-export const rejectedProgress: ApplyProgress = { ...idleProgress, outcome: { result: "rejected" } };
-
 export type ApplyRun = {
   progress: ApplyProgress;
   resolutions?: ResolutionTable;
@@ -34,10 +32,6 @@ export type ApplyRun = {
 /** WU-17。`execute` は必ず `finished` か `aborted` で終わる（core §7）ので、結末の有無で足りる。 */
 export const isRunning = ({ progress, failure }: ApplyRun): boolean =>
   progress.outcome === undefined && failure === undefined;
-
-/** WU-3 (b)。断られた確認だけは計画を使い切らないので、同じ計画にもう一度 Apply を押せる。 */
-export const spentPlan = (run: ApplyRun): boolean =>
-  !isRunning(run) && run.progress.outcome?.result !== "rejected";
 
 const withLine = (state: ApplyProgress, event: ExecutionEvent): ApplyProgress => {
   const outcome = progressOutcome(event);

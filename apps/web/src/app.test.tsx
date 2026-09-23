@@ -12,7 +12,7 @@ import { beforeEach, describe, expect, it, vi, type MockInstance } from "vitest"
 /**
  * 送信層を丸ごと差し替える。`fetch` を差し替える形（CLI の端から端まで）では
  * backlog-js が読み込まれ、ブラウザ環境で動かす意味の無い URL 組み立てまで
- * 巻き込む。ここで確かめたいのはステッパーの挙動である。
+ * 巻き込む。ここで確かめたいのは画面の挙動である。
  */
 let respond: (path: string, space?: string) => Promise<unknown>;
 
@@ -23,7 +23,7 @@ let bytesRequested: string[] = [];
 
 /**
  * Monaco は happy-dom では動かない。レイアウトの測定に実ブラウザの API を使うので、
- * 読み込んだだけで落ちる。ここで確かめたいのはステッパーの挙動なので、入力の口と
+ * 読み込んだだけで落ちる。ここで確かめたいのは画面の挙動なので、入力の口と
  * ファイルの受け口だけを持つ textarea に差し替える。エディタ自体の結線は
  * manifest-editor.tsx の Why-not コメントが守る範囲であり、テストの対象にしない。
  */
@@ -120,18 +120,10 @@ const button = (name: string): HTMLElement => screen.getByRole("button", { name 
 const pane = (name: string): HTMLElement => screen.getByRole("complementary", { name });
 
 /**
- * 文言は段の中で引く。見えないページもアンマウントしない（WU-28）ので、`getByText` は
- * 隠れたページの同じ文言まで拾う。見出しはロールで引くので、見えている段だけが当たる。
+ * 文言は領域の中で引く。見えないページもアンマウントしない（WU-28）ので、`getByText` は
+ * 隠れたページの同じ文言まで拾う。領域はロールで引くので、見えているものだけが当たる。
  */
-const panel = (title: string): HTMLElement => {
-  const found = screen.getByRole("heading", { name: new RegExp(`${title}$`) }).closest("section");
-
-  if (found === null) {
-    throw new TypeError(`The ${title} heading is not inside a panel`);
-  }
-
-  return found;
-};
+const region = (name: string): HTMLElement => screen.getByRole("region", { name });
 
 const ACCOUNT = "yamada at Example Inc.";
 
@@ -159,7 +151,7 @@ const plan = async (user: UserEvent): Promise<void> => {
     expect(button("Plan")).toBeEnabled();
   });
   await user.click(button("Plan"));
-  await screen.findByRole("button", { name: "Apply" });
+  await within(region("Output")).findByRole("button", { name: "Copy JSON" });
 };
 
 const reach = async (user: UserEvent): Promise<void> => {
@@ -205,9 +197,12 @@ const holding = (): (() => void) => {
 const beforeUnloadCalls = (spy: MockInstance<typeof globalThis.addEventListener>): number =>
   spy.mock.calls.filter(([type]) => type === "beforeunload").length;
 
-const confirmApply = async (user: UserEvent): Promise<void> => {
+/** Apply は今出ている計画を適用する。確認は挟まない（WU-3 / WU-5） */
+const apply = async (user: UserEvent): Promise<void> => {
+  await waitFor(() => {
+    expect(button("Apply")).toBeEnabled();
+  });
   await user.click(button("Apply"));
-  await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Apply" }));
 };
 
 /**
@@ -355,7 +350,8 @@ describe("接続", () => {
     await connect(user);
     await signedIn();
 
-    expect(screen.getByRole("heading", { name: "Export a project" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Export" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByLabelText("Project key")).toBeVisible();
   });
 });
 
@@ -374,7 +370,8 @@ describe("接続の切り替え", () => {
 
     /** モーダルの背面は読み上げから外れるので、隠れた要素も含めて探す */
     expect(screen.getByRole("button", { name: ACCOUNT, hidden: true })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Apply", hidden: true })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Copy JSON", hidden: true })).toBeInTheDocument();
+    expect(screen.queryByText("Outdated")).toBeNull();
   });
 
   it("切り替え先に繋げなければ診断をモーダルに出し、今の接続を残す", async () => {
@@ -389,9 +386,10 @@ describe("接続の切り替え", () => {
     await user.keyboard("{Escape}");
     expect(button(ACCOUNT)).toBeInTheDocument();
     expect(button("Apply")).toBeEnabled();
+    expect(screen.queryByText("Outdated")).toBeNull();
   });
 
-  it("別の接続に差し替えるとモーダルは閉じ、算出済みの計画は破棄される", async () => {
+  it("別の接続に差し替えるとモーダルは閉じ、算出済みの計画は前の接続のものとして古くなる", async () => {
     const user = await startApp();
 
     await reach(user);
@@ -400,7 +398,9 @@ describe("接続の切り替え", () => {
     await waitFor(() => {
       expect(screen.queryByRole("dialog", { name: "Switch connection" })).toBeNull();
     });
-    expect(screen.queryByRole("button", { name: "Apply" })).toBeNull();
+    expect(within(region("Output")).getByText("Outdated")).toBeInTheDocument();
+    expect(within(region("Output")).getByText(SPACE)).toBeInTheDocument();
+    expect(button("Apply")).toBeDisabled();
     expect(await manifestField()).toHaveValue(MANIFEST);
   });
 
@@ -409,7 +409,7 @@ describe("接続の切り替え", () => {
 
     deliver = () => new Promise(() => undefined);
     await reach(user);
-    await confirmApply(user);
+    await apply(user);
     await openAccount(user);
 
     expect(await screen.findByRole("button", { name: /Switch connection/ })).toBeDisabled();
@@ -583,111 +583,151 @@ describe("入力値の表示", () => {
   });
 });
 
-describe("確認ダイアログ", () => {
-  it("Apply を押したときだけ開く", async () => {
+describe("Apply できるとき", () => {
+  it("Plan で計画を出すまで Apply は押せない", async () => {
     const user = await startApp();
 
-    await reach(user);
+    await connect(user);
+    await signedIn();
+    await writeManifest(user, MANIFEST);
+    await waitFor(() => {
+      expect(button("Plan")).toBeEnabled();
+    });
 
-    expect(screen.queryByRole("dialog")).toBeNull();
-
-    await user.click(button("Apply"));
-
-    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(button("Apply")).toBeDisabled();
   });
 
-  it("マニフェストを1文字でも変えると閉じる", async () => {
+  it("Apply は確認を挟まずに、今出ている計画をそのまま適用する", async () => {
+    const user = await startApp();
+    const answered = respond;
+    const requested: string[] = [];
+
+    await reach(user);
+
+    respond = (path, space) => {
+      requested.push(path);
+
+      return answered(path, space);
+    };
+
+    await apply(user);
+
+    expect(await within(region("Output")).findByText(/Apply complete/)).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(requested).not.toContain("/api/v2/users/myself");
+  });
+
+  it("マニフェストを1文字でも変えると、計画に Outdated が出て Apply は押せなくなる", async () => {
     const user = await startApp();
 
     await reach(user);
-    await user.click(button("Apply"));
     await user.type(await manifestField(), "#");
 
-    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(await within(region("Output")).findByText("Outdated")).toBeInTheDocument();
+    expect(within(region("Output")).getByText(/Run\s+Plan again to apply/)).toBeInTheDocument();
+    expect(button("Apply")).toBeDisabled();
   });
 
-  /**
-   * 背面は操作できる（confirm.tsx）ので、確認を開いたまま Plan を押し直せる。入力は
-   * 変わっていないので印も変わらないが、読み直した先の状態は変わりうる。
-   */
-  it("入力を変えずに計画を取り直しても閉じる", async () => {
+  it("Outdated は Output を畳んでいても見える", async () => {
     const user = await startApp();
 
     await reach(user);
-    await user.click(button("Apply"));
+    await user.click(button("Minimize output"));
+    await user.type(await manifestField(), "#");
 
-    expect(screen.getByRole("dialog")).toBeInTheDocument();
-
-    await user.click(button("Plan"));
-
-    await waitFor(() => {
-      expect(screen.queryByRole("dialog")).toBeNull();
-    });
+    expect(await within(region("Output")).findByText("Outdated")).toBeInTheDocument();
   });
 
-  it("計画をやり直しても自動では開き直さない", async () => {
+  it("Plan を押し直せば、変えた入力の計画で Apply できる", async () => {
     const user = await startApp();
 
     await reach(user);
-    await user.click(button("Apply"));
     await user.type(await manifestField(), "#");
     await plan(user);
 
-    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(button("Apply")).toBeEnabled();
   });
 });
 
-describe("適用し終えた計画", () => {
-  it("apply が完了すると同じ計画には Apply を押せない", async () => {
+describe("適用した後", () => {
+  it("apply が完了すると結果がその計画の項目に続き、同じ計画にはもう Apply できない", async () => {
     const user = await startApp();
 
     await reach(user);
-    await confirmApply(user);
+    await apply(user);
 
-    expect(await screen.findByText(/Apply complete/)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Apply" })).toBeNull();
+    expect(await within(region("Output")).findByText(/Apply complete/)).toBeInTheDocument();
+    expect(button("Apply")).toBeDisabled();
   });
 
-  it("apply が中断すると Apply は押せなくなるが、中断レポートは残る", async () => {
+  it("apply が中断すると、中断レポートを写せる形で残り、同じ計画にはもう Apply できない", async () => {
     const user = await startApp();
 
     deliver = () => Promise.reject({ status: 400, errors: [{ message: "Bad Request" }] });
 
     await reach(user);
-    await confirmApply(user);
+    await apply(user);
 
-    expect(await screen.findByText(/Apply aborted/)).toBeInTheDocument();
+    expect(await within(region("Output")).findByText(/Apply aborted/)).toBeInTheDocument();
     expect(button("Copy report")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Apply" })).toBeNull();
+    expect(button("Apply")).toBeDisabled();
   });
 
-  it("確認を断った計画にはもう一度 Apply を押せる", async () => {
+  it("前の項目に移っても、適用の記録は残っている", async () => {
     const user = await startApp();
 
     await reach(user);
-    await user.click(button("Apply"));
-    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Cancel" }));
+    await apply(user);
+    await within(region("Output")).findByText(/Apply complete/);
+    await plan(user);
+    await user.click(within(region("Output")).getByRole("button", { name: /^\d\d:\d\d:\d\d · / }));
+    await user.click(await screen.findByRole("menuitem", { name: /Applied$/ }));
 
-    expect(await screen.findByText(/Apply cancelled/)).toBeInTheDocument();
-    expect(button("Apply")).toBeEnabled();
+    expect(await within(region("Output")).findByText(/Apply complete/)).toBeInTheDocument();
+  });
+});
+
+describe("Output パネル", () => {
+  it("適用した計画では、計画と適用のログのあいだに区切りが入る", async () => {
+    const user = await startApp();
+
+    await reach(user);
+
+    expect(within(region("Output")).queryByRole("separator", { name: "Apply" })).toBeNull();
+
+    await apply(user);
+    await within(region("Output")).findByText(/Apply complete/);
+
+    const divider = within(region("Output")).getByRole("separator", { name: "Apply" });
+    const planned = within(region("Output")).getByRole("button", { name: "Copy JSON" });
+    const result = within(region("Output")).getByText(/Apply complete/);
+
+    expect(
+      planned.compareDocumentPosition(divider) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(divider.compareDocumentPosition(result) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("畳んでおいても、Plan を押すと開いてその結果を出す", async () => {
+    const user = await startApp();
+
+    await reach(user);
+    await user.click(button("Minimize output"));
+
+    expect(within(region("Output")).queryByRole("button", { name: "Copy JSON" })).toBeNull();
+
+    await plan(user);
+
+    expect(button("Minimize output")).toHaveAttribute("aria-expanded", "true");
   });
 });
 
 describe("離脱の警告", () => {
   it("登録した警告は離脱を引き止める", async () => {
     const added = vi.spyOn(globalThis, "addEventListener");
-
-    let release!: () => void;
-    const applied = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-
-    deliver = () => applied.then(() => ({ id: 900 }));
-
     const user = await startApp();
 
     await reach(user);
-    await confirmApply(user);
 
     await waitFor(() => {
       expect(beforeUnloadCalls(added)).toBe(1);
@@ -701,41 +741,36 @@ describe("離脱の警告", () => {
     expect(event.defaultPrevented).toBe(true);
     expect(event.returnValue).toBe("");
 
-    release();
     added.mockRestore();
   });
 
-  it("apply の実行中だけ beforeunload を登録する", async () => {
+  it("マニフェストを書いただけでは警告せず、Output に記録ができてから警告する", async () => {
     const added = vi.spyOn(globalThis, "addEventListener");
-    const removed = vi.spyOn(globalThis, "removeEventListener");
-
-    let release!: () => void;
-    const applied = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-
-    deliver = () => applied.then(() => ({ id: 900 }));
-
     const user = await startApp();
 
-    await reach(user);
+    await connect(user);
+    await signedIn();
+    await writeManifest(user, MANIFEST);
 
     expect(beforeUnloadCalls(added)).toBe(0);
 
-    await confirmApply(user);
-    await waitFor(() => {
-      expect(beforeUnloadCalls(added)).toBe(1);
-    });
+    await plan(user);
+
+    expect(beforeUnloadCalls(added)).toBe(1);
+
+    added.mockRestore();
+  });
+
+  it("apply が終わっても、記録が残っているあいだは警告を外さない", async () => {
+    const removed = vi.spyOn(globalThis, "removeEventListener");
+    const user = await startApp();
+
+    await reach(user);
+    await apply(user);
+    await within(region("Output")).findByText(/Apply complete/);
 
     expect(beforeUnloadCalls(removed)).toBe(0);
 
-    release();
-
-    await screen.findByText(/Apply complete/);
-
-    expect(beforeUnloadCalls(removed)).toBe(1);
-
-    added.mockRestore();
     removed.mockRestore();
   });
 });
@@ -760,7 +795,7 @@ describe("通信しているあいだの押せなさ", () => {
     expect(await signedIn()).toBeInTheDocument();
   });
 
-  it("計画を組み立てているあいだ Plan は押せない", async () => {
+  it("計画を組み立てているあいだ Plan も Apply も押せない", async () => {
     const user = await startApp();
 
     await connect(user);
@@ -777,11 +812,13 @@ describe("通信しているあいだの押せなさ", () => {
     await waitFor(() => {
       expect(button("Plan")).toBeDisabled();
     });
+    expect(button("Apply")).toBeDisabled();
 
     release();
 
-    expect(await screen.findByRole("button", { name: "Apply" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Copy JSON" })).toBeInTheDocument();
     expect(button("Plan")).toBeEnabled();
+    expect(button("Apply")).toBeEnabled();
   });
 });
 
@@ -1072,7 +1109,7 @@ describe("Export ページ", () => {
   const openExport = async (user: UserEvent): Promise<void> => {
     await user.click(tab("Export"));
     await waitFor(() => {
-      expect(panel("Export")).toBeInTheDocument();
+      expect(region("Export")).toBeInTheDocument();
     });
   };
 
@@ -1091,7 +1128,7 @@ describe("Export ページ", () => {
     await user.click(button("Export"));
   };
 
-  it("タブで Export を開くと Apply の段は見えなくなり、URL のハッシュが #/export になる", async () => {
+  it("タブで Export を開くと Apply のエディタと Output は見えなくなり、URL のハッシュが #/export になる", async () => {
     const user = await startApp();
 
     await connect(user);
@@ -1099,7 +1136,8 @@ describe("Export ページ", () => {
     await openExport(user);
 
     expect(globalThis.location.hash).toBe("#/export");
-    expect(screen.queryByRole("heading", { name: /Manifest$/ })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Output" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Plan" })).toBeNull();
   });
 
   it("Apply ページで接続すると、Export ページでも接続したまま使える", async () => {
@@ -1190,7 +1228,7 @@ describe("Export ページ", () => {
     await exportProject(user, "proj-a");
 
     expect(
-      await within(panel("Export")).findByText(/export error\. Nothing has been written\./),
+      await within(region("Export")).findByText(/export error\. Nothing has been written\./),
     ).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Copy YAML" })).toBeNull();
   });
@@ -1200,7 +1238,7 @@ describe("Export ページ", () => {
 
     await exportProject(user, "PROJ_A");
 
-    expect(await within(panel("Export")).findAllByText(/EX-9h/)).not.toHaveLength(0);
+    expect(await within(region("Export")).findAllByText(/EX-9h/)).not.toHaveLength(0);
     expect(screen.queryByRole("button", { name: "Copy YAML" })).toBeNull();
   });
 
@@ -1214,7 +1252,7 @@ describe("Export ページ", () => {
 
     await exportProject(user, "PROJ_A");
 
-    expect(await within(panel("Export")).findByText(/Boom/)).toBeInTheDocument();
+    expect(await within(region("Export")).findByText(/Boom/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Copy YAML" })).toBeNull();
   });
 
@@ -1265,7 +1303,7 @@ describe("Export ページ", () => {
     await exportedYaml();
 
     expect(
-      within(panel("Export"))
+      within(region("Export"))
         .getAllByRole("button")
         .map((element) => element.textContent),
     ).toEqual(["Export", "Copy YAML", "Download"]);

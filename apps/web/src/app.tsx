@@ -1,5 +1,5 @@
 import { LayersIcon } from "@radix-ui/react-icons";
-import { Box, Button, Container, Flex, Heading, Text, Theme } from "@radix-ui/themes";
+import { Box, Button, Container, Flex, Theme } from "@radix-ui/themes";
 import {
   startTransition,
   useActionState,
@@ -13,12 +13,13 @@ import {
 import { runApply } from "./apply";
 import { useAppearance } from "./appearance";
 import { AccountMenu } from "./components/account-menu";
-import { ConfirmDialog } from "./components/confirm";
+import { SectionBoundary } from "./components/boundary";
 import { ConnectDialog } from "./components/connect-dialog";
 import { ConnectScreen } from "./components/connect-screen";
 import { DIRECTORY_PANES, DirectoryPane } from "./components/directory-pane";
-import { Panel } from "./components/panel";
-import { Stepper } from "./components/stepper";
+import { ExportPage } from "./components/export-page";
+import { ManifestPane } from "./components/manifest-pane";
+import { OutputPanel } from "./components/output-panel";
 import { type DirectoryKind } from "./directory";
 import { prepareExport, type ExportAttempt } from "./export";
 import {
@@ -29,21 +30,22 @@ import {
   type Derived,
   type ManifestInputs,
 } from "./freshness";
-import { PAGE_INTROS, PAGES, usePage } from "./page";
-import { PASTED, preparePlan, type PlanAttempt, type PreparedPlan } from "./plan";
-import { isRunning, rejectedProgress, spentPlan, type ApplyRun } from "./progress";
+import {
+  appendEntry,
+  applicableEntry,
+  type ApplyRuns,
+  isOutdated,
+  type OutputEntry,
+} from "./output";
+import { PAGES, usePage } from "./page";
+import { PASTED, preparePlan } from "./plan";
+import { isRunning } from "./progress";
 import { secretRevisions, subscribeSecrets } from "./secrets";
-import { ApplyStep } from "./steps/apply";
-import { ExportStep } from "./steps/export";
-import { ManifestStep } from "./steps/manifest";
-import { PlanStep } from "./steps/plan";
 import { pinTransport, transport } from "./transport";
 import { RESTORED_FORM_ID, useConnection } from "./use-connection";
 import { useDirectory } from "./use-directory";
 import { useIcon } from "./use-icon";
 import { validatedFor } from "./validation";
-
-const APPLY_STEPS = ["Manifest", "Plan", "Apply"];
 
 const DIRECTORY_KINDS: DirectoryKind[] = ["users", "teams"];
 
@@ -63,8 +65,10 @@ export const App = () => {
   const [manifestText, setManifestText] = useState("");
   const [manifestSource, setManifestSource] = useState(PASTED);
   const [showUnchanged, setShowUnchanged] = useState(false);
-  const [confirmingPlan, setConfirmingPlan] = useState<PreparedPlan>();
-  const [applyRecord, setApplyRecord] = useState<Derived<ApplyRun>>();
+  const [runs, setRuns] = useState<ApplyRuns>({});
+  /** 未指定のあいだは最新の項目を追う。新しい項目を足したら、その項目を開く（WU-39） */
+  const [selectedId, setSelectedId] = useState<number>();
+  const [outputExpanded, setOutputExpanded] = useState(false);
   const [paneRecord, setPaneRecord] = useState<Derived<DirectoryKind>>();
   const [exportKey, setExportKey] = useState("");
 
@@ -97,7 +101,7 @@ export const App = () => {
   const manifestKey = manifestStamp(manifestInputs);
   const planKey = planStamp(connectionKey, manifestKey);
 
-  /** WU-16。追いついていない結果は印が合わないので `fresh` が弾き、Plan は押せないままになる。 */
+  /** WU-16。追いついていない結果は印が合わないので `fresh` が弾き、Plan も Apply も押せないままになる。 */
   const settled = useDeferredValue(manifestInputs);
   const validated = validatedFor(settled);
 
@@ -146,57 +150,58 @@ export const App = () => {
   /** WU-32。キーの欄には紐づけない。どのキーを書き出したかは結果が持っている。 */
   const exportAttempt = fresh(exportRecord, connectionKey);
 
-  const [planAttempt, runPlan, planning] = useActionState<Derived<PlanAttempt> | undefined>(
-    async (previous) => {
-      if (validation?.manifest === undefined || connection === undefined) {
-        return previous;
-      }
+  /** Plan は計画を作って履歴に1件足すだけで、何も書かない。適用は Apply が別に受け持つ（WU-3） */
+  const [history, runPlan, planning] = useActionState<OutputEntry[]>(async (previous) => {
+    if (validation?.manifest === undefined || connection === undefined) {
+      return previous;
+    }
 
-      const { manifest, diagnostics } = validation;
-      const stamp = planKey;
+    const { manifest, diagnostics } = validation;
+    const entry = { startedAt: Date.now(), space, projectKey: manifest.key, stamp: planKey };
 
-      try {
-        return {
-          stamp,
-          value: await preparePlan({
-            manifest,
-            get: transport.get,
-            space,
-            source: manifestSource,
-            staticDiagnostics: diagnostics,
-          }),
-        };
-      } catch (error) {
-        return { stamp, value: { diagnostics: [], failure: error } };
-      }
-    },
-    undefined,
-  );
+    try {
+      return appendEntry(previous, {
+        ...entry,
+        attempt: await preparePlan({
+          manifest,
+          get: transport.get,
+          space,
+          source: manifestSource,
+          staticDiagnostics: diagnostics,
+        }),
+      });
+    } catch (error) {
+      return appendEntry(previous, { ...entry, attempt: { diagnostics: [], failure: error } });
+    }
+  }, []);
+
+  const running = Object.values(runs).some(isRunning);
+  const applicable = applicableEntry({ history, runs, planKey, pending: planning });
+
+  const selected = history.find(({ id }) => id === selectedId) ?? history.at(-1);
+  const outputView =
+    selected === undefined
+      ? undefined
+      : { entry: selected, outdated: isOutdated(selected, planKey), run: runs[selected.id] };
+
+  const followLatest = (): void => {
+    setSelectedId(undefined);
+    setOutputExpanded(true);
+  };
+
+  const requestPlan = (): void => {
+    followLatest();
+    startTransition(runPlan);
+  };
 
   /**
-   * 適用の記録は印が合わなくなっても消さない。残すのは「何を適用したか」であって、
-   * 「同じ計画をもう一度適用できること」ではない（WU-3 (b)）。
+   * 離脱の警告は Output に失われる記録があるあいだ出す（WU-41）。マニフェストを書いた
+   * だけでは出さない。何も実行していない画面を閉じるたびに聞くと、警告そのものが読まれなくなる。
    */
-  const run = applyRecord?.value;
-  const running = run !== undefined && isRunning(run);
-  const runOfPlan = fresh(applyRecord, planKey);
-  const plan =
-    runOfPlan !== undefined && spentPlan(runOfPlan) ? undefined : fresh(planAttempt, planKey);
+  const keepsRecords = history.length > 0 || planning;
 
-  /**
-   * 確認は計画そのものに紐づける。印に紐づけると、入力を変えずに Plan を押し直したときだけ
-   * 印が変わらないので、開いたままの確認の後ろで計画が差し替わる。背面は操作できる
-   * （confirm.tsx）ので、これは押せる経路である。同一性で見れば、確認が開いていること自体が
-   * 「画面の計画と承認された計画が同じもの」の証拠になる（WU-3）。
-   */
-  const confirming = confirmingPlan !== undefined && confirmingPlan === plan?.prepared;
-
-  /**
-   * 離脱の警告は apply の実行中だけ出す（§2.4）。常に出すと、何も適用していない
-   * 段階のタブを閉じるだけで警告が出て、警告そのものが読まれなくなる。
-   */
   useEffect(() => {
-    if (!running) {
+    if (!keepsRecords) {
       return undefined;
     }
 
@@ -216,38 +221,28 @@ export const App = () => {
     return () => {
       window.removeEventListener("beforeunload", warn);
     };
-  }, [running]);
+  }, [keepsRecords]);
 
   /**
+   * 適用するのは描画した時点の判定ではなく、押された時点で導き直した計画にする。描画の後に
+   * 入力が変わった描画より先にクリックが届く経路が残る。
+   *
    * ここだけ Action にしないのは WU-15 による。進捗を1件ずつ出すのが仕事なので、
    * 包むと全部終わってからまとめて出る。保留中を自前で持たないことは WU-17 が満たす。
    */
   const applyPlan = (): void => {
-    const prepared = plan?.prepared;
+    const prepared = applicable?.attempt.prepared;
 
-    setConfirmingPlan(undefined);
-
-    if (prepared === undefined) {
+    if (applicable === undefined || prepared === undefined) {
       return;
     }
 
-    const stamp = planKey;
+    const { id } = applicable;
 
-    void runApply({ plan: prepared.plan, space, client: pinTransport() }, (value) =>
-      setApplyRecord({ stamp, value }),
+    followLatest();
+    void runApply({ plan: prepared.plan, space, client: pinTransport() }, (run) =>
+      setRuns((previous) => ({ ...previous, [id]: run })),
     );
-  };
-
-  const cancelApply = (): void => {
-    setConfirmingPlan(undefined);
-    setApplyRecord({
-      stamp: planKey,
-      value: {
-        progress: rejectedProgress,
-        projectKey: plan?.prepared?.plan.manifest.key ?? "",
-        space,
-      },
-    });
   };
 
   const openSwitch = (): void => {
@@ -259,8 +254,6 @@ export const App = () => {
     setFormId(formId + 1);
     connectionControl.disconnect();
   };
-
-  const applyReached = [plan !== undefined, run !== undefined].filter(Boolean).length;
 
   const header = (
     <Box asChild className="app-header" position="sticky" top="0">
@@ -345,83 +338,59 @@ export const App = () => {
     <Theme accentColor="blue" appearance={appearance} grayColor="slate" radius="medium">
       <Box className="page" data-pane-open={pane !== undefined}>
         {header}
-        <Container maxWidth="1200px" px={{ initial: "4", sm: "6" }} py={{ initial: "5", sm: "6" }}>
-          <Flex direction="column" gap="5">
-            <Flex direction="column" gap="1">
-              <Heading as="h1" size="6">
-                {PAGE_INTROS[page].title}
-              </Heading>
-              <Text color="gray" size="2">
-                {PAGE_INTROS[page].description}
-              </Text>
-            </Flex>
-            {/**
-             * 見えないページもアンマウントしない（WU-28）。apply の最中に Export を開いた
-             * だけで進捗と離脱の警告が消え、書きかけのマニフェストも失われる。
-             */}
-            <Flex className="page-view" direction="column" gap="5" hidden={page !== "apply"}>
-              <Stepper reached={applyReached} titles={APPLY_STEPS} />
-              <Panel enabled step={1} title="Manifest">
-                <ManifestStep
-                  canPlan={validation?.manifest !== undefined}
-                  names={validated.value.names}
-                  onFileDropped={(name, text) => {
-                    setManifestSource(name);
-                    setManifestText(text);
-                  }}
-                  onPlan={start(runPlan)}
-                  onTextChange={(text) => {
-                    setManifestSource(PASTED);
-                    setManifestText(text);
-                  }}
-                  planning={planning}
-                  text={manifestText}
-                  validation={validation}
-                />
-              </Panel>
-              <Panel
-                enabled={plan !== undefined}
-                hint="Run Plan to see what apply would do. The plan is discarded whenever an input changes, and once it has been applied."
-                step={2}
-                title="Plan"
-              >
-                <PlanStep
-                  applying={running}
-                  diagnostics={plan?.diagnostics ?? []}
-                  failure={plan?.failure}
-                  onApply={() => setConfirmingPlan(plan?.prepared)}
-                  onShowUnchangedChange={setShowUnchanged}
-                  prepared={plan?.prepared}
-                  showUnchanged={showUnchanged}
-                />
-              </Panel>
-              <Panel
-                enabled={run !== undefined}
-                hint="Nothing has been applied yet."
-                step={3}
-                title="Apply"
-              >
-                {run === undefined ? null : <ApplyStep run={run} />}
-              </Panel>
-              {confirming && plan?.prepared !== undefined ? (
-                <ConfirmDialog onCancel={cancelApply} onConfirm={applyPlan} />
-              ) : null}
-            </Flex>
-            <Flex className="page-view" direction="column" gap="5" hidden={page !== "export"}>
-              <Panel enabled title="Export">
-                <ExportStep
-                  canExport={exportKey.trim() !== ""}
-                  diagnostics={exportAttempt?.diagnostics ?? []}
-                  exported={exportAttempt?.exported}
-                  exporting={exporting}
-                  failure={exportAttempt?.failure}
-                  onExport={start(runExport)}
-                  onProjectKeyChange={setExportKey}
-                  projectKey={exportKey}
-                />
-              </Panel>
-            </Flex>
-          </Flex>
+        {/**
+         * 見えないページもアンマウントしない（WU-28）。apply の最中に Export を開いた
+         * だけで進捗と離脱の警告が消え、書きかけのマニフェストも失われる。
+         */}
+        <Container maxWidth="1200px" px={{ initial: "4", sm: "6" }}>
+          <div className="workspace" hidden={page !== "apply"}>
+            <SectionBoundary>
+              <ManifestPane
+                applying={running}
+                canApply={applicable !== undefined}
+                canPlan={validation?.manifest !== undefined && !planning && !running}
+                names={validated.value.names}
+                onFileDropped={(name, text) => {
+                  setManifestSource(name);
+                  setManifestText(text);
+                }}
+                onApply={applyPlan}
+                onPlan={requestPlan}
+                onTextChange={(text) => {
+                  setManifestSource(PASTED);
+                  setManifestText(text);
+                }}
+                planning={planning}
+                text={manifestText}
+                validation={validation}
+              />
+            </SectionBoundary>
+            <OutputPanel
+              entries={history}
+              expanded={outputExpanded}
+              onExpandedChange={setOutputExpanded}
+              onSelect={setSelectedId}
+              onShowUnchangedChange={setShowUnchanged}
+              preparing={planning && selectedId === undefined}
+              runs={runs}
+              showUnchanged={showUnchanged}
+              view={outputView}
+            />
+          </div>
+          <section aria-label="Export" className="export-view" hidden={page !== "export"}>
+            <SectionBoundary>
+              <ExportPage
+                canExport={exportKey.trim() !== ""}
+                diagnostics={exportAttempt?.diagnostics ?? []}
+                exported={exportAttempt?.exported}
+                exporting={exporting}
+                failure={exportAttempt?.failure}
+                onExport={start(runExport)}
+                onProjectKeyChange={setExportKey}
+                projectKey={exportKey}
+              />
+            </SectionBoundary>
+          </section>
         </Container>
       </Box>
       {DIRECTORY_KINDS.map((kind) => (

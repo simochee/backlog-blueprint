@@ -33,7 +33,7 @@ export type PreparePlanInput = {
 };
 
 /**
- * S5〜S7 を走らせる（検証パイプライン §4 の Web Step 3）。Step 2 で出た診断を持ち込むのは、
+ * S5〜S7 を走らせる（検証パイプライン §4 の Web Plan / Apply）。エディタで出た診断を持ち込むのは、
  * 警告がそこで消えると計画の `Warnings:` から落ちるため。
  */
 export const preparePlan = async ({
