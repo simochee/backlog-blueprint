@@ -4,36 +4,40 @@ import {
   optionalString,
   requiredNumber,
   requiredString,
+  SPACE_ADMINISTRATOR_ROLE_TYPE,
   type ReadContext,
 } from "@backlog-blueprint/core";
 
 export type DirectoryKind = "users" | "teams";
 
 /**
- * `value` はマニフェストに写す値（ログイン ID かチーム ID）、`label` は人が探すときに
+ * `value` はマニフェストに写す値（ユーザー ID かチーム ID。A-6 / A-7）、`label` は人が探すときに
  * 読む値で、写すときには行末のコメントになる（WU-23 / A-6）。`details` は見分けるための
  * 手掛かりで、表示と絞り込みにだけ使い、写さない（WU-26）。
  */
 export type DirectoryEntry = {
-  value: string | number;
+  value: number;
   label: string;
   badge?: string;
   details: string[];
 };
 
-const SPACE_ADMINISTRATOR = 1;
-
+/**
+ * ログイン ID を必須にしない。スペース管理者でないキーには本人以外の `userId` が
+ * `null` で返る（API 制約「スペースのユーザー一覧」）。返ったときだけ手掛かりに足す。
+ */
 const toUser = (item: unknown): DirectoryEntry => {
   const user = asRecord(item);
-  const userId = requiredString(user, "userId");
-
-  const mailAddress = optionalString(user, "mailAddress");
+  const id = requiredNumber(user, "id");
+  const details = [optionalString(user, "userId"), optionalString(user, "mailAddress")];
 
   return {
-    value: userId,
-    label: optionalString(user, "name") || userId,
-    ...(requiredNumber(user, "roleType") === SPACE_ADMINISTRATOR ? { badge: "Space admin" } : {}),
-    details: mailAddress === undefined || mailAddress === "" ? [] : [mailAddress],
+    value: id,
+    label: optionalString(user, "name") || String(id),
+    ...(requiredNumber(user, "roleType") === SPACE_ADMINISTRATOR_ROLE_TYPE
+      ? { badge: "Space admin" }
+      : {}),
+    details: details.filter((detail): detail is string => detail !== undefined && detail !== ""),
   };
 };
 

@@ -73,7 +73,7 @@ export const AccountMenu = ({
   onSwitch,
   onDisconnect,
 }: AccountMenuProps) => {
-  const { user, userName, space, updateRateLimit } = connection;
+  const { user, userId, userName, spaceAdministrator, space, updateRateLimit } = connection;
 
   return (
     <Popover.Root>
@@ -102,21 +102,21 @@ export const AccountMenu = ({
                 {user}
               </Text>
               {/**
-               * 値だけを写さない。`123` や `true` のようなログイン ID は、そのまま貼ると
-               * Yaml が文字列として読まない。Users のペインと同じ書き出しを通す（WU-23）。
+               * 表示しているログイン ID を写さない。`access` に書くのは数値の ID で（A-7）、
+               * 名前のコメントも付けるので、Users のペインと同じ書き出しを通す（WU-23）。
                */}
               <CopyIconButton
-                label="Copy login ID as YAML"
+                label="Copy user ID as YAML"
                 text={() =>
                   serializeAccessEntries([
-                    { value: user, ...(userName === undefined ? {} : { label: userName }) },
+                    { value: userId, ...(userName === undefined ? {} : { label: userName }) },
                   ])
                 }
               />
             </Detail>
             <Detail label="Role">
               <Text size="1" weight="medium">
-                Space Administrator
+                {spaceAdministrator ? "Space Administrator" : "Not a space administrator"}
               </Text>
             </Detail>
             <Detail label="Update rate limit">

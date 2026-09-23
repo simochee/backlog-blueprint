@@ -11,12 +11,11 @@ import {
   type Webhook,
 } from "../manifest";
 import { projectSchemaUrl } from "../schema-url";
-import { escaped } from "./to-manifest";
 
 /** `access` の各要素の行末に付ける名前（EX-8 / WU-23）。キーはマニフェストに書く値 */
 export type AccessLabels = {
   teams: ReadonlyMap<number, string>;
-  users: ReadonlyMap<string, string>;
+  users: ReadonlyMap<number, string>;
 };
 
 export type SerializeOptions = {
@@ -25,7 +24,7 @@ export type SerializeOptions = {
   accessLabels?: AccessLabels;
 };
 
-export type AccessEntry = { value: string | number; label?: string };
+export type AccessEntry = { value: number; label?: string };
 
 /**
  * `version` / `schema` / `resolveKnownTags` は S1 の `PARSE_OPTIONS` と同じ値でなければ
@@ -180,7 +179,7 @@ const manifestBody = (manifest: ManifestInput): Record<string, unknown> =>
 type LabelOf = (value: unknown, index: number) => string | undefined;
 
 /**
- * 名前が値そのものと同じなら付けない。`- yamada # yamada` は何も足さずに行を読みにくくする。
+ * 名前が値そのものと同じなら付けない。`- 31 # 31` は何も足さずに行を読みにくくする。
  */
 const labelEach = (document: Document, path: string[], labelOf: LabelOf): void => {
   const sequence = document.getIn(path, true);
@@ -209,7 +208,7 @@ const labelAccess = (document: Document, labels: AccessLabels): void => {
 
   for (const section of ["members", "administrators"]) {
     labelEach(document, ["access", section], (value) =>
-      typeof value === "string" ? labels.users.get(value) : undefined,
+      typeof value === "number" ? labels.users.get(value) : undefined,
     );
   }
 };
@@ -231,8 +230,10 @@ export const serializeManifest = (manifest: ManifestInput, options: SerializeOpt
  * 別に持つことになり、STRINGIFY_OPTIONS を変えたときに貼った行だけが export の出力とずれる（WU-23）。
  */
 export const serializeAccessEntries = (entries: AccessEntry[]): string => {
-  const values = entries.map(({ value }) => (typeof value === "string" ? escaped(value) : value));
-  const document = new Document({ access: { entries: values } }, STRINGIFY_OPTIONS);
+  const document = new Document(
+    { access: { entries: entries.map(({ value }) => value) } },
+    STRINGIFY_OPTIONS,
+  );
 
   labelEach(document, ["access", "entries"], (_, index) => entries[index]?.label);
 

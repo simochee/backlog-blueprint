@@ -88,9 +88,9 @@ access:
     - 31 # 開発チーム
     - 32 # QA
   members:
-    - suzuki # 鈴木 花子
+    - 12 # 鈴木 花子
   administrators:
-    - yamada # 山田 太郎
+    - 11 # 山田 太郎
 
 # events はイベント名でも数値 ID でも書ける。
 # 名前は CLI が数値に解決する。CLI が知らない新しいイベントは数値で書く。

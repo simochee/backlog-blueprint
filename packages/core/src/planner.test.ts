@@ -83,21 +83,25 @@ describe("スナップショットを根拠にした中断（S5 / S6）", () => 
     expect(created).toBeUndefined();
   });
 
-  it("一般ユーザーの API キーでは V-B2 で中断する", async () => {
+  it("一般ユーザーの API キーでも計画を組み立てる", async () => {
     const { ids, plan: created } = await plan({
       "/api/v2/users/myself": { id: 1, userId: "yamada", roleType: 2 },
     });
 
-    expect(ids).toEqual(["V-B2"]);
-    expect(created).toBeUndefined();
+    expect(ids).toEqual([]);
+    expect(created).toBeDefined();
   });
 
-  it("権限が無いと分かった時点でスナップショットの取得を始めない", async () => {
-    const { requested } = await plan({
-      "/api/v2/users/myself": { id: 1, userId: "yamada", roleType: 2 },
-    });
+  it("一般ユーザーの計画にステータスの追加があれば、V-B2 の警告を付けて計画を返す", async () => {
+    const { ids, plan: created } = await plan(
+      { "/api/v2/users/myself": { id: 1, userId: "yamada", roleType: 2 } },
+      manifestText(
+        '未対応\n  - name: 処理中\n  - name: レビュー中\n    color: "#3b9dbd"\n  - name: 処理済み\n  - name: 完了',
+      ),
+    );
 
-    expect(requested).toEqual(["/api/v2/users/myself"]);
+    expect(ids).toEqual(["V-B2"]);
+    expect(created).toBeDefined();
   });
 });
 

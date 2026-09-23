@@ -108,13 +108,13 @@ describe("export の書き出し", () => {
     const io = fakeIo();
     const diagnostics: Diagnostic[] = [
       {
-        id: "V-B2",
+        id: "V-B1",
         severity: "error",
         stage: "auth",
         path: "",
-        message: "not a space administrator",
+        message: "GET /api/v2/users/myself failed",
       },
-      { id: "V-B2", severity: "error", stage: "auth", path: "", message: "another failure" },
+      { id: "V-B3", severity: "error", stage: "snapshot", path: "key", message: "another failure" },
     ];
     const result: CreateExportResult = { diagnostics };
 

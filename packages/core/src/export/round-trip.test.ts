@@ -62,7 +62,7 @@ const withPersonalTeamMember = (): ResourceSnapshots => {
     ...snapshots,
     access: {
       ...snapshots.access,
-      members: [...snapshots.access.members, { id: 3, userId: "tanaka" }],
+      members: [...snapshots.access.members, { id: 3, name: "田中 一郎" }],
     },
   };
 };

@@ -7,6 +7,7 @@ import { type ResourceKind } from "../resource";
 import { type AccessSnapshot } from "../resources/access";
 import { type Snapshot } from "../snapshot";
 import { type Value } from "../value";
+import { SPACE_ADMINISTRATOR_ROLE_TYPE } from "./auth-stage";
 import { ROOT_PATH } from "./source-map";
 
 const planDiagnostic =
@@ -38,8 +39,39 @@ const selfExclusion = (actions: Action[], snapshot: Snapshot): Diagnostic[] => {
         error(
           "V-B6",
           "access/administrators",
-          `the plan revokes the project administrator role of "${revoked.name}", who is running this`,
-          `add "${revoked.name}" to access.administrators`,
+          `the plan revokes the project administrator role of "${revoked.name}" (${revoked.target}), who is running this`,
+          `add ${revoked.target} to access.administrators`,
+        ),
+      ];
+};
+
+/**
+ * API 制約「権限」が Administrator だけに許すと記録している操作に限る（V-B2）。
+ * 記録の無い操作（ステータスの `reorder` など）まで推し量って足すと、実際には通る
+ * 計画に警告が出る。
+ */
+const SPACE_ADMINISTRATOR_ONLY: Partial<Record<ResourceKind, Action["op"][]>> = {
+  project: ["create"],
+  status: ["create", "update", "delete"],
+  projectAdministrator: ["create"],
+};
+
+const spaceAdministratorOnly = (actions: Action[], snapshot: Snapshot): Diagnostic[] => {
+  if (snapshot.executor.roleType === SPACE_ADMINISTRATOR_ROLE_TYPE) {
+    return [];
+  }
+
+  const refused = actions.filter(({ kind, op }) => SPACE_ADMINISTRATOR_ONLY[kind]?.includes(op));
+  const [first] = refused;
+
+  return first === undefined
+    ? []
+    : [
+        warning(
+          "V-B2",
+          ROOT_PATH,
+          `the API key does not belong to a space administrator, and ${refused.length} of the planned operations need one, starting with ${first.kind} "${first.name}"`,
+          "run with the API key of a space administrator, or apply will stop at the first of them",
         ),
       ];
 };
@@ -115,25 +147,25 @@ const displayOrder = (manifest: Manifest, order: ResourceOrder): Diagnostic[] =>
  */
 const teamMembers = (manifest: Manifest, access: AccessSnapshot): Diagnostic[] => {
   const declaredTeams = new Set(manifest.access.teams);
-  const joinedThrough = new Map<string, string>();
+  const joinedThrough = new Map<number, { team: string; name: string }>();
 
   for (const team of access.spaceTeams.filter(({ id }) => declaredTeams.has(id))) {
     for (const member of team.members) {
-      joinedThrough.set(member.userId, team.name);
+      joinedThrough.set(member.id, { team: team.name, name: member.name || `#${member.id}` });
     }
   }
 
-  return manifest.access.members.flatMap((userId, index) => {
-    const team = joinedThrough.get(userId);
+  return manifest.access.members.flatMap((id, index) => {
+    const joined = joinedThrough.get(id);
 
-    return team === undefined
+    return joined === undefined
       ? []
       : [
           warning(
             "V-A16",
             `access/members/${index}`,
-            `"${userId}" already joins the project through the team "${team}"`,
-            `remove "${userId}" from access.members to save one request. leaving it there also works`,
+            `"${joined.name}" (${id}) already joins the project through the team "${joined.team}"`,
+            `remove ${id} from access.members to save one request. leaving it there also works`,
           ),
         ];
   });
@@ -176,6 +208,7 @@ export const validatePlan = ({
   order,
 }: PlanStageInput): Diagnostic[] => [
   ...selfExclusion(actions, snapshot),
+  ...spaceAdministratorOnly(actions, snapshot),
   ...substitutes(actions),
   ...displayOrder(manifest, order),
   ...teamMembers(manifest, snapshots.access),

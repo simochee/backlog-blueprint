@@ -477,17 +477,17 @@ const AccessSchema = StrictObject(
       }),
     ),
     members: Type.Optional(
-      Type.Array(Type.String(), {
+      Type.Array(Type.Integer({ minimum: 1 }), {
         uniqueItems: true,
         description:
-          "Login IDs of people to add one by one, one request each. Leave out anyone already covered by teams or administrators.",
+          "Numeric user IDs of people to add one by one, one request each, not their login IDs. Leave out anyone already covered by teams or administrators.",
       }),
     ),
     administrators: Type.Optional(
-      Type.Array(Type.String(), {
+      Type.Array(Type.Integer({ minimum: 1 }), {
         uniqueItems: true,
         description:
-          "Login IDs of people to make project administrators. Do not write yourself: Backlog refuses that role to space administrators, and you can already operate the project without belonging to it.",
+          "Numeric user IDs of people to make project administrators, not their login IDs. Backlog refuses this role to space administrators, so a space administrator should not write themselves here; they can operate the project without belonging to it.",
       }),
     ),
   },

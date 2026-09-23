@@ -159,14 +159,14 @@ describe("plan を端から端まで", () => {
     expect(Array.isArray(json["actions"])).toBe(true);
   });
 
-  it("スペース管理者でない API キーは V-B2 で止まり、スナップショットを取りにいかない", async () => {
-    const { io, requested, run } = cliWith(MANIFEST, {
+  it("スペース管理者でない API キーでも計画まで進み、ステータスの追加には V-B2 の警告が付く", async () => {
+    const { io, run } = cliWith(MANIFEST, {
       "/api/v2/users/myself": { id: 1, userId: "yamada", roleType: 2 },
     });
 
-    await expect(run(["plan", "-f", "-"])).resolves.toBe(1);
-    expect(requested).toEqual(["/api/v2/users/myself"]);
-    expect(io.stderr).toContain("V-B2");
+    await expect(run(["plan", "-f", "-"])).resolves.toBe(2);
+    expect(`${io.stdout}${io.stderr}`).toContain("V-B2");
+    expect(io.stdout).toContain("レビュー中");
   });
 
   it("課題が残っているプロジェクトは V-B3 で止まる", async () => {

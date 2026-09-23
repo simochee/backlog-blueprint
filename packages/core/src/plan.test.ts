@@ -17,7 +17,7 @@ const snapshots = (overrides: Partial<ResourceSnapshots> = {}): ResourceSnapshot
     teams: [],
     members: [],
     administrators: [],
-    spaceUsers: [{ id: 11, userId: "suzuki", roleType: 2 }],
+    spaceUsers: [{ id: 11, name: "鈴木 花子", roleType: 2 }],
     spaceTeams: [{ id: 21, name: "開発チーム", members: [] }],
   },
   webhooks: [],
@@ -35,16 +35,13 @@ describe("解決表の初期登録", () => {
     expect(resolutions.get("milestone:v1.0")).toBe(31);
   });
 
-  it("利用者はスペース全体から登録する", () => {
-    const resolutions = seedResolutions(snapshots());
-
-    expect(resolutions.get("projectMember:suzuki")).toBe(11);
-    expect(resolutions.get("projectAdministrator:suzuki")).toBe(11);
-  });
-
-  it("チームはマニフェストが ID を直に書くので登録しない", () => {
+  it("チームと利用者はマニフェストが ID を直に書くので登録しない", () => {
     expect(
-      [...seedResolutions(snapshots()).keys()].some((key) => key.startsWith("projectTeam:")),
+      [...seedResolutions(snapshots()).keys()].some((key) =>
+        ["projectTeam:", "projectMember:", "projectAdministrator:"].some((kind) =>
+          key.startsWith(kind),
+        ),
+      ),
     ).toBe(false);
   });
 

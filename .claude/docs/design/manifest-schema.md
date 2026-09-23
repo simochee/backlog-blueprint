@@ -163,10 +163,11 @@ S3 がデータを書き換えることにもなる。
 `access` を書かなければ全メンバーが削除対象になる。プロジェクト管理者を宣言している
 プロジェクトでは実行者以外の管理者も外れるので、**V-B6 が実行者を締め出す計画を止める**。
 
-**ただし実行者自身を `administrators` に書いてはならない**（A-5 / V-B11）。実行者は必ず
-スペース管理者であり（FR-5.4）、**スペース管理者はプロジェクト管理者になれない**。
+**実行者がスペース管理者なら、自分を `administrators` に書いてはならない**（A-5 / V-B11）。
+**スペース管理者はプロジェクト管理者になれない**。
 実行者をプロジェクトに残したいなら `members` に書く。スペース管理者は参加していなくても
 そのプロジェクトを操作できるので、書かなくても締め出されはしない。
+スペース管理者でない実行者は逆で、自分を `administrators` に書かなければ V-B6 が止める。
 
 省略を「管理対象外」と解釈する案は採らない。宣言的であること（Yaml が現実の完全な写像）を
 優先する要件定義 §2.2 の決定と両立しないため。キーの有無で削除の意味が変わると、
@@ -380,10 +381,10 @@ W-1 が数値を許す理由は「Backlog が新イベントを追加しても C
 | キー | 型 | 制約 |
 | --- | --- | --- |
 | `teams` | integer[] | 1 以上。`uniqueItems: true`（V-A13） |
-| `members` | string[] | 同上 |
-| `administrators` | string[] | 同上 |
+| `members` | integer[] | 同上 |
+| `administrators` | integer[] | 同上 |
 
-`teams` はチーム ID（[A-6](../requirements/requirements-definition.md#26-access-の仕様)）、`members` / `administrators` はユーザー ID（ログイン ID）。
+`teams` はチーム ID（[A-6](../requirements/requirements-definition.md#26-access-の仕様)）、`members` / `administrators` はユーザー ID（数値。[A-7](../requirements/requirements-definition.md#26-access-の仕様)）。
 V-A13 は `uniqueItems` で JSON Schema が直接表現できる数少ない検証のひとつ。
 
 **3キーはいずれも任意で、省略したキーは空配列として扱う。** `access` 全体を省略した場合

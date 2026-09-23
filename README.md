@@ -41,21 +41,22 @@ These are deliberately out of scope as well:
 
 ## Before you start
 
-- You need a Backlog space, and an API key that belongs to a **space administrator**. The key is
-  required for every run, whether the project is new or already exists, because the status APIs
-  accept nothing less. A project administrator's key is not enough.
+- You need a Backlog space and an API key. **Creating a project, changing its statuses and making
+  someone a project administrator need a space administrator's key**, because Backlog accepts
+  nothing less for those. To apply everything else to a project that already exists, a project
+  administrator's key is enough: create the project first, or leave the statuses as they are, and
+  `plan` warns you (`V-B2`) when the plan still contains an operation your key cannot perform.
 - The API key is read from the `BACKLOG_API_KEY` environment variable and from nowhere else. There
   is no `--api-key` option, on purpose: an argument would be visible in `ps`, in shell history, and
   in CI command logs.
 
 ### Security: who can change your space
 
-> **Push access to the repository that holds your manifests amounts to space administrator
-> access.**
+> **Push access to the repository that holds your manifests amounts to the access of whoever owns
+> the API key in CI — space administrator access, if that is whose key it is.**
 
-The API key a CI job uses belongs to a space administrator, so anyone who can push a change to a
-manifest — or to the workflow that runs it — can rewrite the settings of any project the tool can
-reach. No amount of validation inside the tool can prevent this; it is a property of where the
+Anyone who can push a change to a manifest — or to the workflow that runs it — can rewrite the
+settings of any project that key can reach. No amount of validation inside the tool can prevent this; it is a property of where the
 credentials live.
 
 Protect the manifest repository accordingly: require review on the branch that CI applies from,
@@ -102,7 +103,7 @@ access:
   teams:
     - 31 # 開発チーム
   members:
-    - suzuki
+    - 12 # 鈴木 花子
 
 webhooks:
   - name: Slack 通知
@@ -139,11 +140,11 @@ Blueprint: PROJ_A (example.backlog.com)
   + status         "レビュー中"  color "#3b9dbd"
   ~ statusOrder    未対応, 処理中, レビュー中, 処理済み, 完了
   + projectTeam    "開発チーム"
-  + projectMember  "suzuki"
+  + projectMember  "鈴木 花子"
   + webhook        "Slack 通知"  hookUrl "https://hooks.example.com/T000/B000"
 
 Warnings:
-  ! [V-A16] access.members: "suzuki" already belongs to team "開発チーム"
+  ! [V-A16] access.members: "鈴木 花子" already belongs to team "開発チーム"
       Remove it from access.members to save one write request.
 
 Plan: 4 to add, 3 to change, 1 to destroy, 5 unchanged.

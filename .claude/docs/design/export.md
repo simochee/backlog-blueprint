@@ -66,22 +66,20 @@ Backlog ──[ 既存の read() ]──▶ ResourceSnapshots ──[ toManifest
 
 ## 2. 対象と権限
 
-### EX-2: 実行者はスペース管理者であることを要求する
+### EX-2: 実行者の権限は問わない
 
 | 決定 | 内容 |
 | --- | --- |
-| EX-2 | `export` も S5（V-B1 / V-B2）をそのまま走らせる。スペース管理者でなければ中断する |
+| EX-2 | `export` も S5（V-B1）を走らせるが、スペース管理者であることは求めない。読めない GET があれば、その取得の失敗として中断する |
 
-要求 R-5 は「実行者がスペース管理者でなければ実行させない」であって、コマンドで限定していない。
-[FR-5.4](../requirements/requirements-definition.md#fr-5-認証と権限) が権限の分岐を退けた理由
-——「ステータスを書いた瞬間に動かなくなる」直感に反するツールになる——は `export` にも当たる。
+当初は「スペース管理者でなければ中断する」だった。要求 R-5 がコマンドで限定していなかったためである。
+R-5 と [FR-5.4](../requirements/requirements-definition.md#fr-5-認証と権限) を撤回したので、`export` だけ残す理由が無い。
 
-権限を緩めても得るものが少ない。`export` が叩く GET には Webhook 一覧のように
-プロジェクト管理者以上を要する（[API 制約](../research/backlog-api-constraints.md#webhook)）ものが混ざるので、
-一般メンバーに開いても途中で落ちるツールになるだけである。
-
-失うもの: **プロジェクト管理者が自分のプロジェクトを `export` できない。**
-これは「このツールは常にスペース管理者が要る」という単純な約束の代価である。
+**プロジェクト管理者が自分のプロジェクトを雛形にできる。** 当初の案で失うとしていたものがこれだった。
+一方で、`export` が叩く GET には Webhook 一覧のようにプロジェクト管理者以上を要する
+（[API 制約](../research/backlog-api-constraints.md#webhook)）ものが混ざるので、
+プロジェクト管理者でもない一般メンバーは途中で落ちる。落ちる前に権限で止める表は持たない
+（FR-5.4 の撤回理由と同じ）。
 
 ### EX-3: プロジェクトの存在は要求するが、課題の有無は見ない
 
@@ -195,7 +193,7 @@ S2 がそれらを参照と見なさず `$` が1つ増えたまま残る。**S2 
 
 | 決定 | 内容 |
 | --- | --- |
-| EX-8 | `teams` = `GET /projects/:key/teams`、`administrators` = `GET /projects/:key/administrators`、`members` = `GET /projects/:key/users?excludeGroupMembers=true` から `administrators` を除いたもの。いずれも応答の順。**チーム経由でも参加している個人参加者は `members` に残す**。`teams` はチーム ID で書き（A-6）、各要素の行末にチーム名を、`members` / `administrators` の各要素の行末には表示名をコメントで付ける（EX-16 の例外）。表示名が空か、ログイン ID と同じならコメントを付けない |
+| EX-8 | `teams` = `GET /projects/:key/teams`、`administrators` = `GET /projects/:key/administrators`、`members` = `GET /projects/:key/users?excludeGroupMembers=true` から `administrators` を除いたもの。いずれも応答の順。**チーム経由でも参加している個人参加者は `members` に残す**。`teams` はチーム ID で書き（A-6）、各要素の行末にチーム名を、`members` / `administrators` はユーザー ID（数値）で書き（A-7）、各要素の行末には表示名をコメントで付ける（EX-16 の例外）。表示名が空ならコメントを付けない |
 
 [§6.3](core-reconciler.md#63-access-の差分算出) が「個人参加のあるべき集合 = `members` ∪ `administrators`」と
 定めているので、`administrators` を `members` から除いた形が最小の書き方になり、
@@ -539,7 +537,7 @@ NFR-6 が禁じているのは**ロジックの二重実装**であって、UI �
 | ID | 決定 | 採らなかった案と理由 |
 | --- | --- | --- |
 | EX-1 | `read` → `toManifest` → `serialize` の3段。core に置く | `Reconciler.export()` を足す。リソースを1つ増やす作業が増え、NFR-8 の約束が薄まる。`apps/cli` に写像を置く案は Web で二重実装になる |
-| EX-2 | スペース管理者を要求する | 読み取りだけなので緩める。緩めても Webhook 一覧で落ちるだけで、R-5 に例外を作る代価に見合わない |
+| EX-2 | 権限を問わない | スペース管理者を要求する。R-5 を撤回した後に `export` だけ残すと、プロジェクト管理者が自分のプロジェクトを雛形にできない |
 | EX-3 | 課題の有無を見ない | V-B3 相当のゲートを置く。稼働中のプロジェクトを雛形にする用途が消え、雛形にできるプロジェクトが実質なくなる |
 | EX-4 | `hookUrl` は取得値をそのまま書く | プレースホルダに置き換える。利用者が環境ごとに変える場所を選べず、出力だけでは同じ設定を再現できない |
 | EX-6 | `oldname` を書き出さない | 推測して復元する。`oldname` は移行元のヒントであり、あるべき姿を表すスナップショットには対応するものが無い |

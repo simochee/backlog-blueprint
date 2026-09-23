@@ -346,25 +346,21 @@ const toAccess = ({
   members,
   administrators,
 }: AccessSnapshot): NonNullable<ManifestInput["access"]> => {
-  const administratorIds = new Set(administrators.map(({ userId }) => userId));
+  const administratorIds = new Set(administrators.map(({ id }) => id));
 
   return {
     teams: teams.map(({ id }) => id),
-    members: members
-      .filter(({ userId }) => !administratorIds.has(userId))
-      .map(({ userId }) => escaped(userId)),
-    administrators: administrators.map(({ userId }) => escaped(userId)),
+    members: members.filter(({ id }) => !administratorIds.has(id)).map(({ id }) => id),
+    administrators: administrators.map(({ id }) => id),
   };
 };
 
-/**
- * 利用者の名前はプロジェクト側の応答から取らない。`AccessUser` は同定に要る2項目しか
- * 持たないので、表示名を持っているのはスペース全体の一覧だけである。
- */
-const toAccessLabels = ({ teams, spaceUsers }: AccessSnapshot): AccessLabels => ({
+const toAccessLabels = ({ teams, members, administrators }: AccessSnapshot): AccessLabels => ({
   teams: new Map(teams.map(({ id, name }) => [id, name])),
   users: new Map(
-    spaceUsers.flatMap(({ userId, name }) => (name === undefined ? [] : [[userId, name] as const])),
+    [...members, ...administrators].flatMap(({ id, name }) =>
+      name === undefined || name === "" ? [] : [[id, name] as const],
+    ),
   ),
 });
 

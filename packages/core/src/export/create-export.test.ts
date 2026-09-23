@@ -34,14 +34,13 @@ describe("プロジェクトの書き出し", () => {
     expect(requested).toEqual([]);
   });
 
-  it("スペース管理者でなければスナップショットの取得を始めない", async () => {
-    const { ids, exported, requested } = await exportProject({
+  it("スペース管理者でなくても書き出す", async () => {
+    const { ids, exported } = await exportProject({
       "/api/v2/users/myself": { id: 2, userId: "sato", roleType: 2 },
     });
 
-    expect(ids).toEqual(["V-B2"]);
-    expect(exported).toBeUndefined();
-    expect(requested).toEqual(["/api/v2/users/myself"]);
+    expect(ids).toEqual([]);
+    expect(exported).toBeDefined();
   });
 
   it("プロジェクトが存在しなければ EX-3 で止まり、リソースは1つも読まない", async () => {

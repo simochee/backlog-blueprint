@@ -105,7 +105,7 @@ plan の段階で所要時間を見積もって提示し、apply 中は進捗を
 
 ## 権限
 
-必要権限がリソースごとにばらついている。これが「常にスペース管理者必須」という決定の理由。
+必要権限がリソースごとにばらついている。当初はこれを理由に「常にスペース管理者必須」としていたが、撤回した（FR-5.4）。表のうち **Administrator** だけのものが V-B2 の警告の対象になる。
 
 | 操作 | 必要権限 | 出典 |
 | --- | --- | --- |
@@ -251,7 +251,7 @@ yyyy-MM-dd の String（[Add Custom Field](https://developer.nulab.com/docs/back
 | 項目 | 内容 |
 | --- | --- |
 | プロジェクト参加者の取得 | `GET /projects/:key/users`。**`excludeGroupMembers`（既定 false）** を true にすると、チーム経由の参加者を除外して個人参加者だけを返す |
-| プロジェクトへの個人追加 | `POST /projects/:key/users`（`userId`）。1人1リクエスト |
+| プロジェクトへの個人追加 | `POST /projects/:key/users`（`userId`）。1人1リクエスト。**`userId` は数値の `id` で、ログイン ID ではない** |
 | プロジェクトへのチーム追加 | `POST /projects/:key/teams`（`teamId`）。1チーム1リクエスト |
 | プロジェクト管理者の付与 | `POST /projects/:key/administrators`（`userId`）。**Administrator 権限必須**。個人単位でしか付与できず、チームごと管理者にはできない |
 | プロジェクト管理者の取得 | `GET /projects/:key/administrators`（実測）。ユーザーの配列を返す。**管理者の削除差分を出せる** |
@@ -259,6 +259,24 @@ yyyy-MM-dd の String（[Add Custom Field](https://developer.nulab.com/docs/back
 
 `excludeGroupMembers` を取り違えると、チーム経由で参加している人を
 「Yaml の `members` に無いから削除」と誤判定する。削除判定では必ず true を指定すること。
+
+### スペースのユーザー一覧
+
+**スペース管理者でない API キーでも `GET /api/v2/users` と `GET /api/v2/teams` は成功する。
+ただし各ユーザーの `userId`（ログイン ID）は、本人を除いて `null` になる**（実測）。
+スペース管理者を含め、本人以外は1人残らず `null` だった。
+`GET /teams` の `members[]` に入るユーザーオブジェクトも同じ。
+
+| 項目 | 一般ユーザーの API キーで返るか |
+| --- | --- |
+| `id` | 返る |
+| `userId` | **本人だけ。他人は `null`** |
+| `name` | 返る |
+| `mailAddress` | 返る |
+| `roleType` | 返る（スペース管理者は 1 のまま） |
+
+**設計への影響**: ログイン ID をマニフェストの識別子にすると、一般ユーザーは照合も
+数値 ID への解決もできない。個人も数値 ID で書く（A-7）。
 
 **プロジェクト管理者の付与には、対象が事前にプロジェクト参加者である必要がある（実測）。**
 未参加のユーザーを管理者にしようとすると `No such project member` が返り、付与されない。
@@ -347,7 +365,7 @@ yyyy-MM-dd の String（[Add Custom Field](https://developer.nulab.com/docs/back
 | --- | --- |
 | 課題件数の確認 | `GET /api/v2/issues/count?projectId[]=N` → `{"count": 43}`。全ロール利用可。**完了済みを含む全ステータスを数える**（実測） |
 | 実行者の確認 | `GET /api/v2/users/myself` |
-| スペースのユーザー一覧 | `GET /api/v2/users`（Yaml のユーザー ID → 数値 ID 解決に使う） |
+| スペースのユーザー一覧 | `GET /api/v2/users`（Yaml のユーザー ID の存在確認（V-B4）、V-B11 の `roleType`、plan に出す表示名の取得に使う） |
 | スペースのチーム一覧 | `GET /api/v2/teams`（Yaml のチーム ID の存在確認（V-B5）と、plan に出すチーム名の取得に使う） |
 | プロジェクトのチーム | `GET` / `POST /api/v2/projects/:key/teams`（`teamId` を指定） |
 
