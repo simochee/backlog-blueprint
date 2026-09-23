@@ -237,13 +237,15 @@ const switchTo = async (user: UserEvent, domain: string): Promise<HTMLElement> =
 
 const OTHER_SPACE = "other.backlog.com";
 
-/** 別のスペースでは一般ユーザーとして返す。切り替えが V-B2 で落ちる経路を作る */
-const notAdministratorOn = (domain: string): void => {
+const KEY_REJECTED = httpFailure({ status: 401, errors: [{ message: "Authentication failure." }] });
+
+/** 別のスペースでは API キーを受け付けない。切り替えが V-B1 で落ちる経路を作る */
+const keyRejectedOn = (domain: string): void => {
   const answered = respond;
 
   respond = (path, space) =>
     space === domain && path === "/api/v2/users/myself"
-      ? Promise.resolve({ id: 2, userId: "suzuki", roleType: 2 })
+      ? fixedGet({ [path]: KEY_REJECTED })(path)
       : answered(path, space);
 };
 
@@ -293,28 +295,16 @@ describe("接続", () => {
     expect(carrying(API_KEY)).toStrictEqual([]);
   });
 
-  it("ログイン ID は表示名のコメント付きで、access の直下に貼れる Yaml としてコピーできる", async () => {
+  it("自分の数値のユーザー ID を、表示名のコメント付きで access の直下に貼れる Yaml としてコピーできる", async () => {
     const user = await startApp({
       "/api/v2/users/myself": { id: 1, userId: "yamada", name: "山田 太郎", roleType: 1 },
     });
 
     await connect(user);
     await openAccount(user);
-    await user.click(await screen.findByRole("button", { name: "Copy login ID as YAML" }));
+    await user.click(await screen.findByRole("button", { name: "Copy user ID as YAML" }));
 
-    expect(await navigator.clipboard.readText()).toBe("    - yamada # 山田 太郎\n");
-  });
-
-  it("数字だけのログイン ID は文字列として読めるよう引用してコピーする", async () => {
-    const user = await startApp({
-      "/api/v2/users/myself": { id: 1, userId: "123", roleType: 1 },
-    });
-
-    await connect(user);
-    await user.click(await screen.findByRole("button", { name: "123 at Example Inc." }));
-    await user.click(await screen.findByRole("button", { name: "Copy login ID as YAML" }));
-
-    expect(await navigator.clipboard.readText()).toBe('    - "123"\n');
+    expect(await navigator.clipboard.readText()).toBe("    - 1 # 山田 太郎\n");
   });
 
   it("ドメインを打つとそのスペースの API キーのページへの導線が出る", async () => {
@@ -330,14 +320,24 @@ describe("接続", () => {
     );
   });
 
-  it("スペース管理者でなければ接続画面から先へ進めない", async () => {
+  it("スペース管理者でなくても繋がり、アカウント表示でスペース管理者ではないと分かる", async () => {
     const user = await startApp({
       "/api/v2/users/myself": { id: 2, userId: "suzuki", roleType: 2 },
     });
 
     await connect(user);
+    await user.click(await screen.findByRole("button", { name: "suzuki at Example Inc." }));
 
-    expect(await screen.findByText("V-B2", { exact: false })).toBeInTheDocument();
+    expect(await screen.findByText("Not a space administrator")).toBeInTheDocument();
+    expect(await manifestField()).toBeInTheDocument();
+  });
+
+  it("API キーが通らなければ接続画面から先へ進めない", async () => {
+    const user = await startApp({ "/api/v2/users/myself": KEY_REJECTED });
+
+    await connect(user);
+
+    expect(await screen.findByText("V-B1", { exact: false })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Connect to Backlog" })).toBeInTheDocument();
     expect(screen.queryByLabelText(/^Manifest/)).toBeNull();
   });
@@ -378,11 +378,11 @@ describe("接続の切り替え", () => {
     const user = await startApp();
 
     await reach(user);
-    notAdministratorOn(OTHER_SPACE);
+    keyRejectedOn(OTHER_SPACE);
 
     const dialog = await switchTo(user, OTHER_SPACE);
 
-    expect(await within(dialog).findByText("V-B2", { exact: false })).toBeInTheDocument();
+    expect(await within(dialog).findByText("V-B1", { exact: false })).toBeInTheDocument();
     await user.keyboard("{Escape}");
     expect(button(ACCOUNT)).toBeInTheDocument();
     expect(button("Apply")).toBeEnabled();
@@ -436,12 +436,10 @@ describe("接続の保存", () => {
     JSON.parse(globalThis.sessionStorage.getItem(STORAGE_KEY) ?? "null");
 
   it("繋げたときだけ、スペースと API キーをこのタブの sessionStorage に保つ", async () => {
-    const user = await startApp({
-      "/api/v2/users/myself": { id: 2, userId: "suzuki", roleType: 2 },
-    });
+    const user = await startApp({ "/api/v2/users/myself": KEY_REJECTED });
 
     await connect(user);
-    await screen.findByText("V-B2", { exact: false });
+    await screen.findByText("V-B1", { exact: false });
 
     expect(stored()).toBeNull();
   });
@@ -467,15 +465,15 @@ describe("接続の保存", () => {
     expect(await signedIn()).toBeInTheDocument();
   });
 
-  it("繋ぎ直すたびに権限を確かめ直し、通らなければ保存を消してドメインを入れた接続画面に戻る", async () => {
+  it("繋ぎ直すたびに API キーを確かめ直し、通らなければ保存を消してドメインを入れた接続画面に戻る", async () => {
     globalThis.sessionStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({ space: SPACE, apiKey: API_KEY }),
     );
 
-    await startApp({ "/api/v2/users/myself": { id: 2, userId: "suzuki", roleType: 2 } });
+    await startApp({ "/api/v2/users/myself": KEY_REJECTED });
 
-    expect(await screen.findByText("V-B2", { exact: false })).toBeInTheDocument();
+    expect(await screen.findByText("V-B1", { exact: false })).toBeInTheDocument();
     expect(screen.getByLabelText("Space domain")).toHaveValue(SPACE);
     expect(stored()).toBeNull();
   });
@@ -934,7 +932,7 @@ describe("スペースのユーザーとチームの一覧", () => {
     expect(paths).not.toContain("/api/v2/teams");
   });
 
-  it("ユーザーの一覧には表示名とログイン ID とメールアドレスが並び、スペース管理者には印が付く", async () => {
+  it("ユーザーの一覧には表示名とユーザー ID とログイン ID とメールアドレスが並び、スペース管理者には印が付く", async () => {
     const user = await connected();
 
     await user.click(button("Users"));
@@ -942,6 +940,7 @@ describe("スペースのユーザーとチームの一覧", () => {
     const users = within(pane("Users"));
 
     expect(await users.findByText("山田 太郎")).toBeInTheDocument();
+    expect(users.getByText("2")).toBeInTheDocument();
     expect(users.getByText("yamada")).toBeInTheDocument();
     expect(users.getByText("Space admin")).toBeInTheDocument();
     expect(users.getByText("hanako@example.com")).toBeInTheDocument();
@@ -979,7 +978,7 @@ describe("スペースのユーザーとチームの一覧", () => {
     expect(screen.queryByRole("complementary")).toBeNull();
   });
 
-  it("選んだユーザーのログイン ID を、表示名のコメント付きで access の直下に貼れる段付きの Yaml としてコピーする", async () => {
+  it("選んだユーザーの数値のユーザー ID を、表示名のコメント付きで access の直下に貼れる段付きの Yaml としてコピーする", async () => {
     const user = await connected();
 
     await user.click(button("Users"));
@@ -990,9 +989,30 @@ describe("スペースのユーザーとチームの一覧", () => {
     await user.click(users.getByRole("checkbox", { name: /真/ }));
     await user.click(users.getByRole("button", { name: "Copy 2 as YAML" }));
 
-    expect(await navigator.clipboard.readText()).toBe(
-      '    - suzuki # 鈴木 花子\n    - "true" # 真\n',
-    );
+    expect(await navigator.clipboard.readText()).toBe("    - 2 # 鈴木 花子\n    - 3 # 真\n");
+  });
+
+  it("スペース管理者でなく他人のログイン ID が返らなくても、一覧を開いてユーザー ID をコピーできる", async () => {
+    const user = await startApp({
+      "/api/v2/users/myself": { id: 2, userId: "suzuki", roleType: 2 },
+      "/api/v2/users": [
+        { id: 1, userId: null, name: "山田 太郎", roleType: 1 },
+        { id: 2, userId: "suzuki", name: "鈴木 花子", roleType: 2 },
+      ],
+    });
+
+    await connect(user);
+    await screen.findByRole("button", { name: "suzuki at Example Inc." });
+    await user.click(button("Users"));
+
+    const users = within(pane("Users"));
+
+    expect(await users.findByText("山田 太郎")).toBeInTheDocument();
+    expect(users.getByText("Space admin")).toBeInTheDocument();
+
+    await user.click(users.getByRole("button", { name: "Copy 山田 太郎" }));
+
+    expect(await navigator.clipboard.readText()).toBe("    - 1 # 山田 太郎\n");
   });
 
   it("チームはチーム ID を、チーム名のコメント付きでコピーする", async () => {
@@ -1018,7 +1038,7 @@ describe("スペースのユーザーとチームの一覧", () => {
     await user.click(await users.findByRole("checkbox", { name: /山田 太郎/ }));
     await user.click(users.getByRole("button", { name: "Copy 鈴木 花子" }));
 
-    expect(await navigator.clipboard.readText()).toBe("    - suzuki # 鈴木 花子\n");
+    expect(await navigator.clipboard.readText()).toBe("    - 2 # 鈴木 花子\n");
     expect(users.getByRole("checkbox", { name: /山田 太郎/ })).toBeChecked();
     expect(users.getByRole("checkbox", { name: /鈴木 花子/ })).not.toBeChecked();
   });
@@ -1064,7 +1084,7 @@ describe("スペースのユーザーとチームの一覧", () => {
 
     await user.click(users.getByRole("button", { name: "Copy 鈴木 花子" }));
 
-    expect(await navigator.clipboard.readText()).toBe("    - suzuki # 鈴木 花子\n");
+    expect(await navigator.clipboard.readText()).toBe("    - 2 # 鈴木 花子\n");
   });
 
   it("閉じて開き直しても一覧を取り直さず、絞り込みと選択が残っている", async () => {

@@ -14,7 +14,7 @@
 
 以下は**本文書を通して使う例**。**課題0件の既存プロジェクト** `PROJ_A`（UC-2）に対し、
 課題種別に タスク（既定のまま）/ バグ（テンプレート追加）/ 調査（`oldname: その他`）を、
-ステータスに既定4つ + レビュー中を、`access` に 開発チーム と suzuki を、
+ステータスに既定4つ + レビュー中を、`access` に 開発チーム と 鈴木 花子 を、
 Webhook に Slack 通知を宣言したマニフェストを適用する。
 
 ```
@@ -27,11 +27,11 @@ Blueprint: PROJ_A (example.backlog.com)
   + status         "レビュー中"    color "#3b9dbd"
   ~ statusOrder    未対応, 処理中, レビュー中, 処理済み, 完了
   + projectTeam    "開発チーム"
-  + projectMember  "suzuki"
+  + projectMember  "鈴木 花子"
   + webhook        "Slack 通知"   hookUrl "https://hooks.example.com/T000/B000"
 
 Warnings:
-  ! [V-A16] access.members: "suzuki" already belongs to team "開発チーム"
+  ! [V-A16] access.members: "鈴木 花子" (12) already joins the project through the team "開発チーム"
 
 Plan: 4 to add, 3 to change, 1 to destroy, 5 unchanged.
 Write requests: 8 (estimated 8s)
@@ -193,8 +193,8 @@ Warnings:
       "severity": "warning",
       "stage": "plan",
       "path": "access/members/0",
-      "message": "\"suzuki\" already belongs to team \"開発チーム\"",
-      "hint": "Remove it from access.members to save one write request."
+      "message": "\"鈴木 花子\" (12) already joins the project through the team \"開発チーム\"",
+      "hint": "remove 12 from access.members to save one request. leaving it there also works"
     }
   ],
   "actions": [
@@ -324,7 +324,7 @@ Not applied (5):
   + status         "レビュー中"
   ~ statusOrder    未対応, 処理中, レビュー中, 処理済み, 完了
   + projectTeam    "開発チーム"
-  + projectMember  "suzuki"
+  + projectMember  "鈴木 花子"
   + webhook        "Slack 通知"
 
 Re-run apply with the same manifest to continue. Already applied changes become no-ops.
@@ -365,7 +365,7 @@ plan の構造に `result` と実行結果を足したもの。
     "status": 400,
     "errors": [{ "message": "deletedTargetIssueTypeId and substituteIssueTypeId are the same." }]
   },
-  "pending": ["statuses/create/レビュー中", "statuses/reorder", "projectTeams/create/31", "projectMembers/create/suzuki", "webhooks/create/Slack 通知"],
+  "pending": ["statuses/create/レビュー中", "statuses/reorder", "projectTeams/create/31", "projectMembers/create/12", "webhooks/create/Slack 通知"],
   "actions": ["...", "plan と同じ配列"]
 }
 ```

@@ -9,8 +9,7 @@ const MYSELF_PATH = "/api/v2/users/myself";
 
 /**
  * `roleType: 1` がスペース管理者（API 制約「権限」）。1 以外の値も実在するが、
- * FR-5.4 が要求するのは新規・既存を問わず管理者であることなので、判定は
- * 「1 か、それ以外か」だけでよい。
+ * V-B2 と V-B11 が問うのはスペース管理者か否かだけなので、判定は「1 か、それ以外か」でよい。
  */
 export const SPACE_ADMINISTRATOR_ROLE_TYPE = 1;
 
@@ -27,7 +26,7 @@ const authDiagnostic = (id: string, message: string, hint: string): Diagnostic =
 
 /**
  * スナップショットの取得より前に、単独のステージとして実行者を確かめる（S5）。
- * 権限が無いと分かった時点で以後のすべての GET が無駄になるので、reconciler の
+ * キーが無効と分かった時点で以後のすべての GET が無駄になるので、reconciler の
  * `read()` と同じ流れに混ぜない。
  */
 export const authenticateExecutor = async (get: ReadContext["get"]): Promise<AuthStageResult> => {
@@ -48,23 +47,9 @@ export const authenticateExecutor = async (get: ReadContext["get"]): Promise<Aut
   }
 
   const myself = asRecord(response);
-  const executor = {
-    id: requiredNumber(myself, "id"),
-    roleType: requiredNumber(myself, "roleType"),
+
+  return {
+    diagnostics: [],
+    executor: { id: requiredNumber(myself, "id"), roleType: requiredNumber(myself, "roleType") },
   };
-
-  if (executor.roleType !== SPACE_ADMINISTRATOR_ROLE_TYPE) {
-    return {
-      diagnostics: [
-        authDiagnostic(
-          "V-B2",
-          `the API key belongs to a user whose roleType is ${executor.roleType}, not a space administrator`,
-          "run with the API key of a space administrator",
-        ),
-      ],
-      executor,
-    };
-  }
-
-  return { diagnostics: [], executor };
 };

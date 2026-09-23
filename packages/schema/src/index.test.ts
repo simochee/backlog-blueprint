@@ -55,7 +55,7 @@ describe("配布する JSON Schema", () => {
     };
 
     expect(access.administrators.description).toContain("space administrator");
-    expect(access.members.description).toContain("Login IDs");
+    expect(access.members.description).toContain("Numeric user IDs");
     expect(access.teams.description).toContain("team");
   });
 

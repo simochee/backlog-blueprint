@@ -38,9 +38,11 @@ from the file are removed.
 **Leaving a key out entirely is the same as writing an empty list.** There is no way to say "I am
 not managing this part". If `categories` is missing, every category is deleted; if `access` is
 missing, every member is removed from the project and every project administrator loses the role.
-That does not lock you out. You run as a space administrator, and a space administrator can
-administer a project without belonging to it — which is also why you must not write yourself into
-`administrators`; [`access`](#access) below says what to write instead.
+A space administrator is not locked out by this: a space administrator can administer a project
+without belonging to it — which is also why a space administrator must not write themselves into
+`administrators`. A project administrator is different, and must stay in `administrators`;
+validation stops a plan that would take the role away from the person running it.
+[`access`](#access) below says what to write in each case.
 
 The same rule applies one level down. `access: { teams: [31] }` leaves `members` and
 `administrators` empty, with the same consequence.
@@ -211,17 +213,19 @@ access:
     - 31 # 開発チーム
     - 32 # QA
   members: # user IDs of people who are not in any of those teams
-    - suzuki # 鈴木 花子
+    - 12 # 鈴木 花子
   administrators: # user IDs of people to make project administrators
-    - yamada # 山田 太郎
+    - 11 # 山田 太郎
 ```
 
-Teams are written by their numeric ID, not by name. Backlog does not keep team names unique within
-a space, so a name could point at more than one team; an ID cannot. The names after `#` are
-comments for whoever reads the file. The tool ignores them: the ID decides, and `plan` shows the
-team's current name from Backlog. You rarely have to look an ID up yourself — `export` and the Web
-UI's Teams pane both write the ID with the name beside it, and the Users pane does the same with
-each person's display name.
+Teams and people are both written by their numeric ID, not by name or login ID. Backlog does not
+keep team names unique within a space, so a name could point at more than one team; an ID cannot.
+People are written by ID because Backlog shows login IDs only to space administrators: with anyone
+else's API key, every login ID but your own comes back empty, and the tool could not tell who you
+meant. The names after `#` are comments for whoever reads the file. The tool ignores them: the ID
+decides, and `plan` shows the current name from Backlog. You rarely have to look an ID up yourself —
+`export` and the Web UI's Teams and Users panes all write the ID with the name beside it, and the
+Web UI's account menu copies your own.
 
 Teams and individuals are separate keys because a name alone would not say which one was meant, and
 because they are added through different APIs. `administrators` is separate again, and holds people
@@ -232,12 +236,15 @@ Anyone in `administrators` is added to the project automatically if they are not
 Backlog refuses to grant the role to a non-member, so this is not a convenience — it is the only way
 the grant can succeed.
 
-**You cannot be one of them.** The tool only runs with the API key of a space administrator, and
-Backlog refuses to make a space administrator a project administrator: the grant comes back as
-`Only normal-user role can be a project administrator.` Validation reports this before anything is
-applied, so it costs you a run rather than a project left half-configured. If you want to appear in
-the project, write yourself under `members`. Leaving yourself out of the file altogether is fine
-too: being a space administrator is already enough to operate the project.
+**A space administrator cannot be one of them.** Backlog refuses to make a space administrator a
+project administrator: the grant comes back as `Only normal-user role can be a project
+administrator.` Validation reports this before anything is applied, so it costs you a run rather
+than a project left half-configured. If you run as a space administrator and want to appear in the
+project, write yourself under `members`. Leaving yourself out of the file altogether is fine too:
+being a space administrator is already enough to operate the project.
+
+If you run as a project administrator, the opposite holds: keep yourself in `administrators`, or the
+plan would take your own role away, and validation stops it.
 
 `members` is for people who are not covered by a team, and not covered by `administrators` either.
 Listing someone who is already covered is not wrong, but it joins them a second time as an

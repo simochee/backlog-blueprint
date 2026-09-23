@@ -84,12 +84,12 @@ describe("省略された値の読まれ方", () => {
   });
 
   it("access の一部だけを書いたとき、書かなかったキーは空配列として読まれる", () => {
-    const manifest = normalizeManifest({ ...minimal, access: { administrators: ["yamada"] } });
+    const manifest = normalizeManifest({ ...minimal, access: { administrators: [1] } });
 
     expect(manifest.access).toEqual({
       teams: [],
       members: [],
-      administrators: ["yamada"],
+      administrators: [1],
     });
   });
 

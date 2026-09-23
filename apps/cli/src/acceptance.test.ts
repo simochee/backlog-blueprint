@@ -67,9 +67,9 @@ access:
   teams:
     - 31 # 開発チーム
   members:
-    - yamada
+    - 1 # 山田 太郎
   administrators:
-    - suzuki
+    - 2 # 鈴木 花子
 webhooks:
   - name: Slack 通知
     description: 課題の追加・更新を Slack に流す
@@ -83,8 +83,8 @@ const withoutResolvedStatus = MANIFEST.replace("  - name: 処理済み\n", "");
 
 /** 実行者はスペース管理者なので、プロジェクト管理者にはできない（A-5） */
 const withExecutorAsAdministrator = MANIFEST.replace(
-  "  administrators:\n    - suzuki\n",
-  "  administrators:\n    - yamada\n",
+  "  administrators:\n    - 2 # 鈴木 花子\n",
+  "  administrators:\n    - 1 # 山田 太郎\n",
 );
 
 const withoutNarrowedCustomField = MANIFEST.replace(
@@ -96,12 +96,49 @@ const withoutNarrowedCustomField = MANIFEST.replace(
  * 実行者。スペース管理者なのでプロジェクト管理者にはなれず（A-5）、
  * プロジェクトに残すなら `access.members` に書く。
  */
-const YAMADA = { id: 1, userId: "yamada", roleType: 1 };
+const YAMADA = { id: 1, userId: "yamada", roleType: 1, name: "山田 太郎" };
 
-const SUZUKI = { id: 2, userId: "suzuki", roleType: 2 };
+/** スペース管理者ではない。作成済みのプロジェクトのプロジェクト管理者として適用する */
+const SUZUKI = { id: 2, userId: "suzuki", roleType: 2, name: "鈴木 花子" };
 
 /** 開発チームにしか属さない人。マニフェストの `access.members` には出てこない */
-const TANAKA = { id: 3, userId: "tanaka", roleType: 2 };
+const TANAKA = { id: 3, userId: "tanaka", roleType: 2, name: "田中 一郎" };
+
+/**
+ * スペース管理者にしかできない操作（V-B2）を1つも含まない。プロジェクトは作成済みで、
+ * 既定の課題種別とステータスをそのまま宣言し、鈴木さんは既にプロジェクト管理者である。
+ */
+const WITHOUT_SPACE_ADMINISTRATOR_ONLY = `key: PROJ_A
+name: プロジェクトA
+issueTypes:
+  - name: タスク
+    color: "#7ea800"
+  - name: バグ
+    color: "#990000"
+  - name: 要望
+    color: "#ff9200"
+  - name: その他
+    color: "#2779ca"
+statuses:
+  - name: 未対応
+  - name: 処理中
+  - name: 処理済み
+  - name: 完了
+categories:
+  - name: フロントエンド
+access:
+  members:
+    - 1 # 山田 太郎
+  administrators:
+    - 2 # 鈴木 花子
+`;
+
+const managedBySuzuki = {
+  key: "PROJ_A",
+  name: "プロジェクトA",
+  members: ["suzuki"],
+  administrators: ["suzuki"],
+};
 
 /** どの受け入れも同じスペースから始める。違うのは投入する前提だけ */
 const space = (options: MockBacklogOptions = {}): MockBacklog =>
@@ -280,8 +317,8 @@ describe("受け入れ基準", () => {
       },
     ]);
     expect(project?.teams.map(({ name }) => name)).toEqual(["開発チーム"]);
-    expect(project?.members.map(({ userId }) => userId)).toEqual(["yamada", "suzuki"]);
-    expect(project?.administrators.map(({ userId }) => userId)).toEqual(["suzuki"]);
+    expect(project?.members.map(({ id }) => id)).toEqual([YAMADA.id, SUZUKI.id]);
+    expect(project?.administrators.map(({ id }) => id)).toEqual([SUZUKI.id]);
     expect(project?.webhooks).toEqual([
       {
         id: expect.any(Number),
@@ -336,13 +373,24 @@ describe("受け入れ基準", () => {
     expect(backlog.writes).toEqual([]);
   });
 
-  it("一般ユーザーの API キーで apply すると、V-B2 のエラーで中断する", async () => {
-    const backlog = space({ executor: SUZUKI });
-    const { io, code } = apply(backlog, MANIFEST);
+  it("一般ユーザーの API キーでも、スペース管理者にしかできない操作を含まない計画は警告なしに apply できる", async () => {
+    const backlog = space({ executor: SUZUKI, projects: [managedBySuzuki] });
+    const { io, code } = apply(backlog, WITHOUT_SPACE_ADMINISTRATOR_ONLY, ["--no-color"]);
 
-    await expect(code).resolves.toBe(1);
-    expect(io.stderr).toContain("ERROR [V-B2]");
-    expect(backlog.reads).toHaveLength(1);
+    await expect(code).resolves.toBe(0);
+    expect(`${io.stdout}${io.stderr}`).not.toContain("V-B2");
+    expect(backlog.project("PROJ_A")?.categories.map(({ name }) => name)).toEqual([
+      "フロントエンド",
+    ]);
+    expect(backlog.project("PROJ_A")?.members.map(({ id }) => id)).toEqual([SUZUKI.id, YAMADA.id]);
+  });
+
+  it("一般ユーザーの API キーでステータスを書き換える計画を plan すると、V-B2 の警告が出るが中断はしない", async () => {
+    const backlog = space({ executor: SUZUKI, projects: [managedBySuzuki] });
+    const { io, code } = plan(backlog, MANIFEST);
+
+    await expect(code).resolves.toBe(2);
+    expect(`${io.stdout}${io.stderr}`).toContain("[V-B2]");
     expect(backlog.writes).toEqual([]);
   });
 

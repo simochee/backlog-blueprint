@@ -43,7 +43,7 @@ describe("スキーマ検証の対象", () => {
         issueTypes: [{ name: "バグ", color: "#990000" }],
         statuses: [{ name: "未対応" }, { name: "処理中", color: "#4caf93" }],
         customFields: [{ name: "影響範囲", type: "singleList", items: ["大", "小"] }],
-        access: { members: ["alice", "bob"] },
+        access: { members: [1, 2] },
       }),
     ).toEqual([]);
   });
@@ -107,9 +107,16 @@ describe("要件定義の ID への割り当て", () => {
   });
 
   it("access の各リスト内の重複は V-A13 として報告される", () => {
-    expect(only({ ...minimal, access: { members: ["alice", "alice"] } })).toMatchObject({
+    expect(only({ ...minimal, access: { members: [1, 1] } })).toMatchObject({
       id: "V-A13",
       path: "access/members",
+    });
+  });
+
+  it("access の個人にログイン ID を書くとスキーマで止まる（A-7）", () => {
+    expect(only({ ...minimal, access: { members: ["yamada"] } })).toMatchObject({
+      severity: "error",
+      path: "access/members/0",
     });
   });
 

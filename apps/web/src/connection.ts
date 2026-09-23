@@ -6,6 +6,7 @@ import {
   readUpdateRateLimit,
   requiredNumber,
   requiredString,
+  SPACE_ADMINISTRATOR_ROLE_TYPE,
   type Diagnostic,
   type RateLimit,
   type ReadContext,
@@ -18,10 +19,13 @@ const SPACE_PATH = "/api/v2/space";
 const SPACE_ICON_PATH = "/api/v2/space/image";
 
 export type Connection = {
-  /** ログイン ID。`access` に書く値（§2.2） */
+  /** ログイン ID。本人が見慣れた値として表示にだけ使う（§2.2）。返らなければ表示名か ID */
   user: string;
-  /** 表示名。ログイン ID をコピーするときのコメントにだけ使う（WU-35） */
+  /** 数値のユーザー ID。`access` に書く値（A-7 / WU-35） */
+  userId: number;
+  /** 表示名。ユーザー ID をコピーするときのコメントにだけ使う（WU-35） */
   userName?: string;
+  spaceAdministrator: boolean;
   space: string;
   /** アイコンを取る path（WU-35）。利用者のものは数値の id で引く */
   icons: { space: string; user: string };
@@ -51,17 +55,20 @@ export const connect = async (get: ReadContext["get"]): Promise<ConnectionResult
   }
 
   const myself = asRecord(responses.get(MYSELF_PATH));
+  const userId = requiredNumber(myself, "id");
   const userName = optionalString(myself, "name");
 
   return {
     diagnostics: auth.diagnostics,
     connection: {
-      user: requiredString(myself, "userId"),
+      user: optionalString(myself, "userId") || userName || String(userId),
+      userId,
       ...(userName === undefined ? {} : { userName }),
+      spaceAdministrator: requiredNumber(myself, "roleType") === SPACE_ADMINISTRATOR_ROLE_TYPE,
       space: requiredString(asRecord(await get(SPACE_PATH)), "name"),
       icons: {
         space: SPACE_ICON_PATH,
-        user: `/api/v2/users/${requiredNumber(myself, "id")}/icon`,
+        user: `/api/v2/users/${userId}/icon`,
       },
       updateRateLimit: await readUpdateRateLimit(get),
     },

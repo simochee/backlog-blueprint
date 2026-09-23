@@ -4,21 +4,21 @@ import { type Access } from "../manifest";
 import { type Reconciler } from "../reconciler";
 import { type Value } from "../value";
 
-export type AccessUser = { id: number; userId: string };
+/**
+ * ログイン ID（`userId`）は取り込まない。スペース管理者でないキーには本人以外の
+ * `userId` が `null` で返る（API 制約「スペースのユーザー一覧」）ので、必須にすると
+ * 一般ユーザーの読み取りがここで落ちる。マニフェストも数値 ID で書く（A-7）。
+ *
+ * `name` を `optionalString` にするのは、表示のための項目が欠けていることで読み取りを
+ * 落としたくないため。
+ */
+export type AccessUser = { id: number; name?: string };
 
 /**
  * `roleType` はスペース全体の権限で、`GET /users` だけが返す（API 制約「権限」）。
  * プロジェクト単位の取得には現れないので、`AccessUser` とは別の型にする。
- *
- * `name` と `mailAddress` を持つのは V-B4 が「書かれた値は誰の表示名／メールアドレスか」
- * を言えるようにするためだけで、計画にも送信にも載らない。取り込みを `optionalString` に
- * するのは、ヒントのための項目が欠けていることで読み取りを落としたくないため。
  */
-export type SpaceUser = AccessUser & {
-  roleType: number;
-  name?: string;
-  mailAddress?: string;
-};
+export type SpaceUser = AccessUser & { roleType: number };
 
 export type AccessTeam = { id: number; name: string };
 
@@ -58,8 +58,9 @@ const administratorsPath = (projectKey: string): string =>
 
 const toUser = (value: unknown): AccessUser => {
   const user = asRecord(value);
+  const name = optionalString(user, "name");
 
-  return { id: requiredNumber(user, "id"), userId: requiredString(user, "userId") };
+  return { id: requiredNumber(user, "id"), ...(name === undefined ? {} : { name }) };
 };
 
 const toUsers = (value: unknown): AccessUser[] => asArray(value).map((item) => toUser(item));
@@ -68,8 +69,6 @@ const toSpaceUsers = (value: unknown): SpaceUser[] =>
   asArray(value).map((item) => ({
     ...toUser(item),
     roleType: requiredNumber(asRecord(item), "roleType"),
-    name: optionalString(asRecord(item), "name"),
-    mailAddress: optionalString(asRecord(item), "mailAddress"),
   }));
 
 const toTeam = (value: unknown): AccessTeam => {
@@ -135,7 +134,7 @@ const removed = (
   writeRequest: true,
 });
 
-const unique = (names: string[]): string[] => [...new Set(names)];
+const unique = (ids: number[]): number[] => [...new Set(ids)];
 
 export const accessReconciler: Reconciler<Access, AccessSnapshot> = {
   /**
@@ -164,11 +163,6 @@ export const accessReconciler: Reconciler<Access, AccessSnapshot> = {
   plan: (desired, snapshot, { manifest }) => {
     const projectKey = manifest.key;
 
-    const userId = (login: string): Value =>
-      snapshot.spaceUsers.find((user) => user.userId === login)?.id ?? {
-        $ref: { kind: "projectMember", name: login },
-      };
-
     /**
      * `administrators` を差し引かずに合併する。§6.3 の表は「`members` ∪
      * （`administrators` のうち未参加の人）」と書いているが、それを削除側にも使うと、
@@ -178,17 +172,19 @@ export const accessReconciler: Reconciler<Access, AccessSnapshot> = {
      */
     const desiredMembers = unique([...desired.members, ...desired.administrators]);
 
-    const joinedMembers = new Map(snapshot.members.map((user) => [user.userId, user.id]));
+    const joinedMembers = new Set(snapshot.members.map(({ id }) => id));
     const joinedTeams = new Set(snapshot.teams.map(({ id }) => id));
     const teamName = (id: number): string =>
       snapshot.spaceTeams.find((team) => team.id === id)?.name ?? `#${id}`;
-    const grantedAdministrators = new Map(
-      snapshot.administrators.map((user) => [user.userId, user.id]),
-    );
+    const userName = (id: number): string =>
+      [...snapshot.spaceUsers, ...snapshot.members, ...snapshot.administrators].find(
+        (user) => user.id === id,
+      )?.name || `#${id}`;
+    const grantedAdministrators = new Set(snapshot.administrators.map(({ id }) => id));
 
     /**
-     * チームだけ `Action.id` と表示名を分ける。名前はスペース内で重なりうる（A-6）ので、
-     * 名前で `id` を作ると同名の2チームが同じ Action を指し、中断レポートがどちらまで
+     * `Action.id` と表示名を分ける。名前はスペース内で重なりうる（A-6 / A-7）ので、
+     * 名前で `id` を作ると同名の2件が同じ Action を指し、中断レポートがどちらまで
      * 進んだかを言えなくなる。表示は人が読むためにスペースの現在の名前で出す。
      */
     const teamsToAdd = desired.teams.map((id) =>
@@ -197,47 +193,43 @@ export const accessReconciler: Reconciler<Access, AccessSnapshot> = {
         : added("projectTeam", String(id), teamName(id), teamsPath(projectKey), { teamId: id }),
     );
 
-    const membersToAdd = desiredMembers.map((login) => {
-      const joined = joinedMembers.get(login);
+    const membersToAdd = desiredMembers.map((id) =>
+      joinedMembers.has(id)
+        ? matched("projectMember", String(id), userName(id), id)
+        : added("projectMember", String(id), userName(id), usersPath(projectKey), { userId: id }),
+    );
 
-      return joined === undefined
-        ? added("projectMember", login, login, usersPath(projectKey), { userId: userId(login) })
-        : matched("projectMember", login, login, joined);
-    });
-
-    const administratorsToGrant = desired.administrators.map((login) => {
-      const granted = grantedAdministrators.get(login);
-
-      return granted === undefined
-        ? added("projectAdministrator", login, login, administratorsPath(projectKey), {
-            userId: userId(login),
-          })
-        : matched("projectAdministrator", login, login, granted);
-    });
+    const administratorsToGrant = desired.administrators.map((id) =>
+      grantedAdministrators.has(id)
+        ? matched("projectAdministrator", String(id), userName(id), id)
+        : added("projectAdministrator", String(id), userName(id), administratorsPath(projectKey), {
+            userId: id,
+          }),
+    );
 
     const administratorsToRevoke = snapshot.administrators
-      .filter((user) => !desired.administrators.includes(user.userId))
-      .map((user) =>
+      .filter(({ id }) => !desired.administrators.includes(id))
+      .map(({ id }) =>
         removed(
           "projectAdministrator",
-          user.userId,
-          user.userId,
+          String(id),
+          userName(id),
           administratorsPath(projectKey),
-          { userId: user.id },
-          user.id,
+          { userId: id },
+          id,
         ),
       );
 
     const membersToRemove = snapshot.members
-      .filter((user) => !desiredMembers.includes(user.userId))
-      .map((user) =>
+      .filter(({ id }) => !desiredMembers.includes(id))
+      .map(({ id }) =>
         removed(
           "projectMember",
-          user.userId,
-          user.userId,
+          String(id),
+          userName(id),
           usersPath(projectKey),
-          { userId: user.id },
-          user.id,
+          { userId: id },
+          id,
         ),
       );
 

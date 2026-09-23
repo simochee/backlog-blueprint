@@ -10,12 +10,12 @@ import { type Action } from "../action";
 import { type Access } from "../manifest";
 import { accessReconciler, type AccessSnapshot } from "./access";
 
-const suzuki = { id: 11, userId: "suzuki" };
-const tanaka = { id: 12, userId: "tanaka" };
-const yamada = { id: 13, userId: "yamada" };
+const suzuki = { id: 11, name: "鈴木 花子" };
+const tanaka = { id: 12, name: "田中 一郎" };
+const yamada = { id: 13, name: "山田 太郎" };
 
 /** `roleType` を返すのはスペースの利用者一覧だけで、プロジェクト側の取得には現れない */
-const inSpace = (user: { id: number; userId: string }) => ({ ...user, roleType: 2 });
+const inSpace = (user: { id: number; name: string }) => ({ ...user, roleType: 2 });
 
 const developers = { id: 21, name: "開発チーム", members: [tanaka] };
 const qa = { id: 22, name: "QA", members: [] };
@@ -109,7 +109,7 @@ describe("現状の取得", () => {
 
 describe("チーム経由の参加者", () => {
   it("チーム経由で参加している人は個人として削除されない", async () => {
-    const manifest = fixedManifest({ access: { teams: [developers.id], members: ["suzuki"] } });
+    const manifest = fixedManifest({ access: { teams: [developers.id], members: [suzuki.id] } });
     const current = await accessReconciler.read(
       fixedReadContext({
         ...SPACE_RESPONSES,
@@ -123,39 +123,39 @@ describe("チーム経由の参加者", () => {
     const actions = accessReconciler.plan(manifest.access, current, fixedPlanContext({ manifest }));
 
     expect(writesOf(actions)).toEqual([]);
-    expect(actions.every(({ name }) => name !== tanaka.userId)).toBe(true);
+    expect(actions.every(({ target }) => target !== tanaka.id)).toBe(true);
   });
 
   it("チーム所属者が members にも書かれていれば個人参加させる", () => {
     const actions = planOf(
-      { teams: [developers.id], members: ["tanaka"] },
+      { teams: [developers.id], members: [tanaka.id] },
       { teams: [joined(developers)] },
     );
 
-    expect(writesOf(actions)).toEqual(["projectMembers/create/tanaka"]);
-    expect(paramsOf(actions, "projectMembers/create/tanaka")).toEqual({ userId: tanaka.id });
+    expect(writesOf(actions)).toEqual(["projectMembers/create/12"]);
+    expect(paramsOf(actions, "projectMembers/create/12")).toEqual({ userId: tanaka.id });
   });
 });
 
 describe("管理者", () => {
   it("管理者に指定された未参加者には個人参加が先に流れる", () => {
-    const actions = planOf({ administrators: ["yamada"] });
+    const actions = planOf({ administrators: [yamada.id] });
 
     expect(writesOf(actions)).toEqual([
-      "projectMembers/create/yamada",
-      "projectAdministrators/create/yamada",
+      "projectMembers/create/13",
+      "projectAdministrators/create/13",
     ]);
   });
 
   it("既に個人参加している管理者には参加のリクエストを打たない", () => {
-    const actions = planOf({ administrators: ["yamada"] }, { members: [yamada] });
+    const actions = planOf({ administrators: [yamada.id] }, { members: [yamada] });
 
-    expect(writesOf(actions)).toEqual(["projectAdministrators/create/yamada"]);
+    expect(writesOf(actions)).toEqual(["projectAdministrators/create/13"]);
   });
 
   it("members に書かれていない管理者も個人参加から外されない", () => {
     const actions = planOf(
-      { administrators: ["yamada"] },
+      { administrators: [yamada.id] },
       { members: [yamada], administrators: [yamada] },
     );
 
@@ -166,39 +166,59 @@ describe("管理者", () => {
     const actions = planOf({}, { members: [yamada], administrators: [yamada] });
 
     expect(writesOf(actions)).toEqual([
-      "projectAdministrators/delete/yamada",
-      "projectMembers/delete/yamada",
+      "projectAdministrators/delete/13",
+      "projectMembers/delete/13",
     ]);
-    expect(paramsOf(actions, "projectMembers/delete/yamada")).toEqual({ userId: yamada.id });
+    expect(paramsOf(actions, "projectMembers/delete/13")).toEqual({ userId: yamada.id });
   });
 });
 
 describe("フェーズ7の並び", () => {
   it("追加を先に、削除を後に並べる", () => {
     const actions = planOf(
-      { teams: [qa.id], members: ["suzuki"], administrators: ["yamada"] },
+      { teams: [qa.id], members: [suzuki.id], administrators: [yamada.id] },
       { teams: [joined(developers)], members: [tanaka], administrators: [tanaka] },
     );
 
     expect(writesOf(actions)).toEqual([
       "projectTeams/create/22",
-      "projectMembers/create/suzuki",
-      "projectMembers/create/yamada",
-      "projectAdministrators/create/yamada",
-      "projectAdministrators/delete/tanaka",
-      "projectMembers/delete/tanaka",
+      "projectMembers/create/11",
+      "projectMembers/create/13",
+      "projectAdministrators/create/13",
+      "projectAdministrators/delete/12",
+      "projectMembers/delete/12",
       "projectTeams/delete/21",
     ]);
   });
 
   it("一致しているものは noop として残る", () => {
     const actions = planOf(
-      { teams: [developers.id], members: ["suzuki"] },
+      { teams: [developers.id], members: [suzuki.id] },
       { teams: [joined(developers)], members: [suzuki] },
     );
 
-    expect(idsOf(actions)).toEqual(["projectTeams/noop/21", "projectMembers/noop/suzuki"]);
+    expect(idsOf(actions)).toEqual(["projectTeams/noop/21", "projectMembers/noop/11"]);
     expect(actions.every(({ writeRequest }) => !writeRequest)).toBe(true);
+  });
+});
+
+describe("個人", () => {
+  it("書いたユーザー ID をそのまま送る", () => {
+    const actions = planOf({ members: [suzuki.id] });
+
+    expect(paramsOf(actions, "projectMembers/create/11")).toEqual({ userId: suzuki.id });
+  });
+
+  it("計画に出る個人の名前は、書いた ID からスペースの表示名を引いたものになる", () => {
+    const actions = planOf({ members: [suzuki.id] });
+
+    expect(actions.find(({ id }) => id === "projectMembers/create/11")?.name).toBe("鈴木 花子");
+  });
+
+  it("表示名が分からない個人は ID で名指す", () => {
+    const actions = planOf({ members: [99] });
+
+    expect(actions.find(({ id }) => id === "projectMembers/create/99")?.name).toBe("#99");
   });
 });
 
@@ -234,7 +254,7 @@ describe("チーム", () => {
 describe("一致している参加の表し方", () => {
   it("一致しているチーム・個人・管理者には既存の ID が載る", () => {
     const actions = planOf(
-      { teams: [developers.id], members: ["suzuki"], administrators: ["yamada"] },
+      { teams: [developers.id], members: [suzuki.id], administrators: [yamada.id] },
       {
         teams: [joined(developers)],
         members: [suzuki, yamada],
@@ -246,9 +266,9 @@ describe("一致している参加の表し方", () => {
       actions.filter(({ op }) => op === "noop").map(({ name, target }) => [name, target]),
     ).toEqual([
       ["開発チーム", developers.id],
-      ["suzuki", suzuki.id],
-      ["yamada", yamada.id],
-      ["yamada", yamada.id],
+      ["鈴木 花子", suzuki.id],
+      ["山田 太郎", yamada.id],
+      ["山田 太郎", yamada.id],
     ]);
   });
 });
@@ -263,17 +283,36 @@ describe("応答の検査", () => {
   it("スペースの利用者に roleType が無い応答も落ちる", async () => {
     await expect(
       accessReconciler.read(
-        fixedReadContext({ ...SPACE_RESPONSES, "/api/v2/users": [{ id: 1, userId: "suzuki" }] }),
+        fixedReadContext({ ...SPACE_RESPONSES, "/api/v2/users": [{ id: 1, name: "鈴木 花子" }] }),
       ),
     ).rejects.toThrow("roleType");
   });
 
-  it("ユーザーに userId が無い応答も落ちる", async () => {
+  it("ユーザーに id が無い応答も落ちる", async () => {
     await expect(
       accessReconciler.read(
-        fixedReadContext({ ...SPACE_RESPONSES, "/api/v2/users": [{ id: 1, roleType: 2 }] }),
+        fixedReadContext({
+          ...SPACE_RESPONSES,
+          "/api/v2/users": [{ name: "鈴木 花子", roleType: 2 }],
+        }),
       ),
-    ).rejects.toThrow("userId");
+    ).rejects.toThrow('"id"');
+  });
+
+  it("ログイン ID が null の利用者も読み取れる（スペース管理者でないキーの応答）", async () => {
+    const hidden = { id: 11, userId: null, name: "鈴木 花子", roleType: 2 };
+    const snapshot = await accessReconciler.read(
+      fixedReadContext(
+        {
+          "/api/v2/users": [hidden],
+          "/api/v2/teams": [{ id: 21, name: "開発チーム", members: [hidden] }],
+        },
+        { snapshot: fixedSnapshot({ project: { exists: false } }) },
+      ),
+    );
+
+    expect(snapshot.spaceUsers).toEqual([{ id: 11, name: "鈴木 花子", roleType: 2 }]);
+    expect(snapshot.spaceTeams[0]?.members).toEqual([{ id: 11, name: "鈴木 花子" }]);
   });
 });
 
@@ -282,8 +321,8 @@ describe("冪等性（NFR-4）", () => {
     const actions = planOf(
       {
         teams: [developers.id],
-        members: ["suzuki"],
-        administrators: ["yamada"],
+        members: [suzuki.id],
+        administrators: [yamada.id],
       },
       {
         teams: [joined(developers)],

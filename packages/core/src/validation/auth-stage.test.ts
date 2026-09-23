@@ -5,11 +5,11 @@ import { authenticateExecutor } from "./auth-stage";
 
 const myself = (response: unknown) => fixedGet({ "/api/v2/users/myself": response });
 
-describe("接続と権限（S5）", () => {
-  it("一般ユーザーの API キーでは V-B2 で中断する", async () => {
-    const { diagnostics } = await authenticateExecutor(myself({ id: 7, roleType: 2 }));
+describe("接続（S5）", () => {
+  it("スペース管理者でない API キーでも中断せず、実行者の権限を返す", async () => {
+    const result = await authenticateExecutor(myself({ id: 7, roleType: 2 }));
 
-    expect(diagnostics).toMatchObject([{ id: "V-B2", severity: "error", stage: "auth" }]);
+    expect(result).toEqual({ diagnostics: [], executor: { id: 7, roleType: 2 } });
   });
 
   it("スペース管理者の API キーなら実行者を返し、指摘を出さない", async () => {

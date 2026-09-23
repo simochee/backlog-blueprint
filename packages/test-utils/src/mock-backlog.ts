@@ -20,7 +20,7 @@ export type MockRequest = {
 };
 
 /** `roleType` はスペース全体の権限。1 がスペース管理者（実測。research「権限」） */
-export type MockUser = { id: number; userId: string; roleType: number };
+export type MockUser = { id: number; userId: string; roleType: number; name?: string };
 
 const SPACE_ADMINISTRATOR_ROLE_TYPE = 1;
 
@@ -349,6 +349,16 @@ export const mockBacklog = (options: MockBacklogOptions = {}): MockBacklog => {
 
   const userById = (id: number): MockUser | undefined => spaceUsers.find((user) => user.id === id);
 
+  /**
+   * スペース管理者でないキーには、本人以外のログイン ID が `null` で返る（実測。
+   * API 制約「スペースのユーザー一覧」）。そのまま返すと、ログイン ID に頼る実装が
+   * 一般ユーザーの受け入れでも通ってしまう。
+   */
+  const asSeenByExecutor = (user: MockUser): unknown =>
+    executor.roleType === SPACE_ADMINISTRATOR_ROLE_TYPE || user.id === executor.id
+      ? user
+      : { ...user, userId: null };
+
   const teamById = (id: number): MockSpaceTeam | undefined =>
     spaceTeams.find((team) => team.id === id);
 
@@ -549,11 +559,11 @@ export const mockBacklog = (options: MockBacklogOptions = {}): MockBacklog => {
     }
 
     if (path === "/api/v2/users") {
-      return spaceUsers;
+      return spaceUsers.map(asSeenByExecutor);
     }
 
     if (path === "/api/v2/teams") {
-      return spaceTeams;
+      return spaceTeams.map((team) => ({ ...team, members: team.members.map(asSeenByExecutor) }));
     }
 
     const counted = /^\/api\/v2\/issues\/count\?projectId\[\]=(\d+)$/.exec(path);

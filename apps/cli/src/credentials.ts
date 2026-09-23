@@ -27,7 +27,7 @@ export const resolveCredentials = (
 
   if (apiKey === undefined || apiKey === "") {
     return {
-      error: `ERROR  ${API_KEY_VARIABLE} is not set.\n  → export ${API_KEY_VARIABLE} with an API key of a space administrator\n`,
+      error: `ERROR  ${API_KEY_VARIABLE} is not set.\n  → export ${API_KEY_VARIABLE} with your Backlog API key\n`,
     };
   }
 

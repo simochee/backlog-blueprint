@@ -69,7 +69,7 @@ export {
 export { webhooksReconciler } from "./resources/webhooks";
 export { declaredOrder, FIXED_ORDER_SECTIONS, resultingOrder } from "./resulting-order";
 export { projectSchemaPath, projectSchemaUrl, SCHEMA_DISTRIBUTION_ORIGIN } from "./schema-url";
-export { authenticateExecutor } from "./validation/auth-stage";
+export { authenticateExecutor, SPACE_ADMINISTRATOR_ROLE_TYPE } from "./validation/auth-stage";
 export { expandEnvironment, hasEnvSentinel, UNRESOLVED_ENV_ID } from "./validation/expand-stage";
 export { blocksNextStage, hasError, orderDiagnostics } from "./validation/gate";
 export { failureDetail, failureStatus } from "./validation/http-failure";

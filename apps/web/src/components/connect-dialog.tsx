@@ -24,7 +24,7 @@ export const ConnectDialog = ({ open, onClose, ...form }: ConnectDialogProps) =>
     <Dialog.Content maxWidth="28rem" size="3">
       <Dialog.Title size="4">Switch connection</Dialog.Title>
       <Dialog.Description color="gray" mb="4" size="2">
-        The current connection stays until the new one is confirmed as a Space Administrator.
+        The current connection stays until the new one is confirmed.
       </Dialog.Description>
       <ConnectForm {...form} submitLabel="Switch" />
     </Dialog.Content>

@@ -124,3 +124,34 @@ describe("プロジェクトの参加者", () => {
     expect(reply.body).toEqual([YAMADA]);
   });
 });
+
+const loginIdsOf = ({ body }: Reply): unknown[] =>
+  (body as { userId: unknown }[]).map(({ userId }) => userId);
+
+describe("スペースのユーザー一覧に載るログイン ID", () => {
+  const asMember = (): MockBacklog =>
+    mockBacklog({
+      executor: TANAKA,
+      spaceUsers: [YAMADA, TANAKA],
+      spaceTeams: [{ name: "開発チーム", members: ["yamada", "tanaka"] }],
+    });
+
+  it("スペース管理者のキーには全員のログイン ID が返る", async () => {
+    const reply = await call(space(), "GET", "/api/v2/users");
+
+    expect(loginIdsOf(reply)).toEqual(["yamada", "tanaka"]);
+  });
+
+  it("スペース管理者でないキーには本人以外のログイン ID が null で返る", async () => {
+    const reply = await call(asMember(), "GET", "/api/v2/users");
+
+    expect(loginIdsOf(reply)).toEqual([null, "tanaka"]);
+  });
+
+  it("チームの所属者のログイン ID も同じように隠れ、ID と権限は返る", async () => {
+    const { body } = await call(asMember(), "GET", "/api/v2/teams");
+    const [team] = body as { members: unknown[] }[];
+
+    expect(team?.members).toEqual([{ ...YAMADA, userId: null }, TANAKA]);
+  });
+});

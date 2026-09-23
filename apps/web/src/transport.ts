@@ -24,7 +24,7 @@ const opened = (): WebClient => {
 
 /**
  * 繋ぐ前の候補は採用するまで `transport` に入れない（WU-36）。先に入れると、切り替えの
- * モーダルで V-B2 に落ちた接続が、今の接続の代わりに一覧や計画の取得に使われる。
+ * モーダルで V-B1 に落ちた接続が、今の接続の代わりに一覧や計画の取得に使われる。
  */
 export const candidateTransport = (space: string, apiKey: string): WebClient =>
   createBacklogClient({ space, apiKey });

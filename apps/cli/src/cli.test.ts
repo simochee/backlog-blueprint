@@ -65,11 +65,11 @@ const anAction = (overrides: Partial<Action> = {}): Action => ({
 });
 
 const violation = (): Diagnostic => ({
-  id: "V-B2",
+  id: "V-B1",
   severity: "error",
   stage: "auth",
   path: "",
-  message: "not a space administrator",
+  message: "GET /api/v2/users/myself failed",
 });
 
 const aWarning = (): Diagnostic => ({

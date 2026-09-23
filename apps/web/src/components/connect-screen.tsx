@@ -18,8 +18,9 @@ export const ConnectScreen = ({ reconnectingTo, ...form }: ConnectScreenProps) =
               Connect to Backlog
             </Heading>
             <Text color="gray" size="2">
-              Use an API key of a Space Administrator. It stays in this tab and is removed when you
-              close it or disconnect.
+              Use your Backlog API key. Creating a project, changing its statuses and granting the
+              project administrator role need a Space Administrator. The key stays in this tab and
+              is removed when you close it or disconnect.
             </Text>
           </Flex>
           <ConnectForm {...form} />

@@ -45,7 +45,7 @@ export const DIRECTORY_PANES: Record<
     title: "Users",
     icon: <PersonIcon aria-hidden />,
     description:
-      "Login IDs for access.members and access.administrators, with each display name as a comment.",
+      "User IDs for access.members and access.administrators, with each display name as a comment.",
     noun: "users",
     singular: "User",
   },

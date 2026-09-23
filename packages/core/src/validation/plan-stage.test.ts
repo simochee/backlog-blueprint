@@ -74,20 +74,91 @@ describe("実行者の締め出し（V-B6）", () => {
     expect(idsOf([revoke])).toEqual([]);
   });
 
-  it("誰を締め出すのかを名前で伝える", () => {
+  it("誰を締め出すのかを名前と ID で伝え、書き足す ID を案内する", () => {
     const [diagnostic] = validate([
       action({
         kind: "projectAdministrator",
         op: "delete",
-        name: "yamada",
+        name: "山田 太郎",
         phase: 7,
         target: 1,
         writeRequest: true,
       }),
     ]);
 
-    expect(diagnostic?.message).toContain("yamada");
+    expect(diagnostic?.message).toContain('"山田 太郎" (1)');
+    expect(diagnostic?.hint).toBe("add 1 to access.administrators");
     expect(diagnostic?.severity).toBe("error");
+  });
+});
+
+describe("スペース管理者にしかできない操作（V-B2）", () => {
+  const MEMBER = { executor: { id: 1, roleType: 2 } };
+
+  const statusCreate = action({
+    kind: "status",
+    op: "create",
+    name: "レビュー中",
+    writeRequest: true,
+  });
+
+  it.each([
+    [
+      "プロジェクトの追加",
+      action({ kind: "project", op: "create", name: "PROJ_A", writeRequest: true }),
+    ],
+    ["ステータスの追加", statusCreate],
+    [
+      "ステータスの更新",
+      action({ kind: "status", op: "update", name: "レビュー中", writeRequest: true }),
+    ],
+    [
+      "ステータスの削除",
+      action({ kind: "status", op: "delete", name: "レビュー中", writeRequest: true }),
+    ],
+    [
+      "プロジェクト管理者の付与",
+      action({ kind: "projectAdministrator", op: "create", name: "鈴木 花子", writeRequest: true }),
+    ],
+  ])("スペース管理者でない実行者の計画に%sがあれば警告する", (_, planned) => {
+    const [diagnostic] = validate([planned], { snapshot: MEMBER });
+
+    expect(diagnostic).toMatchObject({ id: "V-B2", severity: "warning" });
+  });
+
+  it("該当する操作の件数と、最初の1件を伝える", () => {
+    const statusUpdate = action({
+      kind: "status",
+      op: "update",
+      name: "確認待ち",
+      writeRequest: true,
+    });
+    const [diagnostic] = validate([statusCreate, statusUpdate], { snapshot: MEMBER });
+
+    expect(diagnostic?.message).toContain("2 of the planned operations");
+    expect(diagnostic?.message).toContain('status "レビュー中"');
+  });
+
+  it("スペース管理者の計画には警告しない", () => {
+    expect(idsOf([statusCreate], { snapshot: { executor: { id: 1, roleType: 1 } } })).toEqual([]);
+  });
+
+  it("スペース管理者でなくても、該当する操作が無い計画には警告しない", () => {
+    const planned = [
+      action({ kind: "category", op: "create", name: "基盤", writeRequest: true }),
+      action({ kind: "status", op: "reorder", name: "statuses", writeRequest: true }),
+      action({
+        kind: "projectAdministrator",
+        op: "delete",
+        name: "鈴木 花子",
+        target: 9,
+        writeRequest: true,
+      }),
+    ];
+
+    expect(
+      idsOf(planned, { manifest: { categories: [{ name: "基盤" }] }, snapshot: MEMBER }),
+    ).toEqual([]);
   });
 });
 
@@ -218,8 +289,8 @@ describe("チーム経由の重複記述（V-A16）", () => {
         teams: [],
         members: [],
         administrators: [],
-        spaceUsers: [{ id: 9, userId: "suzuki", roleType: 2 }],
-        spaceTeams: [{ id: 3, name: "開発チーム", members: [{ id: 9, userId: "suzuki" }] }],
+        spaceUsers: [{ id: 9, name: "鈴木 花子", roleType: 2 }],
+        spaceTeams: [{ id: 3, name: "開発チーム", members: [{ id: 9, name: "鈴木 花子" }] }],
       },
     },
   };
@@ -227,7 +298,7 @@ describe("チーム経由の重複記述（V-A16）", () => {
   it("チーム経由で参加する人を members に書くと警告する", () => {
     const [diagnostic] = validate([], {
       ...withTeam,
-      manifest: { access: { teams: [3], members: ["suzuki"] } },
+      manifest: { access: { teams: [3], members: [9] } },
     });
 
     expect(diagnostic).toMatchObject({
@@ -236,26 +307,27 @@ describe("チーム経由の重複記述（V-A16）", () => {
       path: "access/members/0",
     });
     expect(diagnostic?.message).toContain("開発チーム");
+    expect(diagnostic?.message).toContain('"鈴木 花子" (9)');
   });
 
   it("書いても動くことを hint で伝える", () => {
     const [diagnostic] = validate([], {
       ...withTeam,
-      manifest: { access: { teams: [3], members: ["suzuki"] } },
+      manifest: { access: { teams: [3], members: [9] } },
     });
 
     expect(diagnostic?.hint).toContain("also works");
   });
 
   it("チームを書いていなければ警告しない", () => {
-    expect(idsOf([], { ...withTeam, manifest: { access: { members: ["suzuki"] } } })).toEqual([]);
+    expect(idsOf([], { ...withTeam, manifest: { access: { members: [9] } } })).toEqual([]);
   });
 
   it("管理者は個人参加が必須なので警告しない", () => {
     expect(
       idsOf([], {
         ...withTeam,
-        manifest: { access: { teams: [3], administrators: ["suzuki"] } },
+        manifest: { access: { teams: [3], administrators: [9] } },
       }),
     ).toEqual([]);
   });

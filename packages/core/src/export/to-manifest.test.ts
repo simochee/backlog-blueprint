@@ -346,50 +346,58 @@ describe("参加者", () => {
     const manifest = manifestOf({
       access: {
         teams: [{ id: 31, name: "開発チーム" }],
-        members: [
-          { id: 1, userId: "yamada" },
-          { id: 2, userId: "suzuki" },
-        ],
-        administrators: [{ id: 2, userId: "suzuki" }],
+        members: [{ id: 1 }, { id: 2 }],
+        administrators: [{ id: 2 }],
         spaceUsers: [],
         spaceTeams: [],
       },
     });
 
-    expect(manifest.access).toEqual({
-      teams: [31],
-      members: ["yamada"],
-      administrators: ["suzuki"],
-    });
+    expect(manifest.access).toEqual({ teams: [31], members: [1], administrators: [2] });
   });
 
   it("チームにも属している個人参加者は members に残る", () => {
     const manifest = manifestOf({
       access: {
         teams: [{ id: 31, name: "開発チーム" }],
-        members: [{ id: 1, userId: "yamada" }],
+        members: [{ id: 1 }],
         administrators: [],
         spaceUsers: [],
-        spaceTeams: [{ id: 31, name: "開発チーム", members: [{ id: 1, userId: "yamada" }] }],
+        spaceTeams: [{ id: 31, name: "開発チーム", members: [{ id: 1 }] }],
       },
     });
 
-    expect(manifest.access?.members).toEqual(["yamada"]);
+    expect(manifest.access?.members).toEqual([1]);
   });
 
-  it("チームにはプロジェクトの応答のチーム名を、利用者にはスペースの一覧の表示名を、コメント用の名前として渡す", () => {
+  it("チームにはチーム名を、利用者にはプロジェクトの応答の表示名を、コメント用の名前として渡す", () => {
     const { accessLabels } = exported({
       access: {
         teams: [{ id: 31, name: "開発チーム" }],
-        members: [{ id: 1, userId: "yamada" }],
-        administrators: [],
-        spaceUsers: [{ id: 1, userId: "yamada", roleType: 2, name: "山田 太郎" }],
+        members: [{ id: 1, name: "山田 太郎" }],
+        administrators: [{ id: 2, name: "鈴木 花子" }],
+        spaceUsers: [],
         spaceTeams: [],
       },
     });
 
     expect(accessLabels?.teams.get(31)).toBe("開発チーム");
-    expect(accessLabels?.users.get("yamada")).toBe("山田 太郎");
+    expect(accessLabels?.users.get(1)).toBe("山田 太郎");
+    expect(accessLabels?.users.get(2)).toBe("鈴木 花子");
+  });
+
+  it("表示名が空の利用者にはコメント用の名前を渡さない", () => {
+    const { accessLabels } = exported({
+      access: {
+        teams: [],
+        members: [{ id: 1, name: "" }, { id: 2 }],
+        administrators: [],
+        spaceUsers: [],
+        spaceTeams: [],
+      },
+    });
+
+    expect(accessLabels?.users.size).toBe(0);
   });
 });
 

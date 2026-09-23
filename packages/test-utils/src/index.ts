@@ -162,16 +162,16 @@ export const exportableResourceSnapshots = (
   access: {
     teams: [{ id: 31, name: "開発チーム" }],
     members: [
-      { id: 1, userId: "yamada" },
-      { id: 2, userId: "suzuki" },
+      { id: 1, name: "山田 太郎" },
+      { id: 2, name: "鈴木 花子" },
     ],
-    administrators: [{ id: 2, userId: "suzuki" }],
+    administrators: [{ id: 2, name: "鈴木 花子" }],
     spaceUsers: [
-      { id: 1, userId: "yamada", roleType: 1 },
-      { id: 2, userId: "suzuki", roleType: 2 },
-      { id: 3, userId: "tanaka", roleType: 2 },
+      { id: 1, name: "山田 太郎", roleType: 1 },
+      { id: 2, name: "鈴木 花子", roleType: 2 },
+      { id: 3, name: "田中 一郎", roleType: 2 },
     ],
-    spaceTeams: [{ id: 31, name: "開発チーム", members: [{ id: 3, userId: "tanaka" }] }],
+    spaceTeams: [{ id: 31, name: "開発チーム", members: [{ id: 3, name: "田中 一郎" }] }],
   },
   webhooks: [
     {

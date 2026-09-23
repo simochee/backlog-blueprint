@@ -74,15 +74,5 @@ export const seedResolutions = (snapshots: ResourceSnapshots): ResolutionTable =
     put(`webhook:${name}`, id);
   }
 
-  /**
-   * 利用者はプロジェクトの参加者ではなくスペース全体から登録する。
-   * フェーズ7が指すのは「これから参加させる」相手で、プロジェクト側にはまだ居ない。
-   * チームは登録しない。マニフェストがチーム ID をそのまま書く（A-6）ので、引く名前が無い。
-   */
-  for (const { id, userId } of snapshots.access.spaceUsers) {
-    put(`projectMember:${userId}`, id);
-    put(`projectAdministrator:${userId}`, id);
-  }
-
   return resolutions;
 };
