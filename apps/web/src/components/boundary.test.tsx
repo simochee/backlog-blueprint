@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from "vitest";
 
-import { Panel } from "./panel";
+import { SectionBoundary } from "./boundary";
 
 const Throws = (): never => {
   throw new TypeError("cannot read properties of undefined");
@@ -21,29 +21,29 @@ afterEach(() => {
   reported.mockRestore();
 });
 
-describe("段の中で落ちたとき", () => {
-  it("落ちた段は差し替わり、他の段は残る", () => {
+describe("領域の中で落ちたとき", () => {
+  it("落ちた領域は差し替わり、他の領域は残る", () => {
     render(
       <>
-        <Panel enabled step={1} title="Connect">
+        <SectionBoundary>
           <Throws />
-        </Panel>
-        <Panel enabled step={2} title="Manifest">
+        </SectionBoundary>
+        <SectionBoundary>
           <p>still here</p>
-        </Panel>
+        </SectionBoundary>
       </>,
     );
 
-    expect(screen.getByText(/This step stopped working/)).toBeInTheDocument();
+    expect(screen.getByText(/This section stopped working/)).toBeInTheDocument();
     expect(screen.getByText("still here")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Reload" })).toBeInTheDocument();
   });
 
   it("受け止めた内容は画面に出さない", () => {
     render(
-      <Panel enabled step={1} title="Connect">
+      <SectionBoundary>
         <Throws />
-      </Panel>,
+      </SectionBoundary>,
     );
 
     expect(document.body.textContent).not.toContain("cannot read properties of undefined");

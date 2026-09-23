@@ -7,21 +7,19 @@ import {
   type Action,
   type Diagnostic,
 } from "@backlog-blueprint/core";
-import { Box, Button, Card, Flex, Grid, Switch, Text } from "@radix-ui/themes";
+import { Box, Card, Flex, Grid, Switch, Text } from "@radix-ui/themes";
 
-import { CopyButton } from "../components/copy-button";
-import { DiagnosticList } from "../components/diagnostics";
 import { type PreparedPlan } from "../plan";
 import { badgedAction } from "../view";
+import { CopyButton } from "./copy-button";
+import { DiagnosticList } from "./diagnostics";
 
-export type PlanStepProps = {
+export type PlanResultProps = {
   prepared?: PreparedPlan;
   diagnostics: Diagnostic[];
   failure?: unknown;
   showUnchanged: boolean;
   onShowUnchangedChange: (showUnchanged: boolean) => void;
-  applying: boolean;
-  onApply: () => void;
 };
 
 const ActionRow = ({ action }: { action: Action }) => {
@@ -55,15 +53,13 @@ const Stat = ({ label, value }: { label: string; value: string | number }) => (
   </Card>
 );
 
-export const PlanStep = ({
+export const PlanResult = ({
   prepared,
   diagnostics,
   failure,
   showUnchanged,
   onShowUnchangedChange,
-  applying,
-  onApply,
-}: PlanStepProps) => {
+}: PlanResultProps) => {
   if (failure !== undefined) {
     return <pre className="mono">{renderHttpFailure(failure, { color: false })}</pre>;
   }
@@ -113,16 +109,8 @@ export const PlanStep = ({
         <Stat label="Write requests" value={summary.writeRequests} />
         <Stat label="Estimated" value={formatDuration(summary.estimatedSeconds)} />
       </Grid>
-      <Flex gap="3" justify="end">
+      <Flex justify="end">
         <CopyButton label="Copy JSON" text={() => renderPlanJson(prepared.report)} />
-        <Button
-          disabled={applying || !summary.hasChanges}
-          loading={applying}
-          onClick={onApply}
-          size="3"
-        >
-          Apply
-        </Button>
       </Flex>
     </Flex>
   );

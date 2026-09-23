@@ -7,11 +7,11 @@ import {
 import { DownloadIcon, InfoCircledIcon } from "@radix-ui/react-icons";
 import { Button, Callout, Card, Flex, Text, TextField } from "@radix-ui/themes";
 
-import { CopyButton } from "../components/copy-button";
-import { DiagnosticList } from "../components/diagnostics";
 import { downloadText } from "../download";
+import { CopyButton } from "./copy-button";
+import { DiagnosticList } from "./diagnostics";
 
-export type ExportStepProps = {
+export type ExportPageProps = {
   projectKey: string;
   onProjectKeyChange: (projectKey: string) => void;
   canExport: boolean;
@@ -65,7 +65,7 @@ const ExportResult = ({ exported }: { exported: ProjectExport }) => {
   );
 };
 
-export const ExportStep = ({
+export const ExportPage = ({
   projectKey,
   onProjectKeyChange,
   canExport,
@@ -74,7 +74,7 @@ export const ExportStep = ({
   exported,
   diagnostics,
   failure,
-}: ExportStepProps) => (
+}: ExportPageProps) => (
   <Flex direction="column" gap="4">
     <Flex align="end" gap="3" wrap="wrap">
       <Flex direction="column" flexGrow="1" gap="1">

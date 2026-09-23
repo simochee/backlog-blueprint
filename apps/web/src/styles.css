@@ -1,6 +1,6 @@
 /**
  * Radix Themes が覆う範囲（色・間隔・角丸・フォーム部品・カード）はここに書かない。
- * 残しているのは、計画の等幅表示と、部品として用意されていないステッパーだけである。
+ * 残しているのは、計画の等幅表示と、部品として用意されていない画面の枠組みだけである。
  * 二重に持つと、テーマを切り替えたときに片方だけ追従しないところができる。
  */
 
@@ -71,98 +71,13 @@ body {
   color: var(--gray-10);
 }
 
-/* ステッパーは Radix に相当する部品が無いので自前で持つ。 */
-.stepper {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  overflow-x: auto;
-  padding-bottom: var(--space-1);
-}
-
-.stepper-item {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  flex: none;
-}
-
-.stepper-bullet {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.5rem;
-  height: 1.5rem;
-  border-radius: 100%;
-  font-size: var(--font-size-1);
-  font-weight: 700;
-  background: var(--gray-a3);
-  color: var(--gray-11);
-}
-
-.stepper-item[data-state="active"] .stepper-bullet {
-  background: var(--accent-9);
-  color: var(--accent-contrast);
-}
-
-.stepper-item[data-state="done"] .stepper-bullet {
-  background: var(--accent-a4);
-  color: var(--accent-11);
-}
-
-.stepper-rule {
-  width: var(--space-6);
-  height: 1px;
-  flex: none;
-  background: var(--gray-a5);
-}
-
-.panel-number {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.75rem;
-  height: 1.75rem;
-  border-radius: 100%;
-  flex: none;
-  font-size: var(--font-size-2);
-  font-weight: 700;
-  background: var(--accent-a4);
-  color: var(--accent-11);
-}
-
-.panel[data-enabled="false"] .panel-number {
-  background: var(--gray-a3);
-  color: var(--gray-10);
-}
-
 /**
- * 覆いは見た目だけで、クリックは通す（confirm.tsx）。`pointer-events: none` を
- * 覆いに置き、ダイアログ本体だけで受け直す。背面が生きていないと WU-3 が効かない。
- */
-.overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 10;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-4);
-  pointer-events: none;
-  background: var(--color-overlay);
-}
-
-.dialog {
-  width: min(28rem, 100%);
-  pointer-events: auto;
-}
-
-/**
- * 高さは器が決める。CodeMirror は中身の行数だけ伸びるので、指定しないと
- * マニフェストの長さで画面が跳ね、下のボタンの位置が入力のたびに変わる。
+ * 高さは器が決める（WU-39）。CodeMirror は中身の行数だけ伸びるので、指定しないと
+ * マニフェストの長さで画面が跳ね、下の Output の位置が入力のたびに変わる。
  */
 .manifest-editor {
-  height: 28rem;
+  flex: 1;
+  min-height: 12rem;
   border: 1px solid var(--gray-a6);
   border-radius: var(--radius-3);
   overflow: hidden;
@@ -238,9 +153,101 @@ body {
   border-bottom: 1px solid var(--gray-a4);
 }
 
-/* Radix の Flex が `display: flex` を付けるので、`hidden` 属性だけでは隠れない。 */
-.page-view[hidden] {
+/**
+ * WU-39。ページを画面の高さに収め、エディタが残りを使う。低い画面で潰れないよう下限を持ち、
+ * それを下回ればページごとスクロールさせる（WU-25）。57px はヘッダーの高さ（`.navbar` と境界）。
+ */
+.workspace {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  box-sizing: border-box;
+  height: calc(100dvh - 57px);
+  min-height: 34rem;
+  padding-block: var(--space-4);
+}
+
+/* `display` を指定した要素には `hidden` 属性の既定の `display: none` が効かない。 */
+.workspace[hidden] {
   display: none;
+}
+
+.workspace-diagnostics {
+  flex: none;
+  max-height: 10rem;
+  overflow: auto;
+}
+
+.workspace-diagnostics:empty {
+  display: none;
+}
+
+.output-panel {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--gray-a6);
+  border-radius: var(--radius-3);
+  background: var(--color-panel-solid);
+}
+
+.output-panel[data-expanded="true"] {
+  height: min(24rem, 45dvh);
+}
+
+.output-header {
+  flex: none;
+  min-height: var(--space-7);
+  padding-inline: var(--space-3);
+}
+
+.output-panel[data-expanded="true"] .output-header {
+  border-bottom: 1px solid var(--gray-a4);
+}
+
+/* 履歴の見出しは長くなりうるので、ヘッダーの幅に収まらない分を省略する。 */
+.output-current {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/**
+ * `position: relative` は外さない。Apply の区切りの `offsetTop` をこの器から測るため
+ * （WU-42）。外すと、ページの先頭からの距離になり、飛ぶ先も現在地もずれる。
+ */
+.output-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--space-3);
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .output-body {
+    scroll-behavior: auto;
+  }
+}
+
+/* 線を文字の両側に引く。文字の背面に1本引く形だと、パネルの地の色で線を隠す必要がある。 */
+.output-divider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.output-divider::before,
+.output-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--gray-a5);
+}
+
+.export-view {
+  padding-block: var(--space-5) var(--space-6);
 }
 
 /* 書き出した Yaml は長くなるので、ページではなく枠の中でスクロールさせる。 */
