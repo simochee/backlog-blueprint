@@ -503,6 +503,36 @@ describe("環境変数から展開した値（E-8）", () => {
   });
 });
 
+describe("1ページに収まらない数のチームを持つスペース（RD-1）", () => {
+  /** 開発チームを151番目に置く。1ページ目（100件）だけを読む実装には見えない */
+  const crowded = (): MockBacklog =>
+    space({
+      spaceTeams: [
+        ...Array.from({ length: 150 }, (_, index) => ({ id: 1001 + index, name: `Team ${index}` })),
+        { id: 31, name: "開発チーム", members: ["tanaka"] },
+      ],
+    });
+
+  it("2ページ目にあるチームの ID を書いても V-B5 にならず、plan にはそのチームの名前が出る", async () => {
+    const backlog = crowded();
+    const { io, code } = plan(backlog, MANIFEST);
+
+    await expect(code).resolves.toBe(2);
+    expect(io.stderr).not.toContain("V-B5");
+    expect(io.stdout).toContain("開発チーム");
+    expect(backlog.writes).toEqual([]);
+  });
+
+  it("どのページにも無いチームの ID を書けば V-B5 で中断する", async () => {
+    const backlog = crowded();
+    const { io, code } = plan(backlog, MANIFEST.replace("    - 31 # 開発チーム\n", "    - 999\n"));
+
+    await expect(code).resolves.toBe(1);
+    expect(io.stderr).toContain("ERROR [V-B5]");
+    expect(backlog.writes).toEqual([]);
+  });
+});
+
 describe("カスタム属性の絞り", () => {
   it("課題種別の絞りを消したマニフェストを適用するとどの課題種別でも使えるようになり、続けて plan しても差分は出ない", async () => {
     const backlog = space();

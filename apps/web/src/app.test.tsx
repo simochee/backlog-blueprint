@@ -1,4 +1,4 @@
-import { type ResolvedHttpRequest } from "@backlog-blueprint/core";
+import { type ResolvedHttpRequest, spaceTeamsPage } from "@backlog-blueprint/core";
 import {
   fixedGet,
   fixedSpaceResponses,
@@ -883,7 +883,7 @@ describe("スペースのユーザーとチームの一覧", () => {
       },
       { id: 3, userId: "true", name: "真", roleType: 2 },
     ],
-    "/api/v2/teams": [
+    [spaceTeamsPage(0)]: [
       { id: 10, name: "開発チーム", members: [{ id: 2, userId: "suzuki" }] },
       { id: 11, name: "QA", members: [] },
     ],
@@ -929,7 +929,7 @@ describe("スペースのユーザーとチームの一覧", () => {
     expect(button("Users")).toBeEnabled();
     expect(screen.queryByRole("complementary")).toBeNull();
     expect(paths).not.toContain("/api/v2/users");
-    expect(paths).not.toContain("/api/v2/teams");
+    expect(paths).not.toContain(spaceTeamsPage(0));
   });
 
   it("ユーザーの一覧には表示名とユーザー ID とログイン ID とメールアドレスが並び、スペース管理者には印が付く", async () => {
@@ -957,6 +957,28 @@ describe("スペースのユーザーとチームの一覧", () => {
     expect(await teams.findByText("開発チーム")).toBeInTheDocument();
     expect(teams.getByText("1 member")).toBeInTheDocument();
     expect(teams.getByText("0 members")).toBeInTheDocument();
+  });
+
+  it("1ページに収まらない数のチームも、2ページ目まで取って全件を並べる", async () => {
+    const teams = Array.from({ length: 150 }, (_, index) => ({
+      id: 100 + index,
+      name: `Team ${index}`,
+      members: [],
+    }));
+    const user = await startApp({
+      ...DIRECTORY,
+      [spaceTeamsPage(0)]: teams.slice(0, 100),
+      [spaceTeamsPage(100)]: teams.slice(100),
+    });
+
+    await connect(user);
+    await signedIn();
+    await user.click(button("Teams"));
+
+    const listed = within(pane("Teams"));
+
+    expect(await listed.findByText("Team 149")).toBeInTheDocument();
+    expect(listed.getByText("150 of 150 teams")).toBeInTheDocument();
   });
 
   it("開いているのは常に1枚だけで、もう一方を開くと先のペインは閉じる", async () => {
@@ -1142,7 +1164,7 @@ describe("スペースのユーザーとチームの一覧", () => {
   it("一覧を取れなかったときは失敗の内容をペインの中に出し、他の段は残る", async () => {
     const user = await startApp({
       ...DIRECTORY,
-      "/api/v2/teams": httpFailure({ status: 500, errors: [{ message: "Boom" }] }),
+      [spaceTeamsPage(0)]: httpFailure({ status: 500, errors: [{ message: "Boom" }] }),
     });
 
     await connect(user);

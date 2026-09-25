@@ -155,3 +155,33 @@ describe("スペースのユーザー一覧に載るログイン ID", () => {
     expect(team?.members).toEqual([{ ...YAMADA, userId: null }, TANAKA]);
   });
 });
+
+const manyTeams = (): MockBacklog =>
+  mockBacklog({
+    spaceTeams: Array.from({ length: 150 }, (_, index) => ({
+      id: index + 1,
+      name: `Team ${index + 1}`,
+    })),
+  });
+
+const teamIdsOf = ({ body }: Reply): number[] => (body as { id: number }[]).map(({ id }) => id);
+
+describe("スペースのチーム一覧のページング", () => {
+  it("count と offset で指したぶんだけを返す", async () => {
+    const reply = await call(manyTeams(), "GET", "/api/v2/teams?count=100&offset=100");
+
+    expect(teamIdsOf(reply)).toEqual(Array.from({ length: 50 }, (_, index) => index + 101));
+  });
+
+  it("count を省くと全件ではなく1ページぶんしか返さない", async () => {
+    const reply = await call(manyTeams(), "GET", "/api/v2/teams");
+
+    expect(teamIdsOf(reply)).toHaveLength(100);
+  });
+
+  it("上限を超える count を指定しても1ページは100件で切れる", async () => {
+    const reply = await call(manyTeams(), "GET", "/api/v2/teams?count=1000&offset=0");
+
+    expect(teamIdsOf(reply)).toHaveLength(100);
+  });
+});

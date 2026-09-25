@@ -170,6 +170,8 @@ const NOT_FOUND = 404;
 
 const BAD_REQUEST = 400;
 
+const TEAMS_PAGE_LIMIT = 100;
+
 type Failure = { status: number; message: string };
 
 const failWith = (status: number, message: string): never => {
@@ -547,6 +549,18 @@ export const mockBacklog = (options: MockBacklogOptions = {}): MockBacklog => {
     releaseDueDate: asStoredDate(text(params, "releaseDueDate")) ?? current?.releaseDueDate ?? null,
   });
 
+  /**
+   * `count` を省いても 100 を超えて頼んでも、1ページは上限の 100 件で切る（API 制約
+   * 「スペースのチーム一覧のページング」）。省いたときの実際の件数は未測定だが、上限より
+   * 多くは返らない。全件を返すと、1回しか取らない実装がこのモックでは通ってしまう。
+   */
+  const teamsPage = (query: Record<string, unknown>): MockSpaceTeam[] => {
+    const offset = digits(query, "offset") ?? 0;
+    const count = Math.min(digits(query, "count") ?? TEAMS_PAGE_LIMIT, TEAMS_PAGE_LIMIT);
+
+    return spaceTeams.slice(offset, offset + count);
+  };
+
   const readSpace = (path: string): unknown => {
     if (path === "/api/v2/users/myself") {
       return executor;
@@ -562,8 +576,13 @@ export const mockBacklog = (options: MockBacklogOptions = {}): MockBacklog => {
       return spaceUsers.map(asSeenByExecutor);
     }
 
-    if (path === "/api/v2/teams") {
-      return spaceTeams.map((team) => ({ ...team, members: team.members.map(asSeenByExecutor) }));
+    const teams = /^\/api\/v2\/teams(?:\?(.*))?$/.exec(path);
+
+    if (teams !== null) {
+      return teamsPage(parseFormBody(teams[1] ?? "")).map((team) => ({
+        ...team,
+        members: team.members.map(asSeenByExecutor),
+      }));
     }
 
     const counted = /^\/api\/v2\/issues\/count\?projectId\[\]=(\d+)$/.exec(path);

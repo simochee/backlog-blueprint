@@ -265,6 +265,23 @@ yyyy-MM-dd の String（[Add Custom Field](https://developer.nulab.com/docs/back
 `excludeGroupMembers` を取り違えると、チーム経由で参加している人を
 「Yaml の `members` に無いから削除」と誤判定する。削除判定では必ず true を指定すること。
 
+### スペースのチーム一覧のページング
+
+**`GET /api/v2/teams` はページング付きの一覧である。** Backlog API リファレンス
+（[チーム一覧の取得](https://developer.nulab.com/docs/backlog/api/2/get-list-of-teams/)）は
+`order`（`asc` / `desc`）・`offset`・`count` を受け付け、**`count` の上限は 100** とする。
+backlog-js も `GetTeamsParams { order?, offset?, count? }` と型付けしている。
+
+パラメータを付けずに1回だけ叩くと、1ページに収まらないチームは**黙って欠ける**。
+欠けたチームは V-B5 で「存在しない」と誤判定され、Web UI の Teams ペインにも出ない。
+
+| 項目 | 内容 |
+| --- | --- |
+| `count` の上限 | 100（リファレンス） |
+| `count` を省いたときの件数 | `要検証` |
+
+読み取り側の決定は [RD-1](../design/core-reconciler.md#rd-1-スペースのチーム一覧は全ページを辿る)。
+
 ### スペースのユーザー一覧
 
 **スペース管理者でない API キーでも `GET /api/v2/users` と `GET /api/v2/teams` は成功する。
@@ -446,10 +463,12 @@ yyyy-MM-dd の String（[Add Custom Field](https://developer.nulab.com/docs/back
 | `GET /projects/:key` が[プロジェクト基本設定](#プロジェクト基本設定)の14キーをすべて返すか | 公式の応答例に `grandchildIssueEnabled` / `useDocument` / `useGit` / `useSubversion` が無い。返らないキーは `export` に現れないだけで往復は壊れない（[EX-10](../design/export.md#ex-10-settings-は14キーに射影する)） | スペース管理者権限 |
 | `GET /projects/:key/customFields` が型固有キーを**他の型で**どう返すか（欠落・`null`・`false` / `0`） | 射影がどの返り方でも S3 を通す形にしてあるので仕様は変わらない（[EX-11](../design/export.md#ex-11-customfields-は型ごとの許可キーに射影する)）。応答の形を記録するためだけに要る | 各型のカスタム属性を持つプロジェクト |
 | イベントを1つも選ばない Webhook を保持できるか | 保持できるなら EX-9f が出る。できないなら到達しない枝として残る（[EX-12](../design/export.md#ex-12-webhooksevents)） | Webhook の作成権限 |
+| `GET /api/v2/teams` で `count` を省いたときの1ページの件数 | 全ページを `count=100` で辿るので仕様は変わらない（[RD-1](../design/core-reconciler.md#rd-1-スペースのチーム一覧は全ページを辿る)）。応答の形を記録するためだけに要る | 1ページを超える数のチームを持つスペース |
 
 上2件は**実装の骨格に影響する**が、いずれも書き込みを伴うため未実施。
 下3件は `export` の実装中に見つかったもので、**どちらに転んでも仕様は変わらない**
 （射影がどの応答の形でも検証を通る）。実測できたら `docs/manifest.md` の
 「`export` が書けないもの」の記述を具体化する。
+`GET /api/v2/teams` の件も、RD-1 が `count` を常に付けるので**どちらに転んでも仕様は変わらない**。
 
 下3件はプラン差に関わるもので、実装の骨格には影響しない。

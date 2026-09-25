@@ -8,6 +8,7 @@ import {
 } from "../../../test-utils/src/index";
 import { type Action } from "../action";
 import { type Access } from "../manifest";
+import { spaceTeamsPage } from "../space-teams";
 import { accessReconciler, type AccessSnapshot } from "./access";
 
 const suzuki = { id: 11, name: "鈴木 花子" };
@@ -29,7 +30,7 @@ const SPACE = {
 
 const SPACE_RESPONSES = {
   "/api/v2/users": SPACE.spaceUsers,
-  "/api/v2/teams": SPACE.spaceTeams,
+  [spaceTeamsPage(0)]: SPACE.spaceTeams,
 };
 
 const emptyProject: AccessSnapshot = {
@@ -305,7 +306,7 @@ describe("応答の検査", () => {
       fixedReadContext(
         {
           "/api/v2/users": [hidden],
-          "/api/v2/teams": [{ id: 21, name: "開発チーム", members: [hidden] }],
+          [spaceTeamsPage(0)]: [{ id: 21, name: "開発チーム", members: [hidden] }],
         },
         { snapshot: fixedSnapshot({ project: { exists: false } }) },
       ),

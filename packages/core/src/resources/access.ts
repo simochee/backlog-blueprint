@@ -2,6 +2,7 @@ import { type Action } from "../action";
 import { asArray, asRecord, optionalString, requiredNumber, requiredString } from "../api-response";
 import { type Access } from "../manifest";
 import { type Reconciler } from "../reconciler";
+import { readSpaceTeams } from "../space-teams";
 import { type Value } from "../value";
 
 /**
@@ -79,8 +80,8 @@ const toTeam = (value: unknown): AccessTeam => {
 
 const toTeams = (value: unknown): AccessTeam[] => asArray(value).map((item) => toTeam(item));
 
-const toSpaceTeams = (value: unknown): SpaceTeam[] =>
-  asArray(value).map((item) => ({
+const toSpaceTeams = (items: unknown[]): SpaceTeam[] =>
+  items.map((item) => ({
     ...toTeam(item),
     members: toUsers(asRecord(item).members ?? []),
   }));
@@ -147,7 +148,7 @@ export const accessReconciler: Reconciler<Access, AccessSnapshot> = {
 
   read: async ({ projectKey, snapshot, get }) => {
     const spaceUsers = toSpaceUsers(await get("/api/v2/users"));
-    const spaceTeams = toSpaceTeams(await get("/api/v2/teams"));
+    const spaceTeams = toSpaceTeams(await readSpaceTeams(get));
 
     if (snapshot.project.exists) {
       const teams = toTeams(await get(teamsPath(projectKey)));

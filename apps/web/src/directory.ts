@@ -2,6 +2,7 @@ import {
   asArray,
   asRecord,
   optionalString,
+  readSpaceTeams,
   requiredNumber,
   requiredString,
   SPACE_ADMINISTRATOR_ROLE_TYPE,
@@ -55,19 +56,24 @@ const toTeam = (item: unknown): DirectoryEntry => {
   };
 };
 
-const SOURCES: Record<DirectoryKind, { path: string; toEntry: (item: unknown) => DirectoryEntry }> =
-  {
-    users: { path: "/api/v2/users", toEntry: toUser },
-    teams: { path: "/api/v2/teams", toEntry: toTeam },
-  };
+type DirectorySource = {
+  read: (get: ReadContext["get"]) => Promise<unknown[]>;
+  toEntry: (item: unknown) => DirectoryEntry;
+};
+
+const SOURCES: Record<DirectoryKind, DirectorySource> = {
+  users: { read: async (get) => asArray(await get("/api/v2/users")), toEntry: toUser },
+  teams: { read: readSpaceTeams, toEntry: toTeam },
+};
 
 export const readDirectory = async (
   kind: DirectoryKind,
   get: ReadContext["get"],
 ): Promise<DirectoryEntry[]> => {
-  const { path, toEntry } = SOURCES[kind];
+  const { read, toEntry } = SOURCES[kind];
+  const items = await read(get);
 
-  return asArray(await get(path)).map((item) => toEntry(item));
+  return items.map((item) => toEntry(item));
 };
 
 export const matchesFilter = (

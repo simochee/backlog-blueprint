@@ -68,6 +68,7 @@ export {
 } from "./resources/statuses";
 export { webhooksReconciler } from "./resources/webhooks";
 export { declaredOrder, FIXED_ORDER_SECTIONS, resultingOrder } from "./resulting-order";
+export { readSpaceTeams, spaceTeamsPage } from "./space-teams";
 export { projectSchemaPath, projectSchemaUrl, SCHEMA_DISTRIBUTION_ORIGIN } from "./schema-url";
 export { authenticateExecutor, SPACE_ADMINISTRATOR_ROLE_TYPE } from "./validation/auth-stage";
 export { expandEnvironment, hasEnvSentinel, UNRESOLVED_ENV_ID } from "./validation/expand-stage";
