@@ -1,6 +1,6 @@
 # CLI と Web UI の設計
 
-最終更新: 2026-09-23
+最終更新: 2026-09-25
 前提: [要件定義 FR-6 / FR-7](../requirements/requirements-definition.md#fr-6-cli) / [plan の出力仕様](plan-output.md) / [検証パイプライン](validation-pipeline.md)
 
 CLI と Web UI は「入出力の違い」だけを担う（要件定義 §7）。
@@ -198,6 +198,40 @@ CL-6 のエラーメッセージ。
 ERROR  apply requires confirmation, but stdin is not a terminal.
   → pass --auto-approve to skip the confirmation
 ```
+
+### CL-10: `apply --output json` は `--auto-approve` を必須にする
+
+| 決定 | 内容 |
+| --- | --- |
+| CL-10 | `apply` に `--output json` を渡したときは、**標準入力が TTY かどうかにかかわらず** `--auto-approve` を必須にする。無ければマニフェストを読む前、Backlog に問い合わせる前にエラーで停止し、stdout には何も書かない |
+
+```
+ERROR  apply --output json cannot ask for confirmation.
+  → pass --auto-approve to skip the confirmation
+```
+
+`--output json` の消費者は CI のスクリプトで（PO-10）、確認プロンプトに答える人がいない。
+CL-6 だけに任せると、止まるのは計画を組み立てた後になる。計画のための GET を出し切ってから止まるうえ、
+そのとき stdout に何を書くか（[plan の出力仕様 §3.3](plan-output.md#33-json) の `result` の新しい値）を決めることになる。
+
+**この停止では stdout に JSON を書かない。** PO-13 が止まったときも JSON を書くのは、
+その停止がマニフェストや Backlog の状態しだいで起き、昨日まで通っていた CI がある日止まりうるからである。
+CL-10 の停止は引数だけで決まり、CI に組み込んだ最初の1回で必ず表に出て、直せば二度と起きない。
+`--api-key`（CL-2）や未知のオプションと同じ使い方の誤りなので、それらと同じく stdout を空にする。
+
+**TTY かどうかを問わない**のは、手元の端末では通り CI では落ちる、という環境による違いを作らないためである。
+「削除を含むときだけ確認する」を退けたのと同じく、いつ止まるかを実行してみるまで分からない挙動にしない。
+Terraform の `apply -json` も、`-auto-approve` か保存済みの計画が無ければ実行しない。
+
+失うのは、確認プロンプトに `yes` と答えつつ結果を JSON で受け取る使い方だけである。
+
+**採らなかった案。**
+
+| 案 | 採らない理由 |
+| --- | --- |
+| CL-6 で止まったときに、§3.3 の `result` へ新しい値（`unconfirmed` など）を足して JSON を書く | 引数だけで決まる誤りのために出力の語彙を増やす。計画のための GET を出し切ってから止まる |
+| 標準入力が TTY でないときだけ、前倒しで止める | TTY の有無で挙動が変わり、手元と CI で結果が違う |
+| `--output json` なら確認を省いて適用する | CL-6 で退けた「非 TTY では自動承認」と同じ。CI で気付かず適用される |
 
 **採らなかった案: 削除を含むときだけ確認する。**
 安全側と手間のバランスは良いが、「いつ止まるか」が実行してみるまで分からない挙動になる。
@@ -494,6 +528,7 @@ Web UI 側で特別な分岐は要らない。
 | CL-4 | 既定で確認プロンプト | 確認なしで即実行。破壊的操作に対する最後の砦が無くなる |
 | CL-5 | `yes` の全文入力 | `y` 1文字。Enter 連打で通る |
 | CL-6 | 非 TTY では確認なしだとエラー | 非 TTY では自動承認。CI で気付かず適用されるのが最悪 |
+| CL-10 | `apply --output json` は `--auto-approve` 必須。引数の誤りとして止め、stdout は空 | CL-6 の停止に `result` の新しい値を足す（引数の誤りのために語彙が増え、GET を出し切ってから止まる）／非 TTY のときだけ止める（手元と CI で挙動が違う）／json なら自動承認（CI で気付かず適用される） |
 | CL-7 | `export` は位置引数1つ | `-f` に揃える（対象は修飾子ではなく主語）／`-o` で出力先を受ける（リダイレクトと二重）／`-f` で既存 Yaml を書き戻す（差分取り込みの導線になる） |
 | CL-8 | stdout は Yaml だけ | 案内も stdout に混ぜる。`> file` がそのまま壊れる |
 | CL-9 | 終了コードは 0 / 1 | `plan` に揃えて 2 を持つ。対応する状態が `export` に無い |

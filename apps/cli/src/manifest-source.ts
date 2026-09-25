@@ -6,7 +6,9 @@ export const STDIN_PATH = "-";
 
 export type ManifestSource = { path: string; text: string };
 
-export const readManifest = async (file: string, io: Io): Promise<ManifestSource> =>
-  file === STDIN_PATH
-    ? { path: "<stdin>", text: await io.readStdin() }
-    : { path: file, text: await readFile(file, "utf8") };
+export const manifestPath = (file: string): string => (file === STDIN_PATH ? "<stdin>" : file);
+
+export const readManifest = async (file: string, io: Io): Promise<ManifestSource> => ({
+  path: manifestPath(file),
+  text: file === STDIN_PATH ? await io.readStdin() : await readFile(file, "utf8"),
+});

@@ -20,6 +20,16 @@ export type ToolContext = {
 /** `validate` はスペースを見ないので、`space` を持つのは plan / apply だけ（CL-1） */
 export type OutputContext = ToolContext & { space: string };
 
+/**
+ * 計画を組み立てる前に止まった plan / apply（PO-13）。`space` は Backlog に
+ * 問い合わせた後に止まったときだけ持ち、`failure` は診断として表せない失敗のときだけ持つ。
+ */
+export type Stopped = {
+  context: ToolContext & { space?: string };
+  diagnostics: Diagnostic[];
+  failure?: unknown;
+};
+
 export type RenderOptions = { color: boolean };
 
 /**
@@ -67,17 +77,23 @@ export type CreateExport = (input: CreateExportOptions) => Promise<CreateExportR
 export type Output = {
   diagnostics: (diagnostics: Diagnostic[], options: DiagnosticsOptions) => string;
   failure: (error: unknown, options: RenderOptions) => string;
-  validateJson: (input: { context: ToolContext; diagnostics: Diagnostic[] }) => string;
+  validateJson: (input: {
+    context: ToolContext;
+    diagnostics: Diagnostic[];
+    failure?: unknown;
+  }) => string;
   plan: (
     input: { context: OutputContext; plan: PlanResult },
     options: RenderOptions & { showUnchanged: boolean },
   ) => string;
   planJson: (input: { context: OutputContext; plan: PlanResult }) => string;
+  stoppedPlanJson: (input: Stopped) => string;
   progress: (event: ExecutionEvent, options: RenderOptions) => string | undefined;
   applyResult: (
     input: { context: OutputContext; plan: PlanResult; outcome: ApplyOutcome },
     options: RenderOptions,
   ) => string;
   applyJson: (input: { context: OutputContext; plan: PlanResult; outcome: ApplyOutcome }) => string;
+  stoppedApplyJson: (input: Stopped) => string;
   exportNotes: (input: ExportNotesInput, options: RenderOptions) => string;
 };

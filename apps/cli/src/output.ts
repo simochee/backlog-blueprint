@@ -9,12 +9,15 @@ import {
   renderPlanJson,
   renderPlanText,
   renderProgress,
+  renderStoppedApplyJson,
+  renderStoppedPlanJson,
   renderValidateJson,
   type Action,
   type PlanReport,
+  type StoppedReport,
 } from "@backlog-blueprint/core";
 
-import { type Output, type OutputContext, type PlanResult } from "./ports";
+import { type Output, type OutputContext, type PlanResult, type Stopped } from "./ports";
 
 const report = (context: OutputContext, plan: PlanResult): PlanReport => ({
   tool: context.tool,
@@ -24,6 +27,12 @@ const report = (context: OutputContext, plan: PlanResult): PlanReport => ({
   diagnostics: plan.diagnostics,
   actions: plan.actions,
   resultingOrder: plan.resultingOrder,
+});
+
+const stoppedReport = ({ context, diagnostics, failure }: Stopped): StoppedReport => ({
+  ...context,
+  diagnostics,
+  failure,
 });
 
 /**
@@ -51,13 +60,15 @@ export const createOutput = (): Output => {
 
     failure: (error, { color }) => block(renderHttpFailure(error, { color })),
 
-    validateJson: ({ context, diagnostics }) =>
-      renderValidateJson({ tool: context.tool, manifest: context.manifest, diagnostics }),
+    validateJson: ({ context, diagnostics, failure }) =>
+      renderValidateJson({ tool: context.tool, manifest: context.manifest, diagnostics, failure }),
 
     plan: ({ context, plan }, { color, showUnchanged }) =>
       block(renderPlanText(report(context, plan), { color, showUnchanged })),
 
     planJson: ({ context, plan }) => renderPlanJson(report(context, plan)),
+
+    stoppedPlanJson: (stopped) => renderStoppedPlanJson(stoppedReport(stopped)),
 
     progress: (event, { color }) => {
       if (event.type === "actionStarted") {
@@ -80,6 +91,8 @@ export const createOutput = (): Output => {
 
     applyJson: ({ context, plan, outcome }) =>
       renderApplyJson(report(context, plan), outcome, { resolutions: plan.resolutions }),
+
+    stoppedApplyJson: (stopped) => renderStoppedApplyJson(stoppedReport(stopped)),
 
     /**
      * 空文字列は `block` に通さない。案内が無いことは呼び出し側が

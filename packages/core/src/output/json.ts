@@ -8,6 +8,7 @@ import {
 } from "../action";
 import { type Diagnostic } from "../diagnostic";
 import { resolvePath } from "../ref";
+import { failureErrors, failureStatus } from "../validation/http-failure";
 import { type ResolutionTable } from "../resolution";
 import { type Op, type Phase, type ResourceKind } from "../resource";
 import { type IdOrRef } from "../value";
@@ -16,6 +17,7 @@ import {
   executedActions,
   type PlanReport,
   type ResultingOrder,
+  type StoppedReport,
   summarize,
   type Summary,
   type ValidateReport,
@@ -41,11 +43,37 @@ export type ActionJson = {
   request?: HttpRequest;
 };
 
+/** `status` は HTTP のやり取りが成立しなかったときは無い（§3.3） */
+export type FailureJson = {
+  status?: number;
+  errors: { message: string }[];
+};
+
 export type ValidateJson = {
   formatVersion: number;
   tool: { name: string; version: string };
   manifest: { path: string };
   diagnostics: Diagnostic[];
+  failure?: FailureJson;
+};
+
+export type StoppedPlanJson = {
+  formatVersion: number;
+  tool: { name: string; version: string };
+  space?: string;
+  manifest: { path: string };
+  diagnostics: Diagnostic[];
+  failure?: FailureJson;
+};
+
+export type StoppedApplyJson = {
+  formatVersion: number;
+  result: "planFailed";
+  tool: { name: string; version: string };
+  space?: string;
+  manifest: { path: string };
+  diagnostics: Diagnostic[];
+  failure?: FailureJson;
 };
 
 export type PlanJson = {
@@ -63,9 +91,7 @@ export type PlanJson = {
 export type FailedJson = {
   id: ActionId;
   request?: { method: string; path: string };
-  status?: number;
-  errors: { message: string }[];
-};
+} & FailureJson;
 
 export type ApplyJson = PlanJson & {
   result: ApplyOutcome["result"];
@@ -101,12 +127,45 @@ const actionJson = ({
   request,
 });
 
+const failureJson = (error: unknown): FailureJson => ({
+  status: failureStatus(error),
+  errors: failureErrors(error),
+});
+
+/**
+ * 無いキーは値が `undefined` のキーとしても置かない。`space` と `failure` は
+ * 有無そのものが意味を持つ（PO-13）ので、`Object.keys` や `in` で見ても無いことにする。
+ */
+const failureEntry = ({ failure }: ValidateReport): { failure?: FailureJson } =>
+  failure === undefined ? {} : { failure: failureJson(failure) };
+
 export const validateJson = (report: ValidateReport): ValidateJson => ({
   formatVersion: FORMAT_VERSION,
   tool: report.tool,
   manifest: report.manifest,
   diagnostics: orderDiagnostics(report.diagnostics),
+  ...failureEntry(report),
 });
+
+/** §2.3 の形に、問い合わせたスペースと失敗を足す（PO-13）。計画に関わる項目は持たない */
+export const stoppedPlanJson = (report: StoppedReport): StoppedPlanJson => ({
+  formatVersion: FORMAT_VERSION,
+  tool: report.tool,
+  ...(report.space === undefined ? {} : { space: report.space }),
+  manifest: report.manifest,
+  diagnostics: orderDiagnostics(report.diagnostics),
+  ...failureEntry(report),
+});
+
+/**
+ * `applied` / `failed` / `pending` を持たない（PO-13）。どの Action にも着手しておらず、
+ * 空の配列を置くと「全部済んだ」「何も無かった」と読めてしまう。
+ */
+export const stoppedApplyJson = (report: StoppedReport): StoppedApplyJson => {
+  const { formatVersion, ...rest } = stoppedPlanJson(report);
+
+  return { formatVersion, result: "planFailed", ...rest };
+};
 
 export const planJson = (report: PlanReport): PlanJson => ({
   formatVersion: FORMAT_VERSION,
@@ -197,6 +256,12 @@ const INDENT = 2;
 
 export const renderValidateJson = (report: ValidateReport): string =>
   `${JSON.stringify(validateJson(report), null, INDENT)}\n`;
+
+export const renderStoppedPlanJson = (report: StoppedReport): string =>
+  `${JSON.stringify(stoppedPlanJson(report), null, INDENT)}\n`;
+
+export const renderStoppedApplyJson = (report: StoppedReport): string =>
+  `${JSON.stringify(stoppedApplyJson(report), null, INDENT)}\n`;
 
 export const renderPlanJson = (report: PlanReport): string =>
   `${JSON.stringify(planJson(report), null, INDENT)}\n`;

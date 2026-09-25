@@ -5,6 +5,13 @@ import { type Io } from "./io";
 export const NOT_A_TERMINAL =
   "ERROR  apply requires confirmation, but stdin is not a terminal.\n  → pass --auto-approve to skip the confirmation\n";
 
+/**
+ * 状態ではなく引数だけで決まる誤りなので、PO-13 の文書を書かずに止める（CL-10）。
+ * TTY かどうかを見ないのは、手元では通り CI では落ちる、を作らないため。
+ */
+export const JSON_WITHOUT_AUTO_APPROVE =
+  "ERROR  apply --output json cannot ask for confirmation.\n  → pass --auto-approve to skip the confirmation\n";
+
 export type Confirmation = { confirmed: boolean } | { error: string };
 
 /**

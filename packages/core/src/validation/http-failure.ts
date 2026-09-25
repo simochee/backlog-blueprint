@@ -26,3 +26,6 @@ const messagesOf = (error: unknown): string[] | undefined => {
 
 export const failureDetail = (error: unknown): string =>
   messagesOf(error)?.join(", ") ?? String(record(error)?.["message"] ?? error);
+
+export const failureErrors = (error: unknown): { message: string }[] =>
+  (messagesOf(error) ?? [failureDetail(error)]).map((message) => ({ message }));

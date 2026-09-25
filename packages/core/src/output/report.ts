@@ -16,7 +16,12 @@ export type ValidateReport = {
   tool: { name: string; version: string };
   manifest: { path: string };
   diagnostics: Diagnostic[];
+  /** 診断として表せない失敗（PO-13）。マニフェストを読めなかったときなど */
+  failure?: unknown;
 };
+
+/** 計画を組み立てる前に止まった plan / apply。`space` は Backlog に問い合わせたときだけ持つ（PO-13） */
+export type StoppedReport = ValidateReport & { space?: string };
 
 export type PlanReport = {
   tool: { name: string; version: string };
