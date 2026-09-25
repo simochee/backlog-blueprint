@@ -14,7 +14,7 @@ import {
   type Manifest,
 } from "@backlog-blueprint/core";
 
-import { confirmApply } from "./confirm";
+import { confirmApply, JSON_WITHOUT_AUTO_APPROVE } from "./confirm";
 import {
   isCredentialsError,
   renderCredentialsError,
@@ -301,6 +301,13 @@ const runExecution = async (
 
 export const runApply = async (options: ApplyOptions, deps: Deps): Promise<number> => {
   const { io, output } = deps;
+
+  if (options.output === "json" && !options.autoApprove) {
+    io.err(JSON_WITHOUT_AUTO_APPROVE);
+
+    return EXIT_ERROR;
+  }
+
   const prepared = await prepare(options, deps, applyNotice(options));
 
   if (!prepared.ok) {

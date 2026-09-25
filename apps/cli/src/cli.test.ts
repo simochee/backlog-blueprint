@@ -457,6 +457,63 @@ describe("CL-4 / CL-5 / CL-6 確認プロンプト", () => {
   });
 });
 
+describe("CL-10 apply --output json は --auto-approve を必須にする", () => {
+  it("--auto-approve が無ければ、マニフェストを読む前に止まり標準出力に何も書かない", async () => {
+    const io = fakeIo();
+    let contacted = false;
+
+    await expect(
+      runCli(
+        ["apply", "-f", "no-such-manifest.yaml", "--output", "json"],
+        deps(io, {
+          output: createOutput(),
+          buildPlan: () => {
+            contacted = true;
+
+            return Promise.resolve({ diagnostics: [] });
+          },
+        }),
+      ),
+    ).resolves.toBe(1);
+    expect(contacted).toBe(false);
+    expect(io.stdout).toBe("");
+    expect(io.stderr).toContain("--auto-approve");
+    expect(io.stderr).not.toContain("no-such-manifest.yaml");
+  });
+
+  it("標準入力が端末でも、確認プロンプトを出さずに止まる", async () => {
+    const io = fakeIo({ isStdinTty: true, answers: ["yes"] });
+
+    await expect(
+      runCli(
+        ["apply", "-f", "-", "--output", "json"],
+        deps(io, { plan: fakePlan({ actions: [anAction()] }) }),
+      ),
+    ).resolves.toBe(1);
+    expect(io.stderr).not.toContain("Enter a value");
+  });
+
+  it("-y があれば進む", async () => {
+    const io = fakeIo({ isStdinTty: false });
+
+    await expect(
+      runCli(
+        ["apply", "-f", "-", "-y", "--output", "json"],
+        deps(io, { plan: fakePlan({ actions: [anAction()] }) }),
+      ),
+    ).resolves.toBe(0);
+  });
+
+  it("--output text では従来どおり確認を求める", async () => {
+    const io = fakeIo({ answers: ["yes"] });
+
+    await expect(
+      runCli(["apply", "-f", "-"], deps(io, { plan: fakePlan({ actions: [anAction()] }) })),
+    ).resolves.toBe(0);
+    expect(io.stderr).toContain("Enter a value");
+  });
+});
+
 describe("§1.3 標準出力と標準エラー出力", () => {
   it("--output json のとき標準出力は JSON だけになる", async () => {
     const io = fakeIo();
