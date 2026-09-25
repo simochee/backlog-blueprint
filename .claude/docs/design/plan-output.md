@@ -1,6 +1,6 @@
 # plan の出力仕様
 
-最終更新: 2026-09-20
+最終更新: 2026-09-25
 前提: [要件定義 FR-3](../requirements/requirements-definition.md#fr-3-計画dry-run) / [core のデータモデル](core-reconciler.md)
 
 人間向け（`--output text`）と機械向け（`--output json`）の両方を定義する。
@@ -267,6 +267,91 @@ JSON 出力は「壊れない限りバージョンを上げない」ほうが消
 `space` と `project` は無い。`validate` は Backlog に一切アクセスせず（CL-1）、
 プロジェクトが存在するかも知らないため。
 
+マニフェストを読めなかったとき（ファイルが無い・読めない）は、`diagnostics` を空にして
+`failure` を足す（形は [§2.4](#po-13-計画を組み立てる前に止まっても-stdout-に-json-を1つ書く) と同じ）。
+`validate` も、止まり方にかかわらず stdout に JSON を1つ書く。
+
+## 2.4 計画を組み立てる前に止まったとき
+
+### PO-13: 計画を組み立てる前に止まっても stdout に JSON を1つ書く
+
+`--output json` の `plan` / `apply` が**計画を組み立てる前に止まったとき**も、stdout に JSON を1つだけ書く。
+形は §2.3 に、分かっている範囲で `space` と `failure` を足したもの。
+
+```json
+{
+  "formatVersion": 1,
+  "tool": { "name": "@simochee/backlog-blueprint", "version": "0.1.0" },
+  "space": "example.backlog.com",
+  "manifest": { "path": "projects/PROJ_A.yaml" },
+  "diagnostics": [
+    {
+      "id": "V-B3",
+      "severity": "error",
+      "stage": "snapshot",
+      "path": "key",
+      "message": "PROJ_A already has issues (43 in total)",
+      "hint": "only projects with zero issues can be targeted"
+    }
+  ]
+}
+```
+
+`apply` は同じ文書の2番目に `"result": "planFailed"` を持つ（§3.3 と同じ位置）。
+
+止まる場所ごとの中身。
+
+| 止まる場所 | 中身 | `space` |
+| --- | --- | --- |
+| マニフェストを読めない | `failure` | 無し |
+| S1〜S4 のエラー | `diagnostics` | 無し |
+| スペースのドメインか `BACKLOG_API_KEY` が設定されていない | `failure` | 無し |
+| S5〜S7 のエラー（V-B1 を含む） | `diagnostics` | あり |
+| S5〜S7 の途中で、診断にならない失敗（V-B1 以外の GET の失敗、応答を読めない） | `failure` | あり |
+
+`failure` は §3.3 の `failed` から `id` と `request` を除いたもの。
+
+```json
+"failure": { "status": 500, "errors": [{ "message": "Internal Server Error" }] }
+```
+
+| 規則 | 内容 |
+| --- | --- |
+| `space` | **Backlog に問い合わせたときだけ**持つ。S5 より前に止まったなら無い。§2.3 で `validate` が持たないのと同じ理由（CL-1）で、消費側はこの有無で「Backlog に問い合わせる前に止まったか」を判別できる |
+| `failure` | 診断として表せない失敗のときだけ持つ。`status` の有無の意味は §3.3 と同じ。`diagnostics` はそれまでに出た警告を持ったままにする |
+| `summary` / `project` / `actions` / `resultingOrder` | 持たない。計画が無い |
+| `result`（apply） | `planFailed`。`applied` / `failed` / `pending` は持たない。どの `Action` にも着手しておらず、並べる `Action.id` が無い |
+| stderr | text のときと同じ診断・エラーを整形して出す。`failure` で止まったときにそれまでの警告があれば、それも写す（`--output json` の警告は stderr にも出す。[CLI 仕様 §1.3](cli-and-web-ui.md#13-標準出力と標準エラー出力)） |
+| 終了コード | 変わらない（1。[CLI 仕様 §1.5](cli-and-web-ui.md#15-終了コード)） |
+| `formatVersion` | 上げない（PO-6）。足したキーと `result` の値が現れるのは、これまで stdout が空だった場面だけで、既に文書を読んでいた消費側から見える変化は無い |
+
+止まったときこそ CI の後処理は理由を読みたい。stdout が空だと `| jq` はパースに失敗し、
+消費側は「ツールが止まった」と「jq の書き方が悪い」を見分けられないうえ、
+検証 ID や path を拾うには stderr の人間向けの整形を解析するしかなくなる。
+
+**本決定が扱わないもの。**
+
+- **CL-6 で止まる `apply`**（計画は組み立てたが、確認を取れない）。計画は既にあるので本文書の形ではなく、
+  §3.3 の形に `result` の新しい値を足すことになる。その値は未決で、stdout は空のまま
+- **ツールの不具合による想定外の例外**。最上位で捕まえたときには、どのコマンドがどこまで書いたかが分からず、
+  そこで JSON を書くと PO-7 の「JSON 1つ」を破りうる。stderr にだけ出す
+
+**Web UI は変えない。** JSON をコピーするボタン（[CLI 仕様 §2 の Plan](cli-and-web-ui.md#plan)）は組み立てた計画にだけ付き、
+止まった計画は Output パネルに診断として出る。描画の関数は core が持つ（NFR-6）ので、
+Web に同じ文書が要るようになったときは同じ関数を呼べばよい。
+
+**採らなかった案。**
+
+| 案 | 採らない理由 |
+| --- | --- |
+| stdout を空のままにし、終了コードだけで伝える | `\| jq` が止まったときだけ壊れる。診断の ID と path を機械が読む手段が無い |
+| plan と同じ形（§2.1）で、`actions` を空・`summary` を0で出す | 空の `Action[]` は「差分なし」と区別できない（VG-2）。`project.exists` は知らないので偽の値で埋めることになり、PO-5 と同じ理由で採らない |
+| JSON を stderr に書く | stderr は人間向けで、進捗や確認プロンプトと混ざる（CLI 仕様 §1.3） |
+| 認証情報の不足や GET の失敗に新しい検証 ID を割り当てて `diagnostics` に入れる | マニフェストの誤りではないので検証仕様の外にある。`/users/myself` の失敗は既に V-B1 として `diagnostics` に入る |
+| `space` を、設定されていれば常に持たせる | 有無が「Backlog に問い合わせたか」を表さなくなる。`validate` が持たない理由（CL-1）とも食い違う |
+| apply の文書に `result` を持たせない | 消費側は `result` で分岐するよう案内している（CLI 仕様 §1.5）。止まったときだけ `null` になる |
+| apply の `result` に `rejected` を使う | 確認プロンプトで拒否したことと、確認より前に止まったことが区別できない |
+
 ## 3. apply の出力
 
 `apply` は plan と同じ描画を出したうえで、確認プロンプトと進捗を重ねる。
@@ -371,6 +456,7 @@ plan の構造に `result` と実行結果を足したもの。
 ```
 
 `result` は `succeeded` / `aborted` / `rejected`（確認プロンプトで拒否）。
+計画を組み立てる前に止まったときは `planFailed` で、文書の形が変わる（PO-13）。
 `applied` / `pending` は `Action.id` の配列。`id` が安定している（[Action の定義](core-reconciler.md#22-action)）ことがここで効く。
 
 `failed.status` は**任意**である。タイムアウト・名前解決の失敗・ブラウザの CORS 失敗のように
@@ -398,3 +484,4 @@ HTTP のやり取りが成立しなかった場合、ステータスは存在し
 | PO-6 | `formatVersion` は破壊的変更時のみ | CLI の semver に追随。消費側がバージョン対応表を持つ羽目になる |
 | PO-10 | apply の JSON は最終結果1つ | JSON Lines で逐次。消費者は CI であり、途中経過を求めていない |
 | PO-11 | `changes` は全フィールド、描画側で絞る | `changes` を差分のある項目だけにする。JSON から「送るが変わらない項目」が消え、`request.params` と突き合わせられなくなる |
+| PO-13 | 計画の前に止まっても stdout に JSON を1つ書く。§2.3 に `space`（問い合わせたときだけ）と `failure` を足した形 | stdout を空にする（`\| jq` が壊れ、診断を機械が読めない）/ §2.1 の形で空の `actions`（「差分なし」と区別できない）/ `space` を常に持たせる（問い合わせたかどうかが読めない） |
