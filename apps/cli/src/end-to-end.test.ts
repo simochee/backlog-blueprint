@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createBacklogClient } from "@backlog-blueprint/backlog-client";
 import { createExport } from "@backlog-blueprint/core";
@@ -76,6 +76,22 @@ const routingFetch = (responses: Record<string, unknown>) => {
   };
 
   return { requested, fetch };
+};
+
+type Fetch = (url: string, init: { method: string }) => Promise<unknown>;
+
+const cliOver = (text: string, fetch: Fetch) => {
+  const io = capturingIo(text);
+  const deps: Deps = {
+    io,
+    output: createOutput(),
+    buildPlan,
+    createExport,
+    createClient: ({ space, apiKey }) =>
+      createBacklogClient({ space, apiKey, fetch: fetch as never }),
+  };
+
+  return { io, run: (argv: string[]) => runCli(argv, deps) };
 };
 
 const cliWith = (text: string, responses: Record<string, unknown> = {}) => {
@@ -186,5 +202,66 @@ describe("plan を端から端まで", () => {
 
     expect(io.stdout).not.toContain(API_KEY);
     expect(io.stderr).not.toContain(API_KEY);
+  });
+});
+
+/** 指定したリクエストにだけ、接続したまま何も返さない */
+const stallingFetch =
+  (stalls: (method: string, path: string) => boolean): Fetch =>
+  (url, init) => {
+    const path = decodeURIComponent(url)
+      .replace(/^https:\/\/[^/]+/, "")
+      .replace(/\?$/, "");
+
+    return stalls(init.method, path)
+      ? new Promise(() => {})
+      : routingFetch(fixedSpaceResponses()).fetch(url);
+  };
+
+/** 経過を早送りしながら終わりまで走らせる。止まった接続は打ち切られるまで次へ進まない */
+const runToEnd = async (run: Promise<number>): Promise<number> => {
+  await vi.runAllTimersAsync();
+
+  return run;
+};
+
+describe("Backlog が応答を返さないとき", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("plan は止まったままにならず、応答が無かったことを書いて失敗する", async () => {
+    const { io, run } = cliOver(
+      MANIFEST,
+      stallingFetch((_method, path) => path === "/api/v2/projects/PROJ_A/categories"),
+    );
+
+    await expect(runToEnd(run(["plan", "-f", "-", "--no-color"]))).resolves.toBe(1);
+    expect(io.stderr).toContain("No response from Backlog within 60 seconds.");
+  });
+
+  it("apply の中断レポートは、応答の無かった更新系を未適用に数えず、適用済みかもしれないと書く", async () => {
+    const { io, run } = cliOver(
+      MANIFEST,
+      stallingFetch((method) => method !== "GET"),
+    );
+
+    await expect(runToEnd(run(["apply", "-f", "-", "--auto-approve", "--no-color"]))).resolves.toBe(
+      1,
+    );
+
+    const report = `${io.stdout}${io.stderr}`;
+
+    expect(report).toContain(
+      "  No response from Backlog within 60 seconds.\n  The request may have been applied anyway.",
+    );
+    expect(report).toContain('Failed (1):\n  + issueType      "タスク"\nNot applied');
+    expect(report.slice(report.indexOf("Not applied"), report.indexOf("Re-run"))).not.toContain(
+      '"タスク"',
+    );
   });
 });

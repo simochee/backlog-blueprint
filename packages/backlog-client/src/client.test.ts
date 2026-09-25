@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { type ResolvedHttpRequest } from "@backlog-blueprint/core";
 
@@ -267,5 +267,189 @@ describe("バイト列の取得", () => {
     await expect(client.getBytes("/api/v2/space/image")).rejects.toBeInstanceOf(
       BacklogHttpFailureError,
     );
+  });
+});
+
+const TIMEOUT_MS = 60_000;
+
+type Stalled = { signals: AbortSignal[]; client: ReturnType<typeof createBacklogClient> };
+
+/** 接続は張れたが Backlog が何も返さない。`signal` を見ない実装として、打ち切られても黙ったまま */
+const stalled = (): Stalled => {
+  const signals: AbortSignal[] = [];
+
+  return {
+    signals,
+    client: createBacklogClient({
+      space: "example.backlog.com",
+      apiKey: API_KEY,
+      fetch: ((_url: string, init: { signal: AbortSignal }) => {
+        signals.push(init.signal);
+
+        return new Promise(() => {});
+      }) as never,
+    }),
+  };
+};
+
+/** ヘッダまでは返るが、本文が届かない */
+const stalledBody = () =>
+  createBacklogClient({
+    space: "example.backlog.com",
+    apiKey: API_KEY,
+    fetch: ((url: string) =>
+      Promise.resolve({
+        url,
+        status: 200,
+        statusText: "",
+        headers: { get: () => null },
+        json: () => new Promise(() => {}),
+        arrayBuffer: () => new Promise(() => {}),
+      })) as never,
+  });
+
+const settle = <T>(promise: Promise<T>) => {
+  const state: { settled: boolean; error?: unknown } = { settled: false };
+
+  promise.then(
+    () => {
+      state.settled = true;
+    },
+    (error: unknown) => {
+      state.settled = true;
+      state.error = error;
+    },
+  );
+
+  return state;
+};
+
+describe("応答を待つ上限", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("応答の無い取得は60秒で状態コードの無い失敗になる", async () => {
+    const outcome = settle(stalled().client.get("/api/v2/space"));
+
+    await vi.advanceTimersByTimeAsync(TIMEOUT_MS);
+
+    expect(outcome.error).toBeInstanceOf(BacklogHttpFailureError);
+    expect((outcome.error as BacklogHttpFailureError).status).toBeUndefined();
+    expect((outcome.error as BacklogHttpFailureError).errors).toStrictEqual([
+      { message: "No response from Backlog within 60 seconds." },
+    ]);
+  });
+
+  it("60秒に届くまでは待ち続ける", async () => {
+    const outcome = settle(stalled().client.get("/api/v2/space"));
+
+    await vi.advanceTimersByTimeAsync(TIMEOUT_MS - 1);
+
+    expect(outcome.settled).toBe(false);
+  });
+
+  it("打ち切ったら fetch に渡した signal を中断し、接続を手放させる", async () => {
+    const { client, signals } = stalled();
+    const outcome = settle(client.get("/api/v2/space"));
+
+    expect(signals[0]?.aborted).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(TIMEOUT_MS);
+
+    expect(outcome.settled).toBe(true);
+    expect(signals[0]?.aborted).toBe(true);
+  });
+
+  it("応答の無い更新系は、適用済みかもしれないと添えて失敗する", async () => {
+    const outcome = settle(stalled().client.send(aRequest()));
+
+    await vi.advanceTimersByTimeAsync(TIMEOUT_MS);
+
+    expect(outcome.error).toBeInstanceOf(BacklogHttpFailureError);
+    expect((outcome.error as BacklogHttpFailureError).status).toBeUndefined();
+    expect((outcome.error as BacklogHttpFailureError).errors).toStrictEqual([
+      { message: "No response from Backlog within 60 seconds." },
+      { message: "The request may have been applied anyway." },
+    ]);
+  });
+
+  it("本文の途中で止まった応答も60秒で打ち切る", async () => {
+    const outcome = settle(stalledBody().get("/api/v2/space"));
+
+    await vi.advanceTimersByTimeAsync(TIMEOUT_MS);
+
+    expect(outcome.error).toMatchObject({
+      errors: [{ message: "No response from Backlog within 60 seconds." }],
+    });
+  });
+
+  it("画像の取得も60秒で打ち切る", async () => {
+    const outcome = settle(stalledBody().getBytes("/api/v2/space/image"));
+
+    await vi.advanceTimersByTimeAsync(TIMEOUT_MS);
+
+    expect(outcome.error).toMatchObject({
+      errors: [{ message: "No response from Backlog within 60 seconds." }],
+    });
+  });
+
+  it("上限はリクエスト1件ごとに数え、前のリクエストの経過を持ち越さない", async () => {
+    let calls = 0;
+    const client = createBacklogClient({
+      space: "example.backlog.com",
+      apiKey: API_KEY,
+      fetch: ((url: string) => {
+        calls += 1;
+
+        return calls === 1
+          ? Promise.resolve({
+              url,
+              status: 200,
+              statusText: "",
+              headers: { get: () => null },
+              json: () => Promise.resolve({}),
+            })
+          : new Promise(() => {});
+      }) as never,
+    });
+
+    await client.get("/api/v2/space");
+    await vi.advanceTimersByTimeAsync(TIMEOUT_MS - 1);
+
+    const second = settle(client.get("/api/v2/space"));
+
+    await vi.advanceTimersByTimeAsync(TIMEOUT_MS - 1);
+
+    expect(second.settled).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(1);
+
+    expect(second.settled).toBe(true);
+  });
+
+  it("間に合った応答は待ちを残さない", async () => {
+    const { client } = clientWith({ status: 200, body: { id: 1 } }, { status: 400, body: {} });
+
+    await client.get("/api/v2/users/myself");
+    await client.send(aRequest()).catch(() => undefined);
+
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("タイムアウトの失敗に API キーが現れない", async () => {
+    const outcome = settle(stalled().client.send(aRequest()));
+
+    await vi.advanceTimersByTimeAsync(TIMEOUT_MS);
+
+    const failure = outcome.error as BacklogHttpFailureError;
+
+    expect(
+      JSON.stringify({ ...failure, message: failure.message, stack: failure.stack }),
+    ).not.toContain(API_KEY);
   });
 });

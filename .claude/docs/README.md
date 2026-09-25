@@ -53,7 +53,7 @@ requirement-design ─▶ requirements-definition ─┬─▶ manifest-schema
 | `G` | syntax-reference-github | 先行事例から借りた原則 |
 | `B` | reference-bee | bee から借りた構成・ツール |
 | `M` / `Y` / `E` / `K` | manifest-schema | Schema の責務 / YAML 解釈 / 変数展開 / キー構造 |
-| `C` / `RF` / `X` | core-reconciler | 責務分割 / 再取得点 / レート制限 |
+| `C` / `RF` / `X` | core-reconciler | 責務分割 / 再取得点 / レート制限と応答の待ち時間 |
 | `PO` | plan-output | 出力形式 |
 | `CL` / `WU` | cli-and-web-ui | CLI / Web UI |
 | `VG` / `VP` / `DG` | validation-pipeline | ゲート / コマンド別構成 / 診断 |
