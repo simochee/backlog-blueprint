@@ -9,6 +9,7 @@ import { type Action, type CreateExportResult, type Diagnostic } from "@backlog-
 
 import { type Deps } from "./commands";
 import { type Io } from "./io";
+import { createOutput } from "./output";
 import { type Output, type PlanResult } from "./ports";
 import { runCli } from "./program";
 
@@ -88,9 +89,11 @@ const fakeOutput: Output = {
   plan: (_input, { color, showUnchanged }) =>
     `plan-body(color=${color},showUnchanged=${showUnchanged})\n`,
   planJson: ({ plan }) => `${JSON.stringify({ actions: plan.actions.length })}\n`,
+  stoppedPlanJson: ({ diagnostics }) => `${JSON.stringify({ stopped: diagnostics.length })}\n`,
   progress: (event) => `progress:${event.type}\n`,
   applyResult: ({ outcome }) => `apply-result:${outcome.result}\n`,
   applyJson: ({ outcome }) => `${JSON.stringify({ result: outcome.result })}\n`,
+  stoppedApplyJson: () => `${JSON.stringify({ result: "planFailed" })}\n`,
   exportNotes: ({ projectKey }, { color }) => `export-notes(color=${color}) ${projectKey}\n`,
 };
 
@@ -117,7 +120,7 @@ const deps = (
   overrides: Partial<Omit<Deps, "io">> & { plan?: PlanResult; respond?: () => unknown } = {},
 ): Deps => ({
   io,
-  output: fakeOutput,
+  output: overrides.output ?? fakeOutput,
   buildPlan:
     overrides.buildPlan ??
     (() => {
@@ -545,6 +548,144 @@ describe("§1.3 標準出力と標準エラー出力", () => {
     await runCli(["plan", "-f", "-"], deps(io, { plan: fakePlan({ actions: [anAction()] }) }));
 
     expect(io.stdout).toContain("plan-body");
+  });
+});
+
+describe("PO-13 計画を組み立てる前に止まったときの --output json", () => {
+  type Document = Record<string, unknown>;
+
+  const COMMANDS = [
+    { command: "plan", args: ["plan"] },
+    { command: "apply", args: ["apply", "--auto-approve"] },
+  ] as const;
+
+  const run = async (
+    args: readonly string[],
+    io: FakeIo,
+    overrides: Parameters<typeof deps>[1] = {},
+  ): Promise<{ code: number; document: Document }> => {
+    const code = await runCli(
+      [...args, "--output", "json"],
+      deps(io, { output: createOutput(), ...overrides }),
+    );
+
+    return { code, document: JSON.parse(io.stdout) as Document };
+  };
+
+  describe.each(COMMANDS)("$command", ({ args }) => {
+    it("マニフェストを読めないと、読めなかった理由を JSON で書く", async () => {
+      const io = fakeIo();
+      const { code, document } = await run([...args, "-f", "no-such-manifest.yaml"], io);
+
+      expect(code).toBe(1);
+      expect(document["manifest"]).toEqual({ path: "no-such-manifest.yaml" });
+      expect(document["failure"]).toMatchObject({
+        errors: [{ message: expect.stringContaining("no-such-manifest.yaml") as unknown }],
+      });
+      expect(document).not.toHaveProperty("space");
+    });
+
+    it("スキーマに違反すると、Backlog に問い合わせずに診断を JSON で書く", async () => {
+      const io = fakeIo({ stdin: "key: PROJ_A\n" });
+      const { code, document } = await run([...args, "-f", "-"], io);
+
+      expect(code).toBe(1);
+      expect(document["diagnostics"]).toContainEqual(
+        expect.objectContaining({ severity: "error", stage: "schema" }),
+      );
+      expect(document).not.toHaveProperty("space");
+      expect(document).not.toHaveProperty("failure");
+    });
+
+    it("API キーが無いと、足りないものを失敗として JSON で書く", async () => {
+      const io = fakeIo({ env: { BACKLOG_SPACE: "example.backlog.com" } });
+      const { code, document } = await run([...args, "-f", "-"], io);
+
+      expect(code).toBe(1);
+      expect(document["failure"]).toEqual({ errors: [{ message: "BACKLOG_API_KEY is not set." }] });
+      expect(document).not.toHaveProperty("space");
+    });
+
+    it("V-B の違反で止まると、問い合わせたスペースと診断を JSON で書く", async () => {
+      const io = fakeIo();
+      const { code, document } = await run([...args, "-f", "-"], io, {
+        buildPlan: () => Promise.resolve({ diagnostics: [violation()] }),
+      });
+
+      expect(code).toBe(1);
+      expect(document["space"]).toBe("example.backlog.com");
+      expect(document["diagnostics"]).toEqual([violation()]);
+      expect(document).not.toHaveProperty("actions");
+    });
+
+    it("取得に失敗すると、ステータスと Backlog のメッセージを JSON で書く", async () => {
+      const io = fakeIo();
+      const { code, document } = await run([...args, "-f", "-"], io, {
+        buildPlan: () =>
+          Promise.reject({ status: 500, errors: [{ message: "Internal Server Error" }] }),
+      });
+
+      expect(code).toBe(1);
+      expect(document["space"]).toBe("example.backlog.com");
+      expect(document["failure"]).toEqual({
+        status: 500,
+        errors: [{ message: "Internal Server Error" }],
+      });
+    });
+
+    it("取得に失敗しても、それまでの警告を JSON に残し標準エラー出力にも写す", async () => {
+      const io = fakeIo({
+        stdin: `${MANIFEST}webhooks:\n  - name: 通知\n    hookUrl: https://example.test\n    events: [9999]\n`,
+      });
+      const { document } = await run([...args, "-f", "-"], io, {
+        buildPlan: () =>
+          Promise.reject({ status: 500, errors: [{ message: "Internal Server Error" }] }),
+      });
+
+      expect(document["diagnostics"]).toEqual([
+        expect.objectContaining({ id: "V-A24", severity: "warning" }),
+      ]);
+      expect(io.stderr).toContain("V-A24");
+      expect(io.stderr).toContain("500");
+    });
+
+    it("--output text では止まっても標準出力に何も書かない", async () => {
+      const io = fakeIo({ stdin: "key: PROJ_A\n" });
+
+      await expect(
+        runCli([...args, "-f", "-"], deps(io, { output: createOutput() })),
+      ).resolves.toBe(1);
+      expect(io.stdout).toBe("");
+    });
+  });
+
+  it("apply は計画が無かったことを result で示し、Action の識別子を並べない", async () => {
+    const io = fakeIo();
+    const { document } = await run(["apply", "--auto-approve", "-f", "-"], io, {
+      buildPlan: () => Promise.resolve({ diagnostics: [violation()] }),
+    });
+
+    expect(document["result"]).toBe("planFailed");
+    expect(document).not.toHaveProperty("applied");
+    expect(document).not.toHaveProperty("pending");
+  });
+
+  it("plan は result を持たない", async () => {
+    const io = fakeIo();
+    const { document } = await run(["plan", "-f", "-"], io, {
+      buildPlan: () => Promise.resolve({ diagnostics: [violation()] }),
+    });
+
+    expect(document).not.toHaveProperty("result");
+  });
+
+  it("validate もマニフェストを読めないと、読めなかった理由を JSON で書く", async () => {
+    const io = fakeIo();
+    const { code, document } = await run(["validate", "-f", "no-such-manifest.yaml"], io);
+
+    expect(code).toBe(1);
+    expect(document["diagnostics"]).toEqual([]);
+    expect(document).toHaveProperty("failure");
   });
 });
 

@@ -15,10 +15,15 @@ import {
 } from "@backlog-blueprint/core";
 
 import { confirmApply } from "./confirm";
-import { isCredentialsError, resolveCredentials, type Credentials } from "./credentials";
+import {
+  isCredentialsError,
+  renderCredentialsError,
+  resolveCredentials,
+  type Credentials,
+} from "./credentials";
 import { EXIT_CHANGES, EXIT_ERROR, EXIT_SUCCESS } from "./exit-code";
 import { type Io } from "./io";
-import { readManifest } from "./manifest-source";
+import { manifestPath, readManifest, type ManifestSource } from "./manifest-source";
 import {
   type BuildPlan,
   type CreateExport,
@@ -27,6 +32,7 @@ import {
   type OutputContext,
   type PlanResult,
   type RenderOptions,
+  type Stopped,
   type ToolContext,
 } from "./ports";
 import { TOOL } from "./version";
@@ -62,10 +68,12 @@ type StaticValidation = {
   path: string;
   diagnostics: Diagnostic[];
   manifest?: Manifest;
+  /** マニフェストを読めなかった。`--output json` でも文書を書けるよう、例外にせず返す（PO-13） */
+  failure?: unknown;
 };
 
 type Prepared =
-  | { ok: false; code: number }
+  | { ok: false; stopped: Stopped }
   | {
       ok: true;
       plan: PlanResult;
@@ -88,7 +96,14 @@ const validateStatically = async (
   deps: Deps,
   unresolvedEnvSeverity: Diagnostic["severity"],
 ): Promise<StaticValidation> => {
-  const source = await readManifest(options.file, deps.io);
+  let source: ManifestSource;
+
+  try {
+    source = await readManifest(options.file, deps.io);
+  } catch (error) {
+    return { path: manifestPath(options.file), diagnostics: [], failure: error };
+  }
+
   const { diagnostics, manifest } = validateManifest({
     text: source.text,
     schemaStage,
@@ -109,18 +124,32 @@ const validateStatically = async (
  */
 export const runValidate = async (options: CommonOptions, deps: Deps): Promise<number> => {
   const { io, output } = deps;
-  const { path, diagnostics } = await validateStatically(options, deps, "warning");
+  const { path, diagnostics, failure } = await validateStatically(options, deps, "warning");
   const context: ToolContext = { tool: TOOL, manifest: { path } };
+
+  if (failure !== undefined) {
+    io.err(output.failure(failure, noticeRender(options)));
+  }
 
   if (diagnostics.length > 0) {
     io.err(output.diagnostics(diagnostics, noticeRender(options)));
   }
 
   if (options.output === "json") {
-    io.out(output.validateJson({ context, diagnostics }));
+    io.out(output.validateJson({ context, diagnostics, failure }));
   }
 
-  return hasError(diagnostics) ? EXIT_ERROR : EXIT_SUCCESS;
+  return failure !== undefined || hasError(diagnostics) ? EXIT_ERROR : EXIT_SUCCESS;
+};
+
+/**
+ * `--output json` のときだけ診断を stderr へ写す。text のときは計画の本文が
+ * `Warnings:` を持つ（plan の出力仕様 §1.1）ので、写すと二重に出る。
+ */
+const echoDiagnostics = (diagnostics: Diagnostic[], options: CommonOptions, deps: Deps): void => {
+  if (options.output === "json" && diagnostics.length > 0) {
+    deps.io.err(deps.output.diagnostics(diagnostics, noticeRender(options)));
+  }
 };
 
 const prepare = async (
@@ -130,27 +159,40 @@ const prepare = async (
 ): Promise<Prepared> => {
   const { io, output } = deps;
   const statically = await validateStatically(options, deps, "error");
+  const offline: Stopped["context"] = { tool: TOOL, manifest: { path: statically.path } };
+
+  /**
+   * それまでの警告も文書に残す（PO-13）。`failure` で止まると計画の本文の
+   * `Warnings:` が書かれないので、json のときは §1.3 のとおり stderr にも写す。
+   */
+  const stopWithFailure = (context: Stopped["context"], failure: unknown): Prepared => {
+    echoDiagnostics(statically.diagnostics, options, deps);
+
+    return { ok: false, stopped: { context, diagnostics: statically.diagnostics, failure } };
+  };
+
+  if (statically.failure !== undefined) {
+    io.err(output.failure(statically.failure, notice));
+
+    return stopWithFailure(offline, statically.failure);
+  }
 
   if (statically.manifest === undefined) {
     io.err(output.diagnostics(statically.diagnostics, notice));
 
-    return { ok: false, code: EXIT_ERROR };
+    return { ok: false, stopped: { context: offline, diagnostics: statically.diagnostics } };
   }
 
   const credentials = resolveCredentials(options.space, io);
 
   if (isCredentialsError(credentials)) {
-    io.err(credentials.error);
+    io.err(renderCredentialsError(credentials.error));
 
-    return { ok: false, code: EXIT_ERROR };
+    return stopWithFailure(offline, { errors: [{ message: credentials.error.message }] });
   }
 
   const client = deps.createClient(credentials);
-  const context: OutputContext = {
-    tool: TOOL,
-    space: credentials.space,
-    manifest: { path: statically.path },
-  };
+  const context: OutputContext = { ...offline, space: credentials.space };
 
   try {
     const built = await deps.buildPlan({
@@ -162,7 +204,7 @@ const prepare = async (
     if (built.plan === undefined || hasError(diagnostics)) {
       io.err(output.diagnostics(diagnostics, notice));
 
-      return { ok: false, code: EXIT_ERROR };
+      return { ok: false, stopped: { context, diagnostics } };
     }
 
     return {
@@ -175,31 +217,25 @@ const prepare = async (
   } catch (error) {
     io.err(output.failure(error, notice));
 
-    return { ok: false, code: EXIT_ERROR };
-  }
-};
-
-/**
- * `--output json` のときだけ診断を stderr へ写す。text のときは計画の本文が
- * `Warnings:` を持つ（plan の出力仕様 §1.1）ので、写すと二重に出る。
- */
-const echoWarnings = (plan: PlanResult, options: CommonOptions, deps: Deps): void => {
-  if (options.output === "json" && plan.diagnostics.length > 0) {
-    deps.io.err(deps.output.diagnostics(plan.diagnostics, noticeRender(options)));
+    return stopWithFailure(context, error);
   }
 };
 
 export const runPlan = async (options: PlanOptions, deps: Deps): Promise<number> => {
+  const { io, output } = deps;
   const prepared = await prepare(options, deps, noticeRender(options));
 
   if (!prepared.ok) {
-    return prepared.code;
+    if (options.output === "json") {
+      io.out(output.stoppedPlanJson(prepared.stopped));
+    }
+
+    return EXIT_ERROR;
   }
 
-  const { io, output } = deps;
   const { plan, context } = prepared;
 
-  echoWarnings(plan, options, deps);
+  echoDiagnostics(plan.diagnostics, options, deps);
 
   io.out(
     options.output === "json"
@@ -264,17 +300,21 @@ const runExecution = async (
 };
 
 export const runApply = async (options: ApplyOptions, deps: Deps): Promise<number> => {
+  const { io, output } = deps;
   const prepared = await prepare(options, deps, applyNotice(options));
 
   if (!prepared.ok) {
-    return prepared.code;
+    if (options.output === "json") {
+      io.out(output.stoppedApplyJson(prepared.stopped));
+    }
+
+    return EXIT_ERROR;
   }
 
-  const { io, output } = deps;
   const { plan, context, client, manifest } = prepared;
   const progressRender = noticeRender(options);
 
-  echoWarnings(plan, options, deps);
+  echoDiagnostics(plan.diagnostics, options, deps);
 
   /**
    * `--output json` では計画の本文を書かない。stdout に出てよいのは最後の
@@ -315,7 +355,7 @@ export const runExport = async (options: ExportOptions, deps: Deps): Promise<num
   const credentials = resolveCredentials(options.space, io);
 
   if (isCredentialsError(credentials)) {
-    io.err(credentials.error);
+    io.err(renderCredentialsError(credentials.error));
 
     return EXIT_ERROR;
   }

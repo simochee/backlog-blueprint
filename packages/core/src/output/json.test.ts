@@ -8,7 +8,11 @@ import {
   planJson,
   renderApplyJson,
   renderPlanJson,
+  renderStoppedApplyJson,
+  renderStoppedPlanJson,
   renderValidateJson,
+  stoppedApplyJson,
+  stoppedPlanJson,
   validateJson,
 } from "./json";
 
@@ -63,6 +67,22 @@ describe("validate の機械向け出力", () => {
     );
 
     expect(json.diagnostics.map(({ id }) => id)).toEqual(["V-A23", "V-A5"]);
+  });
+
+  it("マニフェストを読めなかったときは、その理由を失敗として持つ", () => {
+    const json = validateJson(
+      walkthroughValidateReport({
+        failure: new Error("ENOENT: no such file or directory, open 'projects/PROJ_A.yaml'"),
+      }),
+    );
+
+    expect(json.failure).toEqual({
+      errors: [{ message: "ENOENT: no such file or directory, open 'projects/PROJ_A.yaml'" }],
+    });
+  });
+
+  it("失敗が無ければ失敗の項目そのものが現れない", () => {
+    expect("failure" in validateJson(walkthroughValidateReport())).toBe(false);
   });
 
   it("改行で終わる JSON を書き出す", () => {
@@ -216,5 +236,92 @@ describe("apply の機械向け出力", () => {
     expect(document.applied).toEqual([]);
     expect(document.failed).toBeUndefined();
     expect(document.pending).toHaveLength(executed().length);
+  });
+});
+
+const violation = {
+  id: "V-B3",
+  severity: "error",
+  stage: "snapshot",
+  path: "key",
+  message: "PROJ_A already has issues (43 in total)",
+} as const;
+
+describe("計画を組み立てる前に止まった plan の機械向け出力", () => {
+  it("validate の項目に、問い合わせたスペースを足した形になる", () => {
+    const json = stoppedPlanJson({
+      ...walkthroughValidateReport({ diagnostics: [violation] }),
+      space: "example.backlog.com",
+    });
+
+    expect(Object.keys(json)).toEqual([
+      "formatVersion",
+      "tool",
+      "space",
+      "manifest",
+      "diagnostics",
+    ]);
+    expect(json.diagnostics).toEqual([violation]);
+  });
+
+  it("Backlog に問い合わせる前に止まったならスペースを持たない", () => {
+    expect("space" in stoppedPlanJson(walkthroughValidateReport())).toBe(false);
+  });
+
+  it("計画に関わる項目を持たない", () => {
+    const json = stoppedPlanJson({ ...walkthroughValidateReport(), space: "example.backlog.com" });
+
+    expect(json).not.toHaveProperty("project");
+    expect(json).not.toHaveProperty("summary");
+    expect(json).not.toHaveProperty("actions");
+    expect(json).not.toHaveProperty("resultingOrder");
+  });
+
+  it("Backlog が拒否した失敗はステータスとメッセージで表す", () => {
+    const json = stoppedPlanJson({
+      ...walkthroughValidateReport(),
+      space: "example.backlog.com",
+      failure: { status: 500, errors: [{ message: "Internal Server Error" }] },
+    });
+
+    expect(json.failure).toEqual({ status: 500, errors: [{ message: "Internal Server Error" }] });
+  });
+
+  it("Backlog に届かなかった失敗ではステータスの項目が現れない", () => {
+    const text = renderStoppedPlanJson({
+      ...walkthroughValidateReport(),
+      failure: new TypeError("fetch failed"),
+    });
+    const failure = parsed(text)["failure"] as Record<string, unknown>;
+
+    expect("status" in failure).toBe(false);
+    expect(failure["errors"]).toEqual([{ message: "fetch failed" }]);
+  });
+});
+
+describe("計画を組み立てる前に止まった apply の機械向け出力", () => {
+  it("形式の版の次に、計画が無かったという結果を持つ", () => {
+    const json = stoppedApplyJson({
+      ...walkthroughValidateReport({ diagnostics: [violation] }),
+      space: "example.backlog.com",
+    });
+
+    expect(Object.keys(json)).toEqual([
+      "formatVersion",
+      "result",
+      "tool",
+      "space",
+      "manifest",
+      "diagnostics",
+    ]);
+    expect(json.result).toBe("planFailed");
+  });
+
+  it("着手した Action が無いので、適用済み・失敗・未適用を持たない", () => {
+    const document = parsed(renderStoppedApplyJson(walkthroughValidateReport()));
+
+    expect(document).not.toHaveProperty("applied");
+    expect(document).not.toHaveProperty("failed");
+    expect(document).not.toHaveProperty("pending");
   });
 });
