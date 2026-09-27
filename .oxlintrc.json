@@ -107,6 +107,12 @@
       }
     },
     {
+      "files": ["apps/web/src/globals.d.ts"],
+      "rules": {
+        "no-var": "off"
+      }
+    },
+    {
       "files": ["packages/core/src/manifest.ts"],
       "rules": {
         "unicorn/no-thenable": "off"
