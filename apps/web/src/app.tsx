@@ -1,26 +1,32 @@
-import { LayersIcon } from "@radix-ui/react-icons";
-import { Box, Button, Container, Flex, Theme } from "@radix-ui/themes";
+import { hasError, type Diagnostic } from "@backlog-blueprint/core";
+import { useHotkey } from "@tanstack/react-hotkeys";
 import {
   startTransition,
   useActionState,
   useDeferredValue,
   useEffect,
-  useEffectEvent,
   useMemo,
   useState,
   useSyncExternalStore,
 } from "react";
 
 import { runApply } from "./apply";
-import { useAppearance } from "./appearance";
 import { AccountMenu } from "./components/account-menu";
+import { ActivityBar, type SidebarKind } from "./components/activity-bar";
 import { SectionBoundary } from "./components/boundary";
 import { ConnectDialog, ConnectScreen } from "./components/connect";
-import { DIRECTORY_PANES, DirectoryPane } from "./components/directory-pane";
+import { ProblemList } from "./components/diagnostics";
+import { DirectoryPane } from "./components/directory-pane";
 import { DiscardDialog } from "./components/discard-dialog";
-import { ManifestPane } from "./components/manifest-pane";
-import { OutputPanel } from "./components/output-panel";
+import { EnvironmentPane } from "./components/environment-pane";
+import { ImportDialog } from "./components/import-dialog";
+import { type FileFailure, ManifestPane } from "./components/manifest-pane";
+import { OutputPanel, type OutputView } from "./components/output-panel";
+import { Panel, type PanelTab } from "./components/panel";
+import { StatusBar } from "./components/status-bar";
+import { TitleBar } from "./components/title-bar";
 import { type DirectoryKind } from "./directory";
+import { type EditorJump, type EditorPosition } from "./editor-position";
 import { prepareExport } from "./export";
 import { openManifestFile, saveManifestFile, UNTITLED_FILENAME } from "./files";
 import {
@@ -31,8 +37,10 @@ import {
   type Derived,
   type ManifestInputs,
 } from "./freshness";
+import { SHORTCUTS } from "./hotkeys";
 import {
   documentName,
+  type ExportNotes,
   hasUnsavedChanges,
   importedDocument,
   openedFile,
@@ -43,14 +51,16 @@ import {
 import {
   appendEntry,
   applicableEntry,
+  applyBlocker,
   type ApplyRuns,
+  entryState,
   isOutdated,
   type OutputEntry,
+  PLANNING,
 } from "./output";
 import { PASTED, preparePlan } from "./plan";
 import { isRunning } from "./progress";
 import { secretRevisions, subscribeSecrets } from "./secrets";
-import { isSaveShortcut } from "./shortcut";
 import { pinTransport, transport } from "./transport";
 import { RESTORED_FORM_ID, useConnection } from "./use-connection";
 import { useDirectory } from "./use-directory";
@@ -59,10 +69,18 @@ import { validatedFor } from "./validation";
 
 const DIRECTORY_KINDS: DirectoryKind[] = ["users", "teams"];
 
+const SHORT_SCREEN = "(max-height: 759px)";
+
+/** `matchMedia` があると決めつけない。happy-dom や埋め込みの WebView には無い */
+const isShortScreen = (): boolean =>
+  typeof globalThis.matchMedia === "function" && globalThis.matchMedia(SHORT_SCREEN).matches;
+
+const errorsIn = (diagnostics: Diagnostic[]): number =>
+  diagnostics.filter(({ severity }) => severity === "error").length;
+
 const start = (action: () => void) => () => startTransition(action);
 
 export const App = () => {
-  const appearance = useAppearance();
   const revisions = useSyncExternalStore(subscribeSecrets, secretRevisions);
   const connectionControl = useConnection();
   const { session } = connectionControl;
@@ -73,13 +91,23 @@ export const App = () => {
   const [manifestText, setManifestText] = useState("");
   const [manifestDocument, setManifestDocument] = useState<ManifestDocument>(UNTITLED);
   const [replacement, setReplacement] = useState<OpenedDocument>();
-  const [fileFailure, setFileFailure] = useState<string>();
+  const [fileFailure, setFileFailure] = useState<FileFailure>();
+  const [dismissedNotes, setDismissedNotes] = useState<ExportNotes>();
+  const [importOpen, setImportOpen] = useState(false);
   const [showUnchanged, setShowUnchanged] = useState(false);
   const [runs, setRuns] = useState<ApplyRuns>({});
   const [selectedId, setSelectedId] = useState<number>();
   const [applyRequested, setApplyRequested] = useState<number>();
-  const [outputExpanded, setOutputExpanded] = useState(false);
-  const [paneRecord, setPaneRecord] = useState<Derived<DirectoryKind>>();
+  const [panel, setPanel] = useState<{ open: boolean; tab: PanelTab }>({
+    open: false,
+    tab: "output",
+  });
+  const [sidebarRecord, setSidebarRecord] = useState<Derived<SidebarKind>>();
+  const [lastSidebar, setLastSidebar] = useState<SidebarKind>("users");
+  const [environmentFocus, setEnvironmentFocus] = useState(0);
+  const [cursor, setCursor] = useState<EditorPosition>({ line: 1, column: 1 });
+  const [jump, setJump] = useState<EditorJump>();
+  const [problemsFor, setProblemsFor] = useState<ManifestDocument>();
 
   const connectionKey = connectionStamp(session?.id);
   const icons = {
@@ -109,20 +137,26 @@ export const App = () => {
 
   const validation = fresh(validated, manifestKey);
 
+  // 件数と Problems は落ち着いた検証から描く。今の入力の検証を待つと、打鍵のたびに 0 件へ戻る。
+  const { diagnostics, variables } = validated.value;
+  const errors = errorsIn(diagnostics);
+  const warnings = diagnostics.length - errors;
+  const missingValues = variables.filter(({ missing }) => missing).length;
+
   const directories = {
     users: useDirectory("users", connectionKey),
     teams: useDirectory("teams", connectionKey),
   };
-  const pane = connection === undefined ? undefined : fresh(paneRecord, connectionKey);
+  const recorded = connection === undefined ? undefined : fresh(sidebarRecord, connectionKey);
+  const sidebar = recorded === "env" && variables.length === 0 ? undefined : recorded;
 
-  const togglePane = (kind: DirectoryKind): void => {
-    if (pane === kind) {
-      setPaneRecord(undefined);
+  const openSidebar = (kind: SidebarKind): void => {
+    setSidebarRecord({ stamp: connectionKey, value: kind });
+    setLastSidebar(kind);
 
+    if (kind === "env") {
       return;
     }
-
-    setPaneRecord({ stamp: connectionKey, value: kind });
 
     const directory = directories[kind];
 
@@ -131,12 +165,42 @@ export const App = () => {
     }
   };
 
+  const toggleSidebar = (kind: SidebarKind): void => {
+    if (sidebar === kind) {
+      setSidebarRecord(undefined);
+    } else {
+      openSidebar(kind);
+    }
+  };
+
+  const toggleLastSidebar = (): void => {
+    if (sidebar === undefined) {
+      openSidebar(lastSidebar === "env" && variables.length === 0 ? "users" : lastSidebar);
+    } else {
+      setSidebarRecord(undefined);
+    }
+  };
+
+  const showPanel = (tab: PanelTab): void => {
+    setPanel({ open: true, tab });
+  };
+
+  const selectTab = (tab: PanelTab): void => {
+    setPanel((previous) =>
+      previous.open && previous.tab === tab ? { ...previous, open: false } : { open: true, tab },
+    );
+  };
+
+  const togglePanel = (): void => {
+    setPanel((previous) => ({ ...previous, open: !previous.open }));
+  };
+
   const [history, runPlan, planning] = useActionState<OutputEntry[]>(async (previous) => {
     if (validation?.manifest === undefined || connection === undefined) {
       return previous;
     }
 
-    const { manifest, diagnostics } = validation;
+    const { manifest } = validation;
     const source = manifestDocument.name ?? PASTED;
     const entry = { startedAt: Date.now(), space, projectKey: manifest.key, stamp: planKey };
 
@@ -148,7 +212,7 @@ export const App = () => {
           get: transport.get,
           space,
           source,
-          staticDiagnostics: diagnostics,
+          staticDiagnostics: validation.diagnostics,
         }),
       });
     } catch (error) {
@@ -157,20 +221,74 @@ export const App = () => {
   }, []);
 
   const running = Object.values(runs).some(isRunning);
-  const applicable = applicableEntry({ history, runs, planKey, pending: planning });
+  const applyContext = { history, runs, planKey, pending: planning };
+  const applicable = applicableEntry(applyContext);
 
-  const selected = history.find(({ id }) => id === selectedId) ?? history.at(-1);
-  const outputView =
-    selected === undefined
+  const view = (entry: OutputEntry | undefined): OutputView | undefined =>
+    entry === undefined
       ? undefined
-      : { entry: selected, outdated: isOutdated(selected, planKey), run: runs[selected.id] };
+      : { entry, outdated: isOutdated(entry, planKey), run: runs[entry.id] };
+
+  const outputView = view(history.find(({ id }) => id === selectedId) ?? history.at(-1));
+  const latest = view(history.at(-1));
+  const latestOutdated =
+    latest !== undefined &&
+    latest.run === undefined &&
+    latest.outdated &&
+    latest.entry.attempt.prepared !== undefined;
+
+  const planBlocker = ((): string | undefined => {
+    if (manifestText.trim() === "") {
+      return "Write or open a manifest first";
+    }
+
+    if (running) {
+      return "Apply is running";
+    }
+
+    if (planning) {
+      return "Plan is running";
+    }
+
+    if (validation === undefined) {
+      return "Checking the manifest...";
+    }
+
+    if (validation.manifest !== undefined) {
+      return undefined;
+    }
+
+    return validation.variables.some(({ missing }) => missing)
+      ? "Enter the environment values first"
+      : "Fix the errors in Problems first";
+  })();
 
   const followLatest = (): void => {
     setSelectedId(undefined);
-    setOutputExpanded(true);
+    showPanel("output");
+  };
+
+  // 未入力の環境変数を先に見る。未入力も Problems にエラーとして並ぶが、直す場所は ENV の欄である（WU-52）。
+  const guideToBlocker = (): void => {
+    if (validation !== undefined && validation.variables.some(({ missing }) => missing)) {
+      openSidebar("env");
+      setEnvironmentFocus((previous) => previous + 1);
+
+      return;
+    }
+
+    if (validation !== undefined && hasError(validation.diagnostics)) {
+      showPanel("problems");
+    }
   };
 
   const requestPlan = (): void => {
+    if (planBlocker !== undefined) {
+      guideToBlocker();
+
+      return;
+    }
+
     followLatest();
     startTransition(runPlan);
   };
@@ -205,6 +323,10 @@ export const App = () => {
     const prepared = applicable?.attempt.prepared;
 
     if (applicable === undefined || prepared === undefined) {
+      if (history.length > 0) {
+        showPanel("output");
+      }
+
       return;
     }
 
@@ -217,6 +339,19 @@ export const App = () => {
     );
   };
 
+  // 開いた文書のエラーを知らせるのは1回だけ。閉じた後に打鍵のたびに開き直すと、閉じた意味が無くなる（WU-54）。
+  useEffect(() => {
+    if (problemsFor === undefined || problemsFor !== manifestDocument || validation === undefined) {
+      return;
+    }
+
+    setProblemsFor(undefined);
+
+    if (hasError(validation.diagnostics) && !isShortScreen()) {
+      setPanel({ open: true, tab: "problems" });
+    }
+  }, [problemsFor, manifestDocument, validation]);
+
   const unsaved = hasUnsavedChanges(manifestDocument, manifestText);
 
   const replaceDocument = ({ document, text }: OpenedDocument): void => {
@@ -224,6 +359,7 @@ export const App = () => {
     setManifestText(text);
     setReplacement(undefined);
     setFileFailure(undefined);
+    setProblemsFor(document);
   };
 
   const openDocument = (opened: OpenedDocument): void => {
@@ -242,12 +378,12 @@ export const App = () => {
         openDocument(opened);
       }
     } catch (error) {
-      setFileFailure(`Could not open the file: ${String(error)}`);
+      setFileFailure({ action: "open", message: `Could not open the file: ${String(error)}` });
     }
   };
 
   const saveFile = async (): Promise<void> => {
-    const failure = `Could not save ${manifestDocument.name ?? UNTITLED_FILENAME}`;
+    const name = manifestDocument.name ?? UNTITLED_FILENAME;
 
     try {
       const saved = await saveManifestFile(manifestDocument, manifestText);
@@ -259,38 +395,61 @@ export const App = () => {
         setFileFailure(undefined);
       }
     } catch (error) {
-      setFileFailure(`${failure}: ${String(error)}`);
+      setFileFailure({ action: "save", message: `Could not save ${name}: ${String(error)}` });
     }
   };
 
-  const saveOnShortcut = useEffectEvent((event: KeyboardEvent): void => {
-    if (!isSaveShortcut(event)) {
-      return;
-    }
-
-    // 繰り返しで先に抜けない。押し続けたときにブラウザのページ保存が開く（WU-47）。
-    event.preventDefault();
-
-    if (!event.repeat) {
-      void saveFile();
-    }
-  });
-
   const connected = session !== undefined;
+  const modalOpen = importOpen || switching || replacement !== undefined;
+  const background = { enabled: connected && !modalOpen };
 
-  useEffect(() => {
-    if (!connected) {
-      return undefined;
-    }
-
-    const listen = (event: KeyboardEvent): void => saveOnShortcut(event);
-
-    globalThis.addEventListener("keydown", listen);
-
-    return () => {
-      globalThis.removeEventListener("keydown", listen);
-    };
-  }, [connected]);
+  // 押し続けた繰り返しでは何もしない。保存はダウンロードに落ちる環境で押したぶんだけファイルが増え、
+  // 他は開閉が点滅する。既定の動作は繰り返しでも止まる（WU-47）。
+  useHotkey(
+    SHORTCUTS.save,
+    (event) => {
+      if (!event.repeat) {
+        void saveFile();
+      }
+    },
+    { enabled: connected },
+  );
+  useHotkey(
+    SHORTCUTS.open,
+    (event) => {
+      if (!event.repeat) {
+        void openFile();
+      }
+    },
+    background,
+  );
+  useHotkey(
+    SHORTCUTS.plan,
+    (event) => {
+      if (!event.repeat) {
+        requestPlan();
+      }
+    },
+    background,
+  );
+  useHotkey(
+    SHORTCUTS.panel,
+    (event) => {
+      if (!event.repeat) {
+        togglePanel();
+      }
+    },
+    background,
+  );
+  useHotkey(
+    SHORTCUTS.sidebar,
+    (event) => {
+      if (!event.repeat) {
+        toggleLastSidebar();
+      }
+    },
+    background,
+  );
 
   const openSwitch = (): void => {
     setFormId(formId + 1);
@@ -302,124 +461,145 @@ export const App = () => {
     connectionControl.disconnect();
   };
 
-  const header = (
-    <Box asChild className="app-header" position="sticky" top="0">
-      <header>
-        <Container maxWidth="1200px" px={{ initial: "4", sm: "6" }}>
-          <div className="navbar" data-connected={connection !== undefined}>
-            <span className="navbar-brand">
-              <LayersIcon aria-hidden height="18" width="18" />
-              backlog-blueprint
-            </span>
-            {session === undefined ? null : (
-              <Flex align="center" gap="2">
-                {DIRECTORY_KINDS.map((kind) => (
-                  <Button
-                    aria-label={DIRECTORY_PANES[kind].title}
-                    aria-pressed={pane === kind}
-                    color="gray"
-                    key={kind}
-                    onClick={() => togglePane(kind)}
-                    type="button"
-                    variant={pane === kind ? "solid" : "soft"}
-                  >
-                    {DIRECTORY_PANES[kind].icon}
-                    <span className="navbar-tool-label">{DIRECTORY_PANES[kind].title}</span>
-                  </Button>
-                ))}
-                <AccountMenu
-                  connection={session.connection}
-                  domain={session.domain}
-                  icons={icons}
-                  locked={running}
-                  onDisconnect={disconnect}
-                  onSwitch={openSwitch}
-                />
-              </Flex>
-            )}
-          </div>
-        </Container>
-      </header>
-    </Box>
-  );
+  const jumpTo = ({ line, column }: Diagnostic): void => {
+    if (line !== undefined) {
+      setJump((previous) => ({ line, column: column ?? 1, request: (previous?.request ?? 0) + 1 }));
+    }
+  };
 
   if (session === undefined) {
     return (
-      <Theme accentColor="blue" appearance={appearance} grayColor="slate" radius="medium">
-        <Box className="page">
-          {header}
-          <ConnectScreen
-            connecting={connectionControl.connecting}
-            diagnostics={attempt?.diagnostics ?? []}
-            failure={attempt?.failure}
-            hasApiKey={revisions.hasApiKey}
-            initialSpace={connectionControl.storedSpace}
-            key={formId}
-            onConnect={(domain) => connectionControl.connectTo(domain, formId)}
-            reconnectingTo={connectionControl.reconnectingTo}
-          />
-        </Box>
-      </Theme>
+      <ConnectScreen
+        connecting={connectionControl.connecting}
+        diagnostics={attempt?.diagnostics ?? []}
+        failure={attempt?.failure}
+        hasApiKey={revisions.hasApiKey}
+        initialSpace={connectionControl.storedSpace}
+        key={formId}
+        onConnect={(domain) => connectionControl.connectTo(domain, formId)}
+        reconnectingTo={connectionControl.reconnectingTo}
+      />
     );
   }
 
+  const name = documentName(manifestDocument);
+  const notes = manifestDocument.notes === dismissedNotes ? undefined : manifestDocument.notes;
+  const outputState = planning
+    ? PLANNING
+    : latest && entryState(latest.entry, latest.run, latest.outdated);
+
   return (
-    <Theme accentColor="blue" appearance={appearance} grayColor="slate" radius="medium">
-      <Box className="page" data-pane-open={pane !== undefined}>
-        {header}
-        <Container maxWidth="1200px" px={{ initial: "4", sm: "6" }}>
-          <div className="workspace">
-            <SectionBoundary>
-              <ManifestPane
-                applying={running}
-                canApply={applicable !== undefined}
-                canPlan={validation?.manifest !== undefined && !planning && !running}
-                documentName={documentName(manifestDocument)}
-                fileFailure={fileFailure}
-                importKey={connectionKey}
-                names={validated.value.names}
-                notes={manifestDocument.notes}
-                onApply={applyPlan}
-                onFileDropped={(name, text) => openDocument(openedFile(name, text))}
-                onImport={(projectKey) => prepareExport(projectKey, transport.get)}
-                onImported={(exported) => openDocument(importedDocument(exported))}
-                onOpen={() => void openFile()}
-                onPlan={requestPlan}
-                onSave={() => void saveFile()}
-                onTextChange={setManifestText}
-                planning={planning}
-                text={manifestText}
-                unsaved={unsaved}
-                validation={validation}
-              />
-            </SectionBoundary>
-            <OutputPanel
-              applyRequested={applyRequested}
-              entries={history}
-              expanded={outputExpanded}
-              onExpandedChange={setOutputExpanded}
-              onSelect={setSelectedId}
-              onShowUnchangedChange={setShowUnchanged}
-              preparing={planning && selectedId === undefined}
-              runs={runs}
-              showUnchanged={showUnchanged}
-              view={outputView}
-            />
-          </div>
-        </Container>
-      </Box>
-      {DIRECTORY_KINDS.map((kind) => (
-        <DirectoryPane
-          directory={directories[kind]}
-          key={`${kind}:${connectionKey}`}
-          kind={kind}
-          onClose={() => setPaneRecord(undefined)}
-          onReload={start(directories[kind].load)}
-          open={pane === kind}
+    <div className="workbench">
+      <TitleBar
+        account={
+          <AccountMenu
+            connection={session.connection}
+            domain={session.domain}
+            icons={icons}
+            locked={running}
+            onDisconnect={disconnect}
+            onSwitch={openSwitch}
+          />
+        }
+        apply={{ blocker: applyBlocker(applyContext), onClick: applyPlan }}
+        onImport={() => setImportOpen(true)}
+        onOpen={() => void openFile()}
+        onSave={() => void saveFile()}
+        onShowOutput={() => showPanel("output")}
+        outdated={latestOutdated}
+        plan={{ blocker: planBlocker, onClick: requestPlan }}
+      />
+      <div className="workbench-body">
+        <ActivityBar
+          active={sidebar}
+          missingValues={missingValues}
+          onToggle={toggleSidebar}
+          showEnvironment={variables.length > 0}
         />
-      ))}
+        {DIRECTORY_KINDS.map((kind) => (
+          <DirectoryPane
+            directory={directories[kind]}
+            key={`${kind}:${connectionKey}`}
+            kind={kind}
+            onClose={() => setSidebarRecord(undefined)}
+            onReload={start(directories[kind].load)}
+            open={sidebar === kind}
+          />
+        ))}
+        {variables.length === 0 ? null : (
+          <EnvironmentPane
+            focusRequest={environmentFocus}
+            onClose={() => setSidebarRecord(undefined)}
+            open={sidebar === "env"}
+            variables={variables}
+          />
+        )}
+        <div className="center">
+          <SectionBoundary>
+            <ManifestPane
+              author={session.connection.user}
+              documentName={name}
+              fileFailure={fileFailure}
+              jump={jump}
+              notes={notes}
+              onCursorChange={setCursor}
+              onDismissFailure={() => setFileFailure(undefined)}
+              onDismissNotes={() => setDismissedNotes(manifestDocument.notes)}
+              onFileDropped={(dropped, text) => openDocument(openedFile(dropped, text))}
+              onImport={() => setImportOpen(true)}
+              onOpen={() => void openFile()}
+              onTextChange={setManifestText}
+              space={session.domain}
+              text={manifestText}
+              unsaved={unsaved}
+              untitled={manifestDocument.name === undefined}
+            />
+          </SectionBoundary>
+          <Panel
+            errors={errors}
+            onTab={selectTab}
+            onToggle={togglePanel}
+            open={panel.open}
+            outputState={outputState}
+            tab={panel.tab}
+            warnings={warnings}
+          >
+            {panel.tab === "problems" ? (
+              <ProblemList diagnostics={diagnostics} documentName={name} onSelect={jumpTo} />
+            ) : (
+              <OutputPanel
+                applyRequested={applyRequested}
+                entries={history}
+                onApplyFollowed={() => setApplyRequested(undefined)}
+                onPlanAgain={requestPlan}
+                onSelect={setSelectedId}
+                onShowUnchangedChange={setShowUnchanged}
+                planKey={planKey}
+                preparing={planning && selectedId === undefined}
+                runs={runs}
+                showUnchanged={showUnchanged}
+                view={outputView}
+              />
+            )}
+          </Panel>
+        </div>
+      </div>
+      <StatusBar
+        cursor={cursor}
+        domain={session.domain}
+        errors={errors}
+        latest={latest}
+        missingValues={missingValues}
+        onEnvironment={() => openSidebar("env")}
+        onOutput={() => showPanel("output")}
+        onProblems={() => showPanel("problems")}
+        planning={planning}
+        rateLimit={session.connection.updateRateLimit}
+        schemaVersion={__SCHEMA_VERSION__}
+        warnings={warnings}
+      />
       <DiscardDialog
-        current={documentName(manifestDocument)}
+        current={name}
         onCancel={() => setReplacement(undefined)}
         onDiscard={() => {
           if (replacement !== undefined) {
@@ -430,6 +610,7 @@ export const App = () => {
       />
       <ConnectDialog
         connecting={connectionControl.connecting}
+        current={session.domain}
         diagnostics={attempt?.diagnostics ?? []}
         failure={attempt?.failure}
         hasApiKey={revisions.hasApiKey}
@@ -438,6 +619,13 @@ export const App = () => {
         onConnect={(domain) => connectionControl.connectTo(domain, formId)}
         open={switching}
       />
-    </Theme>
+      <ImportDialog
+        key={connectionKey}
+        onImport={(projectKey) => prepareExport(projectKey, transport.get)}
+        onImported={(exported) => openDocument(importedDocument(exported))}
+        onOpenChange={setImportOpen}
+        open={importOpen}
+      />
+    </div>
   );
 };

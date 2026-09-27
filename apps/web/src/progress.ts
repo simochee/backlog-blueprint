@@ -9,10 +9,14 @@ import {
 
 type Started = { index: number; total: number; action: Action };
 
+export type ProgressMark = "done" | "failed" | "waiting";
+
+export type ProgressEntry = { text: string; mark: ProgressMark };
+
 export type ApplyProgress = {
   total: number;
   completed: number;
-  lines: string[];
+  lines: ProgressEntry[];
   applied: Action[];
   started?: Started;
   failure?: { status?: number; errors: { message: string }[] };
@@ -22,6 +26,7 @@ export type ApplyProgress = {
 export const idleProgress: ApplyProgress = { total: 0, completed: 0, lines: [], applied: [] };
 
 export type ApplyRun = {
+  startedAt: number;
   progress: ApplyProgress;
   resolutions?: ResolutionTable;
   projectKey: string;
@@ -42,7 +47,13 @@ const withLine = (state: ApplyProgress, event: ExecutionEvent): ApplyProgress =>
 
   return {
     ...state,
-    lines: [...state.lines, renderProgress({ ...state.started, outcome }, { color: false })],
+    lines: [
+      ...state.lines,
+      {
+        text: renderProgress({ ...state.started, outcome }, { color: false }),
+        mark: typeof outcome === "string" ? outcome : "waiting",
+      },
+    ],
   };
 };
 

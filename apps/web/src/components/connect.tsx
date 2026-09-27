@@ -1,18 +1,8 @@
 import { renderHttpFailure, type Diagnostic } from "@backlog-blueprint/core";
-import { ExternalLinkIcon } from "@radix-ui/react-icons";
-import {
-  Button,
-  Card,
-  Dialog,
-  Flex,
-  Heading,
-  Link,
-  Spinner,
-  Text,
-  TextField,
-} from "@radix-ui/themes";
+import { Dialog } from "radix-ui";
 import { useEffect, useState } from "react";
 
+import { LOGO_LOCKUP } from "../logos";
 import { setApiKey } from "../secrets";
 import { apiKeyPageUrl } from "../space";
 import { DiagnosticList } from "./diagnostics";
@@ -24,8 +14,9 @@ type ConnectFormProps = {
   onConnect: (space: string) => void;
   diagnostics: Diagnostic[];
   failure?: unknown;
-  submitLabel?: string;
 };
+
+type FormLayout = { layout: "card" } | { layout: "modal"; current: string };
 
 const ConnectForm = ({
   initialSpace,
@@ -34,11 +25,13 @@ const ConnectForm = ({
   onConnect,
   diagnostics,
   failure,
-  submitLabel = "Connect",
-}: ConnectFormProps) => {
+  ...layout
+}: ConnectFormProps & FormLayout) => {
   const [space, setSpace] = useState(initialSpace);
   const apiKeyPage = apiKeyPageUrl(space);
-  const canConnect = space.trim() !== "" && hasApiKey && !connecting;
+  const filled = space.trim() !== "" && hasApiKey;
+  const canConnect = filled && !connecting;
+  const prefix = layout.layout === "card" ? "" : "switch-";
 
   // 開いた時点で API キーの下書きを空にする。欄は非制御で初期値を持てない（§2.4）ので、
   // 前に打った値が secrets.ts に残っていると、空に見える欄のまま Connect が押せる。
@@ -46,8 +39,24 @@ const ConnectForm = ({
     setApiKey("");
   }, []);
 
+  const submit = (
+    <button
+      className={layout.layout === "card" ? "button connect-submit" : "button"}
+      data-busy={connecting}
+      data-size={layout.layout === "card" ? undefined : "modal"}
+      data-variant="primary"
+      disabled={!canConnect}
+      title={filled || connecting ? undefined : "Enter a space domain and an API key"}
+      type="submit"
+    >
+      {connecting ? <span aria-hidden className="spinner" /> : null}
+      {connecting ? "Connecting..." : "Connect"}
+    </button>
+  );
+
   return (
     <form
+      className={layout.layout === "card" ? "connect-card" : undefined}
       onSubmit={(event) => {
         event.preventDefault();
 
@@ -56,89 +65,135 @@ const ConnectForm = ({
         }
       }}
     >
-      <Flex direction="column" gap="4">
-        <Flex direction="column" gap="1">
-          <Text as="label" htmlFor="space-domain" size="2" weight="medium">
+      <div className={layout.layout === "card" ? "contents" : "modal-body"}>
+        {layout.layout === "card" ? (
+          <div className="card-heading">
+            <h1 id="connect-heading">Connect a space</h1>
+            <span aria-hidden>BB-001</span>
+          </div>
+        ) : null}
+        <div className="field">
+          <label className="field-label" htmlFor={`${prefix}space-domain`}>
             Space domain
-          </Text>
-          <TextField.Root
+          </label>
+          <input
+            aria-invalid={failure !== undefined}
             autoFocus
-            id="space-domain"
+            className="input"
+            disabled={connecting}
+            id={`${prefix}space-domain`}
             onChange={(event) => setSpace(event.target.value)}
             placeholder="example.backlog.com"
-            size="3"
             spellCheck={false}
             value={space}
           />
           {apiKeyPage === undefined ? null : (
-            <Text size="1">
-              <Link href={apiKeyPage} rel="noreferrer" target="_blank">
-                Get an API key on {space.trim()} <ExternalLinkIcon aria-hidden />
-              </Link>
-            </Text>
+            <a className="api-key-link" href={apiKeyPage} rel="noreferrer" target="_blank">
+              Get an API key on {space.trim()} ↗
+            </a>
           )}
-        </Flex>
-        <Flex direction="column" gap="1">
-          <Text as="label" htmlFor="api-key" size="2" weight="medium">
+        </div>
+        <div className="field">
+          <label className="field-label" htmlFor={`${prefix}api-key`}>
             API key
-          </Text>
-          <TextField.Root
+          </label>
+          <input
+            aria-invalid={diagnostics.length > 0}
             autoComplete="off"
-            id="api-key"
+            className="input"
+            disabled={connecting}
+            id={`${prefix}api-key`}
             onChange={(event) => setApiKey(event.target.value)}
-            size="3"
+            placeholder="Paste your API key"
             type="password"
           />
-        </Flex>
+        </div>
         <DiagnosticList diagnostics={diagnostics} />
         {failure === undefined ? null : (
-          <pre className="mono">{renderHttpFailure(failure, { color: false })}</pre>
+          <p className="failure mono">{renderHttpFailure(failure, { color: false })}</p>
         )}
-        <Button disabled={!canConnect} loading={connecting} size="3" type="submit">
-          {submitLabel}
-        </Button>
-      </Flex>
+        {layout.layout === "card" ? (
+          <>
+            {submit}
+            <p className="note">
+              The API key is kept in this tab only. Closing the tab or disconnecting erases it.
+            </p>
+          </>
+        ) : (
+          <p className="note">
+            You stay connected to {layout.current} until the new connection succeeds. The API key is
+            kept in this tab only.
+          </p>
+        )}
+      </div>
+      {layout.layout === "modal" ? (
+        <div className="modal-footer">
+          <Dialog.Close asChild>
+            <button className="button" data-size="modal" type="button">
+              Cancel
+            </button>
+          </Dialog.Close>
+          {submit}
+        </div>
+      ) : null}
     </form>
   );
 };
 
 type ConnectScreenProps = ConnectFormProps & { reconnectingTo?: string };
 
-export const ConnectScreen = ({ reconnectingTo, ...form }: ConnectScreenProps) => (
-  <Flex align="center" className="connect-screen" justify="center" px="4">
-    <Card size="4" style={{ width: "100%", maxWidth: "28rem" }}>
-      {reconnectingTo === undefined ? (
-        <Flex direction="column" gap="5">
-          <Flex direction="column" gap="2">
-            <Heading as="h1" size="6">
-              Connect to Backlog
-            </Heading>
-            <Text color="gray" size="2">
-              Use your Backlog API key. Creating a project, changing its statuses and granting the
-              project administrator role need a Space Administrator. The key stays in this tab and
-              is removed when you close it or disconnect.
-            </Text>
-          </Flex>
-          <ConnectForm {...form} />
-        </Flex>
-      ) : (
-        <Flex align="center" direction="column" gap="3" py="4">
-          <Spinner size="3" />
-          <Text color="gray" size="2">
-            Reconnecting to {reconnectingTo}...
-          </Text>
-        </Flex>
-      )}
-    </Card>
-  </Flex>
+const Dimension = () => (
+  <div aria-hidden className="dimension">
+    <span className="dimension-arm">
+      <span className="dimension-tick" />
+      <span className="dimension-arrow" data-direction="left" />
+      <span className="dimension-line" />
+    </span>
+    <span>MANIFEST → PROJECT</span>
+    <span className="dimension-arm">
+      <span className="dimension-line" />
+      <span className="dimension-arrow" data-direction="right" />
+      <span className="dimension-tick" />
+    </span>
+  </div>
 );
 
-type ConnectDialogProps = Omit<ConnectFormProps, "submitLabel"> & {
+export const ConnectScreen = ({ reconnectingTo, ...form }: ConnectScreenProps) => (
+  <main className="connect">
+    {["top-left", "top-right", "bottom-left", "bottom-right"].map((corner) => (
+      <span aria-hidden className="corner" data-corner={corner} key={corner} />
+    ))}
+    <span aria-hidden className="sheet-number">
+      SHEET 01 · CONNECT
+    </span>
+    <div className="connect-stack">
+      <div className="connect-logo">
+        <img alt="Backlog Blueprint" src={LOGO_LOCKUP} />
+        <Dimension />
+      </div>
+      {reconnectingTo === undefined ? (
+        <section aria-labelledby="connect-heading">
+          <ConnectForm {...form} layout="card" />
+        </section>
+      ) : (
+        <div className="connect-card">
+          <p className="reconnecting" role="status">
+            <span aria-hidden className="spinner" />
+            Reconnecting to {reconnectingTo}...
+          </p>
+        </div>
+      )}
+    </div>
+  </main>
+);
+
+type ConnectDialogProps = ConnectFormProps & {
   open: boolean;
+  current: string;
   onClose: () => void;
 };
 
-export const ConnectDialog = ({ open, onClose, ...form }: ConnectDialogProps) => (
+export const ConnectDialog = ({ open, current, onClose, ...form }: ConnectDialogProps) => (
   <Dialog.Root
     onOpenChange={(next) => {
       if (!next) {
@@ -147,12 +202,20 @@ export const ConnectDialog = ({ open, onClose, ...form }: ConnectDialogProps) =>
     }}
     open={open}
   >
-    <Dialog.Content maxWidth="28rem" size="3">
-      <Dialog.Title size="4">Switch connection</Dialog.Title>
-      <Dialog.Description color="gray" mb="4" size="2">
-        The current connection stays until the new one is confirmed.
-      </Dialog.Description>
-      <ConnectForm {...form} submitLabel="Switch" />
-    </Dialog.Content>
+    <Dialog.Portal>
+      <Dialog.Overlay className="scrim" />
+      <Dialog.Content aria-describedby={undefined} className="modal">
+        <div className="modal-header">
+          <Dialog.Title className="modal-title">Switch connection</Dialog.Title>
+          <span className="modal-sheet">{current.split(".")[0]} → ?</span>
+          <Dialog.Close asChild>
+            <button aria-label="Close" className="close-button" type="button">
+              ×
+            </button>
+          </Dialog.Close>
+        </div>
+        <ConnectForm {...form} current={current} layout="modal" />
+      </Dialog.Content>
+    </Dialog.Portal>
   </Dialog.Root>
 );

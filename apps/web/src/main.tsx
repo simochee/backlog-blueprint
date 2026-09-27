@@ -1,6 +1,5 @@
-/** 並べ替えない。読む順がそのまま優先順で、逆にすると計画の桁が Radix 側の指定で崩れる */
-import "@radix-ui/themes/styles.css";
-import "./catppuccin.css";
+import "@fontsource/jetbrains-mono/latin-400.css";
+import "@fontsource/jetbrains-mono/latin-700.css";
 import "./styles.css";
 
 import { StrictMode } from "react";

@@ -48,6 +48,13 @@ describe("計画の行をバッジに置き換える", () => {
     expect(`${symbol} ${text}`).toBe(actionLine(created, "plan", PLAIN));
   });
 
+  it("行は種類の列とその後ろに分かれ、種類の列の空白は落とす", () => {
+    const { label, detail } = badgedAction(created);
+
+    expect(label).toBe("status");
+    expect(detail).toBe('"レビュー中"');
+  });
+
   it("操作の種類はバッジの見た目に渡す", () => {
     expect(badgedAction(created).style).toBe("create");
   });
@@ -74,6 +81,13 @@ describe("診断に行番号を添えて並べる", () => {
 
     expect(summary).toBe("1 validation error.");
     expect(blocks[0]?.text.startsWith("ERROR")).toBe(true);
+  });
+
+  it("本文は core の文面から先頭の重大度と ID を外したもので、ID は別に持つ", () => {
+    const [block] = diagnosticView([diagnostic()]).blocks;
+
+    expect(block?.diagnostic.id).toBe("V-A15");
+    expect(block?.message).toBe("categories: resulting order differs from manifest");
   });
 
   it("警告だけのときは件数の要約が出ない", () => {

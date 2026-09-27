@@ -54,7 +54,14 @@ describe("貼り付けられたマニフェストをブラウザの中で検証�
   it("入力欄を作るべき名前を返す", () => {
     const result = validateInBrowser({ text: MANIFEST, valueOf: entered({}) });
 
-    expect(result.names).toStrictEqual(["SLACK_WEBHOOK_URL"]);
+    expect(result.variables.map(({ name }) => name)).toStrictEqual(["SLACK_WEBHOOK_URL"]);
+  });
+
+  it("名前ごとに最初に書かれた行と、値がまだ無いかを返す", () => {
+    const text = `${MANIFEST}categories:\n  - name: \${SLACK_WEBHOOK_URL}\n`;
+    const result = validateInBrowser({ text, valueOf: entered({}) });
+
+    expect(result.variables).toStrictEqual([{ name: "SLACK_WEBHOOK_URL", line: 8, missing: true }]);
   });
 
   it("Yaml が壊れていれば構文の誤りを位置付きで出す", () => {

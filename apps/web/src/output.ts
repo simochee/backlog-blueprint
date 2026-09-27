@@ -31,43 +31,99 @@ export type ApplyContext = {
 };
 
 /**
- * 押せるかどうかを state に持たない。持てば条件が外れる経路ごとに倒す処理が要り、
- * 1つ漏れれば古い計画を適用できる（WU-3）。
+ * 押せない理由を押せるかどうかと別の関数に書かない。条件が2か所に分かれると、片方だけ
+ * 書き足したときに「押せないのに理由が出ない」か「理由が出るのに押せる」になる（WU-52）。
  */
-export const applicableEntry = ({
+export const applyBlocker = ({
   history,
   runs,
   planKey,
   pending,
-}: ApplyContext): OutputEntry | undefined => {
+}: ApplyContext): string | undefined => {
   const latest = history.at(-1);
-  const prepared = latest?.attempt.prepared;
 
-  if (latest === undefined || prepared === undefined || pending) {
-    return undefined;
+  if (Object.values(runs).some(isRunning)) {
+    return "Apply is running";
   }
 
-  if (Object.values(runs).some(isRunning) || runs[latest.id] !== undefined) {
-    return undefined;
+  if (pending) {
+    return "Plan is running";
   }
 
-  if (isOutdated(latest, planKey) || !summarize(prepared.plan.actions).hasChanges) {
-    return undefined;
+  if (latest === undefined) {
+    return "Run Plan first";
   }
 
-  return latest;
+  if (runs[latest.id] !== undefined) {
+    return "This plan is already applied";
+  }
+
+  const { prepared } = latest.attempt;
+
+  if (prepared === undefined) {
+    return "The plan stopped. Fix the problems and run Plan again.";
+  }
+
+  if (isOutdated(latest, planKey)) {
+    return "The plan is outdated. Run Plan again.";
+  }
+
+  return summarize(prepared.plan.actions).hasChanges ? undefined : "The plan has no changes";
 };
 
-const runStatus = (run: ApplyRun | undefined): string | undefined => {
-  if (run === undefined) {
-    return undefined;
+/**
+ * 押せるかどうかを state に持たない。持てば条件が外れる経路ごとに倒す処理が要り、
+ * 1つ漏れれば古い計画を適用できる（WU-3）。
+ */
+export const applicableEntry = (context: ApplyContext): OutputEntry | undefined =>
+  applyBlocker(context) === undefined ? context.history.at(-1) : undefined;
+
+export type Tone = "add" | "change" | "destroy" | "refresh" | "weak";
+
+export type EntryState = {
+  label: string;
+  chip: string;
+  tone: Tone;
+  filled: boolean;
+};
+
+export const PLANNING: EntryState = {
+  label: "Planning",
+  chip: "Planning",
+  tone: "weak",
+  filled: false,
+};
+
+/** 塗りを増やさない。塗るのはやり直しが要るものだけで、増やすとどれに手を打つかが読めなくなる（WU-53） */
+export const entryState = (
+  entry: OutputEntry,
+  run: ApplyRun | undefined,
+  outdated: boolean,
+): EntryState => {
+  if (run !== undefined) {
+    const { completed, total, outcome } = run.progress;
+
+    if (isRunning(run)) {
+      return {
+        label: "Applying",
+        chip: `Applying ${completed}/${total}`,
+        tone: "refresh",
+        filled: false,
+      };
+    }
+
+    return outcome?.result === "succeeded"
+      ? { label: "Applied", chip: "Applied", tone: "add", filled: false }
+      : { label: "Apply aborted", chip: "Aborted", tone: "destroy", filled: true };
   }
 
-  if (isRunning(run)) {
-    return "Applying";
+  if (entry.attempt.prepared === undefined) {
+    return { label: "Plan stopped", chip: "Stopped", tone: "destroy", filled: true };
   }
 
-  return run.progress.outcome?.result === "succeeded" ? "Applied" : "Aborted";
+  return outdated
+    ? { label: "Planned", chip: "Outdated", tone: "change", filled: true }
+    : { label: "Planned", chip: "Planned", tone: "add", filled: false };
 };
 
 /**
@@ -80,8 +136,10 @@ const TIME = new Intl.DateTimeFormat("en-GB", {
   second: "2-digit",
 });
 
-export const entryLabel = ({ startedAt, projectKey }: OutputEntry, run?: ApplyRun): string =>
-  [TIME.format(startedAt), projectKey, runStatus(run)].filter(Boolean).join(" · ");
+export const formatTime = (time: number): string => TIME.format(time);
+
+export const entryLabel = (entry: OutputEntry, run?: ApplyRun): string =>
+  [formatTime(entry.startedAt), entry.projectKey, entryState(entry, run, false).label].join(" · ");
 
 export type Section = "plan" | "apply";
 

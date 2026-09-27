@@ -4,7 +4,9 @@ import { describe, expect, it } from "vitest";
 import {
   appendEntry,
   applicableEntry,
+  applyBlocker,
   entryLabel,
+  entryState,
   isOutdated,
   sectionAt,
   type ApplyContext,
@@ -52,6 +54,7 @@ const context = (history: OutputEntry[], overrides: Partial<ApplyContext> = {}):
 });
 
 const runWith = (progress: ApplyProgress): ApplyRun => ({
+  startedAt: 0,
   progress,
   projectKey: "PROJ_A",
   space: "example.backlog.com",
@@ -64,10 +67,16 @@ describe("Output の履歴", () => {
     expect(historyOf(entry(), entry()).map(({ id }) => id)).toStrictEqual([1, 2]);
   });
 
-  it("見出しは時刻を 24 時間表記で出し、プロジェクトキーを並べる", () => {
+  it("見出しは時刻を 24 時間表記で出し、プロジェクトキーと状態を並べる", () => {
     const [first] = historyOf(entry());
 
-    expect(first === undefined ? "" : entryLabel(first)).toBe("14:02:31 · PROJ_A");
+    expect(first === undefined ? "" : entryLabel(first)).toBe("14:02:31 · PROJ_A · Planned");
+  });
+
+  it("計画が止まった項目の見出しは Plan stopped を名乗る", () => {
+    const [first] = historyOf(entry({ attempt: { diagnostics: [] } }));
+
+    expect(first === undefined ? "" : entryLabel(first)).toBe("14:02:31 · PROJ_A · Plan stopped");
   });
 
   it("適用した項目の見出しには、適用の結末が付く", () => {
@@ -133,6 +142,78 @@ describe("Apply できる計画", () => {
 
   it("計画がまだ無ければ Apply できない", () => {
     expect(applicableEntry(context([]))).toBeUndefined();
+  });
+});
+
+describe("項目の状態の印", () => {
+  const [first] = historyOf(entry());
+  const aborted = runWith({
+    ...idleProgress,
+    outcome: {
+      result: "aborted",
+      applied: [],
+      failed: { action: action("create"), errors: [] },
+      pending: [],
+    },
+  });
+
+  it("塗るのはやり直しが要る Outdated・Stopped・Aborted だけ", () => {
+    const [stopped] = historyOf(entry({ attempt: { diagnostics: [] } }));
+
+    expect(first && entryState(first, undefined, true)).toMatchObject({
+      chip: "Outdated",
+      filled: true,
+    });
+    expect(stopped && entryState(stopped, undefined, false)).toMatchObject({
+      chip: "Stopped",
+      filled: true,
+    });
+    expect(first && entryState(first, aborted, false)).toMatchObject({
+      chip: "Aborted",
+      filled: true,
+    });
+    expect(first && entryState(first, undefined, false)).toMatchObject({
+      chip: "Planned",
+      filled: false,
+    });
+    expect(first && entryState(first, succeeded, false)).toMatchObject({
+      chip: "Applied",
+      filled: false,
+    });
+  });
+
+  it("適用している最中は、済んだ件数と全体の件数を出す", () => {
+    const running = runWith({ ...idleProgress, total: 12, completed: 8 });
+
+    expect(first && entryState(first, running, false).chip).toBe("Applying 8/12");
+  });
+});
+
+describe("Apply できない理由", () => {
+  it("計画がまだ無ければ、まず Plan を促す", () => {
+    expect(applyBlocker(context([]))).toBe("Run Plan first");
+  });
+
+  it("入力が変わっていれば、Plan をやり直すよう促す", () => {
+    expect(applyBlocker(context(historyOf(entry()), { planKey: "edited" }))).toBe(
+      "The plan is outdated. Run Plan again.",
+    );
+  });
+
+  it("適用した計画には、もう適用したと言う", () => {
+    expect(applyBlocker(context(historyOf(entry()), { runs: { 1: succeeded } }))).toBe(
+      "This plan is already applied",
+    );
+  });
+
+  it("適用している最中は、それを理由にする", () => {
+    expect(
+      applyBlocker(context(historyOf(entry(), entry()), { runs: { 1: runWith(idleProgress) } })),
+    ).toBe("Apply is running");
+  });
+
+  it("Apply できるときは理由が無い", () => {
+    expect(applyBlocker(context(historyOf(entry())))).toBeUndefined();
   });
 });
 

@@ -52,6 +52,29 @@ export const referencedNames = (references: EnvironmentReference[]): string[] =>
   ...new Set(references.map(({ name }) => name)),
 ];
 
+export type EnvironmentVariable = { name: string; line: number; missing: boolean };
+
+/** 行は名前ごとに最初に書かれた位置だけを出す。欄は名前ごとに1つで、行を全部並べる場所が無い */
+export const environmentVariables = (
+  references: EnvironmentReference[],
+  source: SourceMap,
+  isEntered: (name: string) => boolean,
+): EnvironmentVariable[] => {
+  const firstPaths = new Map<string, string>();
+
+  for (const { name, path } of references) {
+    if (!firstPaths.has(name)) {
+      firstPaths.set(name, path);
+    }
+  }
+
+  return [...firstPaths].map(([name, path]) => ({
+    name,
+    line: source.positionAt(path).line,
+    missing: !isEntered(name),
+  }));
+};
+
 /** core の「環境変数が未定義」を出さない。ブラウザに環境変数は無く、正しくない説明になる（V-A4） */
 export const missingValueDiagnostics = (
   references: EnvironmentReference[],
