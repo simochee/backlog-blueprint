@@ -1,4 +1,4 @@
-# backlog-blueprint
+# ![backlog-blueprint](https://raw.githubusercontent.com/simochee/backlog-blueprint/main/packages/brand/out/eyecatch.png)
 
 Declare the settings of a [Backlog](https://backlog.com/) project in a YAML file, and create the
 project from it. The manifest lives in your repository, so the shape of a project can be reviewed in
