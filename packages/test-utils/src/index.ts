@@ -1,10 +1,3 @@
-/**
- * `packages/core` のテストはこのファイルを相対 path で読む。core の
- * devDependencies に `@backlog-blueprint/test-utils` を足すと、test-utils → core の
- * 依存と合わせてワークスペースの循環になり、turbo が
- * `Cyclic dependency detected` でタスクを組めなくなる（実測）。
- * 相対 import はその循環を作らないための形であって、書き忘れではない。
- */
 import {
   DEFAULT_STATUSES_JA,
   normalizeManifest,
@@ -28,10 +21,6 @@ export const fixedSnapshot = (overrides: Partial<Snapshot> = {}): Snapshot => ({
 
 const HTTP_FAILURE = Symbol("HttpFailure");
 
-/**
- * `get` は 404 でも `HttpFailure` を投げる（§7.0）。応答の表に書けるのは値だけなので、
- * 投げてほしい失敗であることを印で表す。
- */
 export const httpFailure = (failure: HttpFailure): unknown => ({ [HTTP_FAILURE]: failure });
 
 const thrownFailure = (response: unknown): HttpFailure | undefined =>
@@ -40,8 +29,7 @@ const thrownFailure = (response: unknown): HttpFailure | undefined =>
     : undefined;
 
 /**
- * 表に無い path を `undefined` で返さない。返すとリソースの取得を書き忘れた実装が
- * テストを通ってしまい、固定値で組み立てる（B-3）意味が消える。
+ * 表に無い path を `undefined` で返さない。取得を書き忘れた実装がテストを通ってしまう。
  */
 export const fixedGet =
   (responses: Record<string, unknown>): ReadContext["get"] =>
@@ -56,12 +44,8 @@ export const fixedGet =
     return failure === undefined ? Promise.resolve(response) : Promise.reject(failure);
   };
 
-export type RecordingGet = { get: ReadContext["get"]; requested: string[] };
+type RecordingGet = { get: ReadContext["get"]; requested: string[] };
 
-/**
- * どこまで取得したかを残す。S5 が「権限が無ければスナップショットの取得を始めない」
- * ステージである以上、出た指摘だけでは中断の効き目を書き表せない。
- */
 export const recordingGet = (responses: Record<string, unknown>): RecordingGet => {
   const requested: string[] = [];
   const get = fixedGet(responses);
@@ -91,7 +75,7 @@ export const fixedResourceSnapshots = (
   ...overrides,
 });
 
-export const EXPORTABLE_WEBHOOK_URL = "https://hooks.example.test/T000/B000";
+const EXPORTABLE_WEBHOOK_URL = "https://hooks.example.test/T000/B000";
 
 const EXPORTABLE_ISSUE_TYPES = [
   { id: 11, name: "タスク", color: "#7ea800" },
@@ -102,8 +86,8 @@ const EXPORTABLE_ISSUE_TYPES = [
 const REVIEWING_STATUS = { id: 5, name: "レビュー中", color: "#3b9dbd" };
 
 /**
- * 既定ステータスを書き写さずに `DEFAULT_STATUSES_JA` へ差し込む。色は実測値であり、
- * 写しを持つと実測が直ったときに、この fixture だけが古い色のまま往復を主張する。
+ * 既定ステータスを書き写さない。写しを持つと実測の色が直ったときに、この fixture だけが
+ * 古い色のまま往復を主張する。
  */
 const exportableStatuses = () =>
   DEFAULT_STATUSES_JA.flatMap((status) =>
@@ -111,9 +95,8 @@ const exportableStatuses = () =>
   );
 
 /**
- * `fixedResourceSnapshots` の既定は空に寄せてあり、1つだけ差し替える plan の
- * テストのための形である。往復（EX-18）はどのリソースも埋まった姿から始めたいので、
- * 受け入れ（`apps/cli` の `MANIFEST`）を適用し終えた実状を別の関数として持つ。
+ * `fixedResourceSnapshots` の既定を埋めた姿に変えない。あちらは1つだけ差し替える plan の
+ * テストのために空へ寄せてあり、往復（EX-18）はどのリソースも埋まった姿から始めたい。
  */
 export const exportableResourceSnapshots = (
   overrides: Partial<ResourceSnapshots> = {},
@@ -131,11 +114,8 @@ export const exportableResourceSnapshots = (
     { id: 61, name: "フロントエンド" },
     { id: 62, name: "バックエンド" },
   ],
-  /**
-   * 日付を API の返す時刻付きの形で持たない。`read()` が取り込みの時点で Y-1 の
-   * `yyyy-MM-dd` に切り詰めるので、スナップショットに時刻が残ることは無い。
-   * 時刻付きで置くと、reconciler が毎回 update を出す往復しない fixture になる。
-   */
+  // 日付を API の返す時刻付きで持たない。`read()` が Y-1 の形に切り詰めるので実際には残らず、
+  // 置くと reconciler が毎回 update を出す往復しない fixture になる。
   milestones: [
     {
       id: 51,
@@ -186,11 +166,6 @@ export const exportableResourceSnapshots = (
   ...overrides,
 });
 
-/**
- * フェーズ0と各 reconciler の `read()` が叩く GET（§4.1）を、課題0件の既存
- * プロジェクトの形でひととおり持つ。1つの取得だけを差し替えるテストが、
- * 残り全部を書き写さずに済むようにする。
- */
 export const fixedSpaceResponses = (
   overrides: Record<string, unknown> = {},
 ): Record<string, unknown> => ({
@@ -213,7 +188,7 @@ export const fixedSpaceResponses = (
   ...overrides,
 });
 
-export type RecordingSend = {
+type RecordingSend = {
   send: ExecuteContext["send"];
   sent: ResolvedHttpRequest[];
 };
@@ -253,21 +228,4 @@ export const fixedPlanContext = (overrides: Partial<PlanContext> = {}): PlanCont
 });
 
 export { mockBacklog, withoutWritePacing } from "./mock-backlog";
-export type {
-  MockBacklog,
-  MockBacklogOptions,
-  MockCategory,
-  MockCustomField,
-  MockFailure,
-  MockFetch,
-  MockIssueType,
-  MockMethod,
-  MockMilestone,
-  MockProject,
-  MockProjectInput,
-  MockRequest,
-  MockStatus,
-  MockTeam,
-  MockUser,
-  MockWebhook,
-} from "./mock-backlog";
+export type { MockBacklog, MockBacklogOptions } from "./mock-backlog";

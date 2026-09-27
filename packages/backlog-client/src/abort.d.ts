@@ -1,11 +1,7 @@
 /**
- * core の `fetch.d.ts` が写す面に足すのは、X-5 の打ち切りに要る2つだけにする。
- * `lib` に `DOM` を足す案と `@types/node` を読む案は、core と同じ理由で採らない。
- * このパッケージもブラウザで動くので、どちらも Node とブラウザの両方にあるものに限る。
- * `clearTimeout` が無いと、応答が間に合ったリクエストの待ちが残り、CLI が
- * 最後の応答から上限の時間だけ終了しなくなる。
+ * core の `fetch.d.ts` の面に足すのは X-5 の打ち切りに要るものだけにする。`lib` に `DOM` を
+ * 足す案と `@types/node` を読む案は、core と同じ理由（NFR-5）で採らない。
  */
-
 interface AbortController {
   readonly signal: AbortSignal;
   abort(): void;

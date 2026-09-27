@@ -49,10 +49,7 @@ const capturingIo = (text: string): Capture => {
   return io;
 };
 
-/**
- * 実 API を叩かない（開発上の禁止事項）。`fetch` そのものを差し替えることで、
- * 送信層の URL 組み立てとクエリの符号化まで含めて経路を通す。
- */
+/** 送信層ではなく `fetch` を差し替える。URL の組み立てと符号化まで経路に含めるため */
 const routingFetch = (responses: Record<string, unknown>) => {
   const requested: string[] = [];
 
@@ -205,7 +202,6 @@ describe("plan を端から端まで", () => {
   });
 });
 
-/** 指定したリクエストにだけ、接続したまま何も返さない */
 const stallingFetch =
   (stalls: (method: string, path: string) => boolean): Fetch =>
   (url, init) => {
@@ -218,7 +214,6 @@ const stallingFetch =
       : routingFetch(fixedSpaceResponses()).fetch(url);
   };
 
-/** 経過を早送りしながら終わりまで走らせる。止まった接続は打ち切られるまで次へ進まない */
 const runToEnd = async (run: Promise<number>): Promise<number> => {
   await vi.runAllTimersAsync();
 

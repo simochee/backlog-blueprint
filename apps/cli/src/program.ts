@@ -21,9 +21,8 @@ import { TOOL } from "./version";
 type RawOptions = Record<string, unknown>;
 
 /**
- * 複数のマニフェストを受け取らない（CL-3）。受け取ると、2つ目のプロジェクトの
- * 途中で失敗したときに「1つ目は適用済み」というプロジェクト境界をまたぐ
- * 部分適用が生まれる。commander の既定は後勝ちなので、明示的に断る。
+ * commander の既定の後勝ちにしない（CL-3）。複数を受け取ると、プロジェクト境界を
+ * またぐ部分適用が生まれる。
  */
 const onlyOnce = () => {
   let given = false;
@@ -41,10 +40,7 @@ const onlyOnce = () => {
   };
 };
 
-/**
- * 3分割する（CL-7）。`export` は位置引数1つを主語に取り、`-f` / `--output` という
- * 修飾子を持たないので、全コマンド共通の接続オプションだけ別に切り出す。
- */
+/** 1つにまとめない。`export` は `-f` と `--output` を持たない（CL-7） */
 const withConnectionOptions = (command: Command): Command =>
   command
     .option("--space <domain>", `Backlog space domain (falls back to ${SPACE_VARIABLE})`)
@@ -65,10 +61,7 @@ const withOutputOption = (command: Command): Command =>
 const withCommonOptions = (command: Command): Command =>
   withOutputOption(withManifestOption(withConnectionOptions(command)));
 
-/**
- * 色は `--no-color` と `NO_COLOR` のどちらでも落ちる。`NO_COLOR` は空でない値が
- * 設定されていることを合図とする取り決めなので、空文字は無視する。
- */
+/** `NO_COLOR` が空文字なら色を落とさない。空でない値を合図とする取り決めである */
 const colorAllowed = (options: RawOptions, io: Io): boolean => {
   const noColor = io.env["NO_COLOR"];
 
@@ -107,8 +100,8 @@ const applyOptions = (options: RawOptions, io: Io): ApplyOptions => ({
 });
 
 /**
- * コマンドの外に例外を出さない。commander の `parseAsync` まで抜けた例外は
- * commander のものと区別が付かず、握りつぶすと原因を出さないまま 1 で終わる。
+ * コマンドの外に例外を出さない。`parseAsync` まで抜けると commander のものと区別が付かず、
+ * 原因を出さないまま 1 で終わる。
  */
 const runCommand = async <T extends ConnectionOptions>(
   options: T,

@@ -1,34 +1,24 @@
 import { DEFAULT_STATUSES_JA } from "@backlog-blueprint/core";
 
-/**
- * `fixedSpaceResponses` と違い、`fetch` そのものを差し替えて更新系にも応答し、
- * 状態を進める。受け入れ基準の AC-1 / AC-2 / AC-7 / AC-8 は「適用したあとに
- * どうなっているか」を問うので、path から値を引くだけの表では書き表せない。
- *
- * 既定リソースの名前・色・ID は Backlog API の実測値（research の
- * 「既定リソースの表示名」「課題種別」）をそのまま写している。
- */
+type MockMethod = "GET" | "POST" | "PATCH" | "DELETE";
 
-export type MockMethod = "GET" | "POST" | "PATCH" | "DELETE";
-
-export type MockRequest = {
+type MockRequest = {
   method: MockMethod;
   path: string;
   params: Record<string, unknown>;
-  /** 符号化されたままの本文。`params` に畳むと `key[]=` と `key[]=""` の区別が消える */
+  /** `params` だけにしない。畳むと `key[]=` と `key[]=""` の区別が消える */
   body: string;
 };
 
-/** `roleType` はスペース全体の権限。1 がスペース管理者（実測。research「権限」） */
-export type MockUser = { id: number; userId: string; roleType: number; name?: string };
+type MockUser = { id: number; userId: string; roleType: number; name?: string };
 
 const SPACE_ADMINISTRATOR_ROLE_TYPE = 1;
 
-export type MockTeam = { id: number; name: string };
+type MockTeam = { id: number; name: string };
 
-export type MockSpaceTeam = MockTeam & { members: MockUser[] };
+type MockSpaceTeam = MockTeam & { members: MockUser[] };
 
-export type MockIssueType = {
+type MockIssueType = {
   id: number;
   name: string;
   color: string;
@@ -36,11 +26,11 @@ export type MockIssueType = {
   templateDescription: string | null;
 };
 
-export type MockStatus = { id: number; name: string; color: string };
+type MockStatus = { id: number; name: string; color: string };
 
-export type MockCategory = { id: number; name: string };
+type MockCategory = { id: number; name: string };
 
-export type MockMilestone = {
+type MockMilestone = {
   id: number;
   name: string;
   description: string | null;
@@ -48,7 +38,7 @@ export type MockMilestone = {
   releaseDueDate: string | null;
 };
 
-export type MockCustomField = {
+type MockCustomField = {
   id: number;
   name: string;
   typeId: number;
@@ -67,7 +57,7 @@ export type MockCustomField = {
   applicableIssueTypes: number[];
 };
 
-export type MockWebhook = {
+type MockWebhook = {
   id: number;
   name: string;
   description: string | null;
@@ -76,7 +66,7 @@ export type MockWebhook = {
   activityTypeIds: number[];
 };
 
-export type MockProject = {
+type MockProject = {
   id: number;
   projectKey: string;
   name: string;
@@ -93,7 +83,7 @@ export type MockProject = {
   administrators: MockUser[];
 };
 
-export type MockProjectInput = {
+type MockProjectInput = {
   key: string;
   name: string;
   issueCount?: number;
@@ -104,8 +94,7 @@ export type MockProjectInput = {
   teams?: string[];
 };
 
-/** 応答の代わりにこの失敗を返す規則。合致した要求は状態を進めない */
-export type MockFailure = {
+type MockFailure = {
   method: MockMethod;
   path: string;
   status?: number;
@@ -116,13 +105,12 @@ export type MockBacklogOptions = {
   executor?: MockUser;
   rateLimit?: { limit: number; remaining: number; reset: number };
   spaceUsers?: MockUser[];
-  /** `id` を省けば採番する。マニフェストはチームを ID で書く（A-6）ので、書く側が知るには明示する */
   spaceTeams?: { id?: number; name: string; members?: string[] }[];
   projects?: MockProjectInput[];
   failures?: MockFailure[];
 };
 
-export type MockResponse = {
+type MockResponse = {
   url: string;
   status: number;
   statusText: string;
@@ -130,22 +118,16 @@ export type MockResponse = {
   json: () => Promise<unknown>;
 };
 
-export type MockFetch = (
-  url: string,
-  init?: { method?: string; body?: string },
-) => Promise<MockResponse>;
+type MockFetch = (url: string, init?: { method?: string; body?: string }) => Promise<MockResponse>;
 
 export type MockBacklog = {
   fetch: MockFetch;
-  /** 送られた要求のすべて。GET と更新系を分けて見るための元 */
   requests: MockRequest[];
   reads: MockRequest[];
-  /** 更新系だけ。`[]` であることが「Backlog は一切変更されていない」の裏取りになる */
   writes: MockRequest[];
   project: (key: string) => MockProject | undefined;
 };
 
-/** 既定の課題種別4件（実測。research「課題種別」） */
 const DEFAULT_ISSUE_TYPES_JA: { name: string; color: string }[] = [
   { name: "タスク", color: "#7ea800" },
   { name: "バグ", color: "#990000" },
@@ -153,14 +135,11 @@ const DEFAULT_ISSUE_TYPES_JA: { name: string; color: string }[] = [
   { name: "その他", color: "#2779ca" },
 ];
 
-/** 既定ステータスは全プロジェクト共通で ID 1〜4 の固定値（実測） */
 const LAST_DEFAULT_STATUS_ID = 4;
 
 /**
- * 実 API は既定ステータスの更新に `No such status`、削除に
- * `Default status cannot be deleted. id: N` を返す（research「ステータス」）。
- * 受け付ける実装にすると、適用順序 §6 フェーズ3の「既定4つには何もしない」を
- * 破る計画でも受け入れが通ってしまう。
+ * 既定ステータスの更新・削除を受け付けない（research「ステータス」）。受け付けると、
+ * 既定4つに手を出す計画でも受け入れが通ってしまう（要件定義 §6 フェーズ3）。
  */
 const isDefaultStatus = ({ id }: MockStatus): boolean => id <= LAST_DEFAULT_STATUS_ID;
 
@@ -180,8 +159,7 @@ const isFailure = (value: unknown): value is Failure =>
   typeof value === "object" && value !== null && "status" in value && "message" in value;
 
 /**
- * `URLSearchParams` を使わない。`packages/test-utils` は基底の tsconfig
- * （`lib: ES2022` / `types: []`）を継承しており、実行環境固有のグローバルは
+ * `URLSearchParams` を使わない。基底の tsconfig（`lib: ES2022` / `types: []`）には
  * 型として存在しない。
  */
 const parseFormBody = (body: string): Record<string, unknown> => {
@@ -232,9 +210,8 @@ const digits = (params: Record<string, unknown>, field: string): number | undefi
 };
 
 /**
- * `key[]=` の1件だけを空配列として読む。送信層は空配列をこの形に変換する
- * （API 制約「空配列を送る方法」）ので、`[""]` のまま扱うと絞りの解除が
- * 「空文字という値が1つ」に化ける。
+ * `key[]=` の1件だけを空配列として読む。送信層は空配列をこの形で送り（API 制約
+ * 「空配列を送る方法」）、`[""]` のまま扱うと絞りの解除が「空文字という値が1つ」に化ける。
  */
 const list = (params: Record<string, unknown>, field: string): string[] | undefined => {
   const value = params[field];
@@ -254,7 +231,7 @@ const list = (params: Record<string, unknown>, field: string): string[] | undefi
 
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 
-/** 日付は `yyyy-MM-ddT00:00:00Z` で返る（実測） */
+/** 送られた日付のまま返さない。実 API は `yyyy-MM-ddT00:00:00Z` で返す */
 const asStoredDate = (value: string | undefined): string | null => {
   if (value === undefined) {
     return null;
@@ -264,9 +241,8 @@ const asStoredDate = (value: string | undefined): string | null => {
 };
 
 /**
- * 本文の値はすべて文字列として届くので、Backlog が返す型に戻す。戻さないと
- * 適用直後の plan で「`true` と `"true"` が違う」という差分が出て、AC-8 が
- * モックの都合で落ちる。
+ * 本文の文字列を Backlog が返す型に戻す。戻さないと適用直後の plan で `true` と `"true"` の
+ * 差分が出て、AC-8 がモックの都合で落ちる。
  */
 const settingValue = (value: string): string | boolean => {
   if (value === "true") {
@@ -288,7 +264,6 @@ const settingsOf = (params: Record<string, unknown>): Record<string, string | bo
   return settings;
 };
 
-/** 数値型のカスタム属性は `min` / `max` / `initialValue` が Number（API 制約） */
 const NUMBER_CUSTOM_FIELD_TYPE_ID = 3;
 
 const projectBody = (project: MockProject): Record<string, unknown> => ({
@@ -350,9 +325,8 @@ export const mockBacklog = (options: MockBacklogOptions = {}): MockBacklog => {
   const userById = (id: number): MockUser | undefined => spaceUsers.find((user) => user.id === id);
 
   /**
-   * スペース管理者でないキーには、本人以外のログイン ID が `null` で返る（実測。
-   * API 制約「スペースのユーザー一覧」）。そのまま返すと、ログイン ID に頼る実装が
-   * 一般ユーザーの受け入れでも通ってしまう。
+   * 本人以外のログイン ID を隠さずに返さない（API 制約「スペースのユーザー一覧」）。
+   * 返すと、ログイン ID に頼る実装が一般ユーザーの受け入れでも通ってしまう。
    */
   const asSeenByExecutor = (user: MockUser): unknown =>
     executor.roleType === SPACE_ADMINISTRATOR_ROLE_TYPE || user.id === executor.id
@@ -363,9 +337,8 @@ export const mockBacklog = (options: MockBacklogOptions = {}): MockBacklog => {
     spaceTeams.find((team) => team.id === id);
 
   /**
-   * 表示順の2番目に、1番目より小さい ID を置く（実測）。ID の昇順で返すと、
-   * 「返ってきた順で枠を割り当てる」（§4.1）が ID 順の割り当てでも通ってしまい、
-   * 枠方式が並びに依存していることをテストが確かめられなくなる。
+   * ID の昇順で返さない（実測でも2番目の ID が小さい）。昇順だと、返ってきた順で枠を
+   * 割り当てる（core §4.1）実装と ID 順で割り当てる実装をテストが区別できない。
    */
   const defaultIssueTypes = (): MockIssueType[] => {
     const ids = DEFAULT_ISSUE_TYPES_JA.map(() => identify());
@@ -455,9 +428,7 @@ export const mockBacklog = (options: MockBacklogOptions = {}): MockBacklog => {
   };
 
   /**
-   * 新規カスタムステータスは「完了」（ID 4）の直前に入る（実測）。末尾に足すと、
-   * 記述順どおりに書いたマニフェストでも並べ替えが要る計画になり、
-   * 適用順序 §6 が前提にしている挙動と食い違う。
+   * 末尾に足さない。実 API は「完了」の直前に入れ、要件定義 §6 の並べ替えはそれを前提にしている。
    */
   const insertStatus = (project: MockProject, status: MockStatus): MockStatus => {
     const last = project.statuses.findIndex(({ id }) => id === LAST_DEFAULT_STATUS_ID);
@@ -581,8 +552,8 @@ export const mockBacklog = (options: MockBacklogOptions = {}): MockBacklog => {
   };
 
   /**
-   * `excludeGroupMembers=true` が無ければチーム経由の参加者まで返る（要件定義 §6 フェーズ7）。
-   * 常に個人参加者だけを返すと、問い合わせ側が付け忘れても受け入れが気づけない。
+   * 常に個人参加者だけを返さない。実 API は `excludeGroupMembers=true` が無ければチーム経由の
+   * 参加者まで返し（要件定義 §6 フェーズ7）、付け忘れに受け入れが気づけなくなる。
    */
   const projectUsers = (project: MockProject, query: string): MockUser[] => {
     if (query.includes("excludeGroupMembers=true")) {
@@ -871,13 +842,8 @@ export const mockBacklog = (options: MockBacklogOptions = {}): MockBacklog => {
         return user;
       }
 
-      /**
-       * スペース管理者には付与できない（A-5。実測。`Only normal-user role can be a
-       * project administrator.`）。チーム経由のみの参加者にも付与できない（実測。
-       * `No such project member`）。どちらも通す実装にすると、V-B11 が無くても、
-       * またフェーズ7が「管理者の未参加者を必ず個人参加させる」順序でなくても
-       * 受け入れが通ってしまう。
-       */
+      // スペース管理者とチーム経由だけの参加者への付与を通さない（A-5、実測）。通すと、V-B11 が
+      // 無くても、フェーズ7が未参加の管理者を先に個人参加させなくても受け入れが通る。
       if (method !== "DELETE" && user.roleType === SPACE_ADMINISTRATOR_ROLE_TYPE) {
         failWith(BAD_REQUEST, "Only normal-user role can be a project administrator.");
       }
@@ -945,9 +911,8 @@ export const mockBacklog = (options: MockBacklogOptions = {}): MockBacklog => {
 };
 
 /**
- * X-1 の1秒間隔をそのまま待つと、受け入れ1本ごとに更新系の件数ぶんの実時間がかかる
- * （AC-1 の適用だけで20秒を超える）。間隔そのものは Executor の仕様なので消さず、
- * 待ち時間だけを潰す。
+ * Executor の間隔（X-1）を消さずに待ち時間だけを潰す。そのまま待つと AC-1 の適用だけで
+ * 20秒を超える。
  */
 export const withoutWritePacing = async <T>(run: () => Promise<T>): Promise<T> => {
   const original = globalThis.setTimeout;

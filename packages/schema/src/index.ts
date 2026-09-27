@@ -1,27 +1,117 @@
-/**
- * 配布 URL を組み立て直さない。`export` が書き出す `$schema` のコメント行と
- * ここが入れる `$id` は同じ URL でなければならず（EX-15）、2箇所で組み立てると
- * 版の入れ方が食い違ったまま両方とも「正しく見える」状態になる。
- */
 import { ManifestSchema, projectSchemaPath, projectSchemaUrl } from "@backlog-blueprint/core";
 
-import { acceptEnvReferences } from "./accept-env-references";
+type SchemaNode = Record<string, unknown>;
 
-export { isEnvReferenceBranch } from "./accept-env-references";
+/**
+ * `$${NAME}` は参照として数えない。core の展開ではリテラルになる書き方なので、
+ * これを受け付けるとエディタだけが制約を免除することになる。
+ */
+const ENV_REFERENCE = {
+  type: "string",
+  pattern: String.raw`(?:^|[^$])\$\{[^}]+\}`,
+};
+
+export const isEnvReferenceBranch = (schema: unknown): boolean =>
+  typeof schema === "object" &&
+  schema !== null &&
+  (schema as SchemaNode).pattern === ENV_REFERENCE.pattern;
+
+const SCALAR_KEYWORDS = ["pattern", "enum", "const"];
+
+const NON_STRING_SCALAR_TYPES = new Set(["boolean", "number", "integer"]);
+
+const isNode = (value: unknown): value is SchemaNode =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+const branchesOf = (node: SchemaNode): unknown[] => [
+  ...(Array.isArray(node.anyOf) ? node.anyOf : []),
+  ...(Array.isArray(node.oneOf) ? node.oneOf : []),
+];
+
+const judgedBeforeExpansion = (node: SchemaNode): boolean => {
+  if (SCALAR_KEYWORDS.some((keyword) => keyword in node)) {
+    return true;
+  }
+
+  if (typeof node.type === "string" && NON_STRING_SCALAR_TYPES.has(node.type)) {
+    return true;
+  }
+
+  const branches = branchesOf(node);
+
+  return (
+    branches.length > 0 &&
+    branches.every((branch) => isNode(branch) && judgedBeforeExpansion(branch))
+  );
+};
+
+const SUBSCHEMA_KEYWORDS = new Set(["items", "then"]);
+
+const SUBSCHEMA_LIST_KEYWORDS = new Set(["anyOf", "oneOf", "allOf"]);
+
+const relaxSubschemas = (keyword: string, child: unknown): unknown => {
+  if (keyword === "properties" && isNode(child)) {
+    return Object.fromEntries(Object.entries(child).map(([key, node]) => [key, relax(node)]));
+  }
+  if (SUBSCHEMA_KEYWORDS.has(keyword)) {
+    return relax(child);
+  }
+  if (SUBSCHEMA_LIST_KEYWORDS.has(keyword) && Array.isArray(child)) {
+    return child.map(relax);
+  }
+
+  return child;
+};
+
+/**
+ * スカラーの union は枝ごとに包まず、ノードごと1回だけ包む（E-9）。`oneOf` の各枝に
+ * 参照を足すと、`${NAME}` がすべての枝に一致して `oneOf` が必ず失敗する。
+ * `if` は判別であって制約ではないので包まない。
+ */
+const relax = (value: unknown): unknown => {
+  if (!isNode(value)) {
+    return value;
+  }
+
+  if (judgedBeforeExpansion(value)) {
+    return {
+      ...(value.description === undefined ? {} : { description: value.description }),
+      anyOf: [value, ENV_REFERENCE],
+    };
+  }
+
+  return Object.fromEntries(
+    Object.entries(value).map(([keyword, child]) => [keyword, relaxSubschemas(keyword, child)]),
+  );
+};
+
+/**
+ * 実行時のスキーマはこの変換を通さない。core は展開後の値を検証するので、そこに
+ * 参照が残っていれば `$${NAME}` のリテラルであり、制約どおりに判定されるべき値である。
+ */
+const acceptEnvReferences = (schema: object): SchemaNode => {
+  const relaxed = relax(schema);
+
+  return isNode(relaxed) ? relaxed : {};
+};
 
 const DIALECT = "https://json-schema.org/draft/2020-12/schema";
 
+/**
+ * `$id` の URL をここで組み立てない。`export` が書き出す `$schema` の行と同じでなければ
+ * ならず（EX-15）、2箇所で組むと版の入れ方が食い違っても両方とも正しく見える。
+ */
 export const projectSchema = (version: string) => ({
   $schema: DIALECT,
   $id: projectSchemaUrl(version),
   ...acceptEnvReferences(ManifestSchema),
 });
 
-export type SchemaArtifact = { path: string; contents: string };
+type SchemaArtifact = { path: string; contents: string };
 
 /**
- * ファイルを書かずに置き場所と中身を返す。`packages/schema` が `node:fs` を持つと
- * ブラウザ向けのバンドルに Node 専用 API が混ざる経路ができる（NFR-5）。
+ * ファイルを書かずに置き場所と中身を返す。`node:fs` を持つとブラウザ向けのバンドルに
+ * Node 専用 API が混ざる経路ができる（NFR-5）。
  */
 export const projectSchemaArtifact = (version: string): SchemaArtifact => ({
   path: projectSchemaPath(version),
