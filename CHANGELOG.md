@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.2.0](https://github.com/simochee/backlog-blueprint/compare/v0.1.0...v0.2.0) (2026-09-27)
+
+
+### Features
+
+* ship the JSON Schema in the npm package and point $schema at jsDelivr ([#24](https://github.com/simochee/backlog-blueprint/issues/24)) ([7abb298](https://github.com/simochee/backlog-blueprint/commit/7abb2982d123ef9b7e03a90b1c911d46aa7b2507))
+* **web:** add a favicon and an Apple touch icon ([#29](https://github.com/simochee/backlog-blueprint/issues/29)) ([b6ee19d](https://github.com/simochee/backlog-blueprint/commit/b6ee19dd0a0d32a279da6e88292a09ffc70c5de9))
+* **web:** rebuild the Web UI as a blueprint workbench with a Problems and Output panel ([#27](https://github.com/simochee/backlog-blueprint/issues/27)) ([a55b71c](https://github.com/simochee/backlog-blueprint/commit/a55b71c31bea5b052384684ea07d025e89e8f2cc))
+
 ## 0.1.0 (2026-09-27)
 
 
