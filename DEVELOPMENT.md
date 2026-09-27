@@ -212,9 +212,10 @@ and `.release-please-manifest.json` records the last version that was released �
    Add prose above it only when a version asks something of its users — a manifest that has to be
    rewritten, an option that no longer exists.
 
-The release pull request carries no CI run, because a pull request opened with `GITHUB_TOKEN` does
-not start workflows. Everything in it has already been checked on `main`; the only thing CI would
-see for the first time is the version bump and the CHANGELOG.
+CI runs on the release pull request like on any other, because release-please opens it as the
+organization's release bot, a GitHub App, rather than with `GITHUB_TOKEN`. A pull request opened by
+`github-actions[bot]` holds its workflows until someone with write access approves them, which
+would leave the one pull request that decides a release as the only one merged without CI.
 
 If the publish job fails once the tag exists, use **Re-run failed jobs** on that workflow run: the
 tag comes from the first job's outputs, which a re-run keeps, so the same commit is built and
@@ -238,12 +239,11 @@ one of those says nothing about what a version does differently from the one bef
 
 ### What the workflow has to guarantee
 
-- **Tagging and publishing stay inside one workflow run.** A tag or a Release created with
-  `GITHUB_TOKEN` starts no further workflow, so a separate workflow listening for `v*` tags would
-  wait forever. Publishing is therefore another job of the release workflow, gated on
-  release-please's `releases_created` output. The other way out — a personal access token, whose
-  tags do trigger workflows — was rejected: a long-lived secret to store and rotate, for nothing
-  that two jobs do not already give.
+- **Tagging and publishing stay inside one workflow run.** Publishing is another job of the
+  release workflow, gated on release-please's `releases_created` output, because it has to `needs`
+  the Pages job (next item), and a job cannot wait on a job in another workflow. A separate workflow
+  listening for `v*` tags would start as soon as the tag exists, whether or not the site is deployed
+  yet.
 - **A release's schema is on Pages before its CLI is on npm.** Publish a CLI whose schema URL is not
   deployed yet, and every editor pointed at that version silently stops offering completion. The
   publish job therefore `needs` the Pages job and is skipped with it when the deployment fails
@@ -280,7 +280,8 @@ The workflow cannot create any of these itself.
 | npm trusted publisher      | On the package's npm settings: this repository, workflow `release.yml`, **no environment** |
 | npm publishing access      | On the package's npm settings: **Require two-factor authentication and disallow tokens** |
 | `github-pages` environment | Created by GitHub with the Pages source; must allow `main`                  |
-| Pull requests from Actions | Settings, Actions, General: **Allow GitHub Actions to create and approve pull requests** |
+| Release bot                | The organization's GitHub App, installed on this repository with Contents, Issues and Pull requests: **Read and write** |
+| Release bot credentials    | Organization secrets `RELEASE_BOT_APP_ID` and `RELEASE_BOT_PRIVATE_KEY`, available to this repository |
 
 The repository holds no npm token. npm accepts the publish job's OIDC token instead, which is why
 `id-token: write` appears in its permissions and why `actions/setup-node` is not given

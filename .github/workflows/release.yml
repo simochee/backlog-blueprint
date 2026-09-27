@@ -21,19 +21,27 @@ jobs:
   release-please:
     name: Maintain the release pull request
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      # `pull-requests: write` だけにしない。release-please はリリース PR のラベルで次の実行が
-      # タグ付けを判断し、PR へのラベル付けは issues API を通る。
-      issues: write
-      pull-requests: write
     outputs:
       released: ${{ steps.release.outputs.releases_created }}
       tag: ${{ steps.release.outputs['apps/cli--tag_name'] }}
     steps:
+      # GITHUB_TOKEN にしない。github-actions[bot] が開いたリリース PR の CI は、誰かが承認するまで
+      # 走らない。
+      - id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.RELEASE_BOT_APP_ID }}
+          private-key: ${{ secrets.RELEASE_BOT_PRIVATE_KEY }}
+          permission-contents: write
+          # `pull-requests: write` だけにしない。release-please はリリース PR のラベルで次の実行が
+          # タグ付けを判断し、PR へのラベル付けは issues API を通る。
+          permission-issues: write
+          permission-pull-requests: write
+
       - id: release
         uses: googleapis/release-please-action@v5
         with:
+          token: ${{ steps.app-token.outputs.token }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
@@ -110,8 +118,8 @@ jobs:
         uses: actions/deploy-pages@v5
 
   # `needs: pages` を外さない。スキーマの URL が未デプロイの CLI を公開すると、エディタの補完が
-  # 黙って効かなくなる（要件定義 §7.1）。`push: tags` の別ワークフローにもしない。GITHUB_TOKEN で
-  # 作ったタグはワークフローを起動しない。
+  # 黙って効かなくなる（要件定義 §7.1）。`push: tags` の別ワークフローにもしない。ワークフローを
+  # またぐと、`needs` で Pages のデプロイを待てない。
   publish:
     name: Publish the CLI to npm
     needs: [release-please, pages]
