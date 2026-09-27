@@ -1,6 +1,6 @@
 {
   "name": "@simochee/backlog-blueprint",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Create a Backlog project from a YAML manifest: validate it, review the plan, then apply it.",
   "keywords": [
     "backlog",
