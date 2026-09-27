@@ -1,4 +1,11 @@
-import { type Action, type Change, type ProvidedRef } from "../action";
+import {
+  declaredOnly,
+  differs,
+  fieldChanges,
+  type Action,
+  type Change,
+  type ProvidedRef,
+} from "../action";
 import { type IssueType } from "../manifest";
 import { type Reconciler } from "../reconciler";
 import { embedRef } from "../ref";
@@ -20,16 +27,14 @@ export type ExistingIssueType = {
 };
 
 /**
- * 新規プロジェクトの既定4件は名前を持たせない。表示名はスペースの言語設定で変わり、
- * `POST /projects` の前には取得できない（§4.1）。言語ごとの名前の組を持つ案は採らない。
- * Backlog が対応言語を増やすたびに追随が要り、表に無い言語では計画そのものが組めない。
- * ID は言語に依存しないので、RF-1 の refresh が登録する位置キーで枠として指す。
+ * 新規プロジェクトの既定4件に名前を持たせない。表示名はスペースの言語設定で変わり、
+ * 作成前には取得できない（§4.1）。言語ごとの名前の組を持つ案は、表に無い言語で計画が
+ * 組めなくなるので採らない。
  */
 export type IssueTypesSnapshot =
   | { source: "project"; issueTypes: ExistingIssueType[] }
   | { source: "defaults"; slots: number };
 
-/** 既定の課題種別は4件（API 制約） */
 export const DEFAULT_ISSUE_TYPE_SLOTS = 4;
 
 const issueTypesPath = (key: string): string => `/api/v2/projects/${key}/issueTypes`;
@@ -37,22 +42,16 @@ const issueTypesPath = (key: string): string => `/api/v2/projects/${key}/issueTy
 const issueTypeRef = (name: string): Ref => ({ $ref: { kind: "issueType", name } });
 
 /**
- * 引き継ぐ枠は、枠の識別子ではなくマニフェストの名前で指す（§4.1）。中間の識別子を
- * 作ると利用者の名前と同じ名前空間に入り、その表記を名前に書かれたときに黙って
- * 別の枠を書き換える。解決表は RF-1 の `refresh` が i 番目の既定を
- * マニフェストの i 番目の名前で登録するので、最初から最終的な名前で引ける。
+ * 引き継ぐ枠を枠の識別子で指さない。識別子は利用者の名前と同じ名前空間に入り、
+ * その表記を名前に書かれたときに黙って別の枠を書き換える（§4.1）。
  */
 const slotPosition = (slot: number): string => String(slot);
 
-/** 余った枠だけは対応する名前が無いので、位置を別の名前空間（§2.1）で指す */
 const spareSlotRef = (slot: number): Ref => ({
   $ref: { kind: "issueTypeSlot", name: slotPosition(slot) },
 });
 
-/**
- * `refresh` が「どの枠をどの名前で登録するか」を持つ唯一の場所（RF-1）。枠の割り当ては
- * ここでしか決まらないので、`project` の reconciler に同じ規則を書き写さない。
- */
+/** 枠の割り当てを `project` の reconciler に書き写さない。ここでしか決まらない（RF-1）。 */
 export const defaultIssueTypeSlotRefs = (desired: IssueType[]): ProvidedRef[] =>
   Array.from({ length: DEFAULT_ISSUE_TYPE_SLOTS }, (_, slot): ProvidedRef => {
     const adopted = desired[slot];
@@ -66,50 +65,25 @@ const memberPath = (key: string, target: IdOrRef): string =>
   `${issueTypesPath(key)}/${typeof target === "number" ? target : embedRef(target)}`;
 
 /**
- * 書かれていないキーを「空にする」と解釈しない。`templateSummary` を消す意図と
- * 書き忘れを区別する手段がマニフェストに無く、K-3 が `settings` について定めた
- * 「省略は現状維持」から外れる根拠も無い。
+ * 書かれていないキーを「空にする」と解釈しない。消す意図と書き忘れを区別する手段が
+ * マニフェストに無い（K-3）。
  */
-const declaredFields = (desired: IssueType): Record<string, Value> => ({
-  name: desired.name,
-  color: desired.color,
-  ...(desired.templateSummary === undefined ? {} : { templateSummary: desired.templateSummary }),
-  ...(desired.templateDescription === undefined
-    ? {}
-    : { templateDescription: desired.templateDescription }),
-});
+const declaredFields = (desired: IssueType): Record<string, Value> =>
+  declaredOnly({
+    name: desired.name,
+    color: desired.color,
+    templateSummary: desired.templateSummary,
+    templateDescription: desired.templateDescription,
+  });
+
+const changesOf = (desired: IssueType, existing: ExistingIssueType | undefined): Change[] =>
+  fieldChanges(declaredFields(desired), existing ?? {});
 
 /**
- * 値が変わらない項目も落とさない（PO-11）。落とすと JSON から「送るが変わらない項目」が
- * 消え、`request.params` と突き合わせられなくなる。描画側が変わった行だけを描くのは
- * 絞り込みであって、データの間引きではない。
- */
-const changesOf = (desired: IssueType, existing: ExistingIssueType | undefined): Change[] => {
-  const before: Record<string, Value | undefined> = {
-    name: existing?.name,
-    color: existing?.color,
-    templateSummary: existing?.templateSummary,
-    templateDescription: existing?.templateDescription,
-  };
-
-  return Object.entries(declaredFields(desired)).map(([field, after]) => ({
-    field,
-    before: before[field] ?? null,
-    after,
-  }));
-};
-
-const differs = (changes: Change[]): boolean =>
-  changes.some(({ before, after }) => before !== after);
-
-/**
- * 既定枠を引き継ぐときも `op` は `create` にする。PO-1 が `oldname` のリネームを `~` で
- * 表すと決めたのは、利用者が `oldname` を書いた効果を plan に出すためであり、
- * ツールが新規プロジェクトで勝手に行う引き継ぎにはその理由が無い。利用者から見れば、
- * 何も無いところに課題種別を1つ宣言しただけである。
+ * 既定枠を引き継ぐときも PO-1 のリネーム（`~`）として出さない。`~` は利用者が `oldname` を
+ * 書いた効果を出すためのもので、ツールが勝手に行う引き継ぎにはその理由が無い。
  *
- * 既定を全削除して作り直す形は採らない。L-2 / L-6 が数えている節約
- * （既定を使い回せば削除＋作成の2リクエストが1リクエストで済む）が丸ごと消える。
+ * 既定を全削除して作り直す形は採らない。L-2 / L-6 が数える節約が丸ごと消える。
  */
 const createAction = (item: IssueType, key: string, adoptsSlot = false): Action => ({
   id: `issueTypes/create/${item.name}`,

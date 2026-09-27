@@ -2,29 +2,21 @@ import {
   type Action,
   type ActionId,
   type Change,
+  executedActions,
   type HttpRequest,
   type Note,
   type ProvidedRef,
 } from "../action";
 import { type Diagnostic } from "../diagnostic";
-import { resolvePath } from "../ref";
 import { type ResolutionTable } from "../resolution";
 import { type Op, type Phase, type ResourceKind } from "../resource";
+import { type ResourceOrder } from "../resulting-order";
 import { type IdOrRef } from "../value";
-import { type ActionFailure, type ApplyOptions, type ApplyOutcome } from "./apply";
-import {
-  executedActions,
-  type PlanReport,
-  type ResultingOrder,
-  summarize,
-  type Summary,
-  type ValidateReport,
-} from "./report";
+import { type ActionFailure, type ApplyOptions, type ApplyOutcome, failedPath } from "./apply";
+import { type PlanReport, summarize, type Summary, type ValidateReport } from "./report";
 import { orderDiagnostics } from "../validation/gate";
 
-/**
- * 整数で持ち、破壊的変更のときだけ上げる（PO-6）。キーの追加では上げない。
- */
+/** キーの追加では上げない。上げるのは破壊的変更のときだけ（PO-6） */
 const FORMAT_VERSION = 1;
 
 export type ActionJson = {
@@ -57,7 +49,7 @@ export type PlanJson = {
   summary: Summary;
   diagnostics: Diagnostic[];
   actions: ActionJson[];
-  resultingOrder: ResultingOrder;
+  resultingOrder: ResourceOrder;
 };
 
 export type FailedJson = {
@@ -74,7 +66,7 @@ export type ApplyJson = PlanJson & {
   pending: ActionId[];
 };
 
-/** 未解決の `Ref` はそのまま載せる（PO-5）。`changes` は全項目を含む（PO-11）。 */
+/** 未解決の `Ref` を偽の ID で埋めず（PO-5）、`changes` も変わらない項目まで残す（PO-11） */
 const actionJson = ({
   id,
   phase,
@@ -116,7 +108,7 @@ export const planJson = (report: PlanReport): PlanJson => ({
   project: report.project,
   summary: summarize(report.actions),
   diagnostics: orderDiagnostics(report.diagnostics),
-  /** `noop` も必ず含める。人間向けとは逆である（PO-2） */
+  // `noop` も捨てない。人間向けの出力とは逆（PO-2）
   actions: report.actions.map(actionJson),
   resultingOrder: report.resultingOrder,
 });
@@ -126,17 +118,13 @@ const failedJson = (
   resolutions: ResolutionTable | undefined,
 ): FailedJson => {
   const { request } = action;
-  const path =
-    request === undefined || resolutions === undefined
-      ? undefined
-      : resolvePath(request.path, resolutions);
 
   return {
     id: action.id,
     request:
       request === undefined
         ? undefined
-        : { method: request.method, path: path?.resolved === true ? path.value : request.path },
+        : { method: request.method, path: failedPath(request, resolutions) },
     status,
     errors,
   };
@@ -164,10 +152,7 @@ const progress = (
   };
 };
 
-/**
- * 逐次ではなく最終結果1つを返す（PO-10）。消費側は CI のスクリプトで、
- * 途中経過ではなく結果を1つの値として受け取りたい。
- */
+/** 途中経過を逐次流さない（PO-10）。消費側の CI スクリプトは結果を1つの値として受け取りたい */
 export const applyJson = (
   report: PlanReport,
   outcome: ApplyOutcome,

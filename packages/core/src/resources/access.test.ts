@@ -14,7 +14,6 @@ const suzuki = { id: 11, name: "鈴木 花子" };
 const tanaka = { id: 12, name: "田中 一郎" };
 const yamada = { id: 13, name: "山田 太郎" };
 
-/** `roleType` を返すのはスペースの利用者一覧だけで、プロジェクト側の取得には現れない */
 const inSpace = (user: { id: number; name: string }) => ({ ...user, roleType: 2 });
 
 const developers = { id: 21, name: "開発チーム", members: [tanaka] };

@@ -1,4 +1,4 @@
-import { type Action, type Change } from "../action";
+import { differs, type Action, type Change } from "../action";
 import { type Webhook } from "../manifest";
 import { type Reconciler } from "../reconciler";
 import { type Value } from "../value";
@@ -34,10 +34,7 @@ const collectionPath = (projectKey: string) => `/api/v2/projects/${projectKey}/w
 
 const memberPath = (projectKey: string, id: number) => `${collectionPath(projectKey)}/${id}`;
 
-/**
- * 名前を落とすのは、S3 が未知の名前を既に弾いているため（W-4 前半）。
- * ここで落ちうるのは型の上でだけ起こりうる値で、利用者の誤りは隠れない。
- */
+/** 引けない名前を黙って落としてよい。未知の名前は S3 が既に弾いている（W-4）。 */
 const activityTypeIdsOf = (events: WebhookEvent[]) => {
   const ids = events.flatMap((event) => {
     if (typeof event === "number") {
@@ -58,18 +55,9 @@ const desiredEvents = (events: Webhook["events"]) =>
 const existingEvents = ({ allEvent, activityTypeIds }: ExistingWebhook) =>
   allEvent ? ALL_EVENTS : activityTypeIdsOf(activityTypeIds);
 
-const sameValue = (before: Value | null, after: Value | null) => {
-  if (Array.isArray(before) && Array.isArray(after)) {
-    return before.length === after.length && before.every((item, index) => item === after[index]);
-  }
-
-  return before === after;
-};
-
 /**
- * `events` はマニフェストのキー名のまま載せる（W-3）。送信の `allEvent` /
- * `activityTypeIds` に割ってしまうと、W-5 の「数値に名前を添えて表示する」対象が
- * 2つのフィールドに散る。
+ * 差分を送信の `allEvent` / `activityTypeIds` に割らない。W-5 の名前を添える表示の対象が
+ * 2つのフィールドに散る（W-3）。
  */
 const changesOf = (desired: Webhook, existing: ExistingWebhook | undefined): Change[] => [
   { field: "name", before: existing?.name ?? null, after: desired.name },
@@ -156,7 +144,7 @@ export const webhooksReconciler: Reconciler<Webhook[], WebhooksSnapshot> = {
 
       kept.add(existing.id);
 
-      if (changes.every(({ before, after }) => sameValue(before, after))) {
+      if (!differs(changes)) {
         updates.push({
           id: `webhooks/noop/${webhook.name}`,
           phase: 8,

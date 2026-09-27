@@ -1,8 +1,8 @@
 import { type Action } from "../action";
 import { type Op, type ResourceKind } from "../resource";
-import { type Value } from "../value";
+import { sameValue, type Value } from "../value";
 import { type Paint, styleOf } from "./color";
-import { formatValue, sameValue, type ValueFormat, webhookEventLabel } from "./value";
+import { formatValue, type ValueFormat, webhookEventLabel } from "./value";
 
 const SYMBOLS: Record<Op, string> = {
   create: "+",
@@ -19,18 +19,12 @@ const REFRESH_DETAIL = "reading back default issue types and statuses";
 
 const UNUSED_DEFAULT = "(unused default)";
 
-/**
- * 値の桁でも整列しない。日本語の文字幅で崩れるため表形式を採らなかった（PO-8）
- * 判断が、そのまま名前より右の桁にも当てはまる。
- */
+/** 値の桁で整列しない。日本語の文字幅で崩れる（PO-8） */
 const CELL_SEPARATOR = "  ";
 
 type Highlight = { field: string; label?: string };
 
-/**
- * `create` にだけ添える。`update` は下に `field: before -> after` が並ぶので、
- * 同じ値を2度描くことになる（§1.1 の `~ issueType "調査"` は色を添えていない）。
- */
+/** `update` には添えない。下に並ぶ `field: before -> after` と同じ値を2度描く（§1.1） */
 const HIGHLIGHTS: Partial<Record<ResourceKind, Highlight[]>> = {
   project: [{ field: "name" }],
   issueType: [{ field: "color", label: "color" }],
@@ -55,10 +49,7 @@ const labelColumn = (action: Action): string => {
   return text.length < LABEL_WIDTH ? text.padEnd(LABEL_WIDTH) : `${text} `;
 };
 
-/**
- * 枠の位置（`Action.name` の数字）を見せない。利用者は初期状態にあるものを
- * 認識しなくてよい（core のデータモデル §4.1）。
- */
+/** 枠の位置（`Action.name` の数字）を見せない。利用者は初期状態を認識しなくてよい（core §4.1） */
 const isUnusedDefaultSlot = (action: Action): boolean =>
   action.target !== undefined &&
   typeof action.target !== "number" &&
@@ -110,10 +101,6 @@ const highlights = (action: Action): string[] => {
   });
 };
 
-/**
- * 新規プロジェクトの枠の引き継ぎに `renamed from` は付かない。`notes` を持つのは
- * 利用者が `oldname` を書いた場合だけである（PO-1）。
- */
 const notes = (action: Action): string[] =>
   (action.notes ?? []).map(({ from }) => `renamed from ${JSON.stringify(from)}`);
 
@@ -138,17 +125,11 @@ const changeLine = (
   return `${field}: ${formatValue(before, format)} -> ${formatValue(after, format)}`;
 };
 
-/**
- * 改名された `name` を変更行に出さない。行に添えた `renamed from "X"` と同じことを
- * 2度書くことになる（§1.1 の `~ issueType "調査"` に変更行が無い）。
- */
+/** 改名された `name` を変更行に出さない。行に添えた `renamed from "X"` と2度書くことになる（§1.1） */
 const isRenamedName = (action: Action, field: string): boolean =>
   field === "name" && (action.notes ?? []).some(({ type }) => type === "renamed");
 
-/**
- * 変わらない項目を描かない（§1.2）。`changes` がリクエストに載る全フィールドを
- * 持つ（PO-11）のは JSON の約束なので、絞るのは描画側の仕事になる。
- */
+/** `changes` の側では絞らない。全フィールドを持つのは JSON の約束（PO-11） */
 export const changeLines = (action: Action): string[] =>
   action.op === "update"
     ? (action.changes ?? [])

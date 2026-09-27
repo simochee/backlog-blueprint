@@ -23,11 +23,9 @@ const CUSTOM_FIELD_INDEX = /^\/customFields\/(\d+)/;
 const STATUS_COLOR_PATH = /^\/statuses\/\d+\/color$/;
 
 /**
- * `if` の指摘と、`anyOf` / `oneOf` の枝の指摘は落とす。どちらも同じ誤りが二重に出るが、
- * 残すべき側が逆になる。`if` は `then` 側の指摘が本体で、`if` 自身は
- * 「then に一致しない」としか言わない。`anyOf` / `oneOf` は逆で、枝の指摘には
- * 「数値でない」と「日付形式でない」のように同時には満たせないものが並び、
- * どれか1つを満たせばよいことを利用者に伝えられない。
+ * `if` と `anyOf` / `oneOf` の枝の指摘は同じ誤りの二重報告だが、残す側が逆になる。
+ * `if` 自身は「then に一致しない」としか言わず、枝の指摘は「数値でない」と
+ * 「日付形式でない」のように同時には満たせないものを並べてしまう。
  */
 const isRedundant = (error: ErrorObject): boolean =>
   error.keyword === "if" || UNION_BRANCH.test(error.schemaPath);
@@ -126,8 +124,8 @@ type Wording = { message: string; hint?: string };
 const WEBHOOK_EVENTS_PATH = /^\/webhooks\/\d+\/events/;
 
 /**
- * `events` には専用の hint を出す（W-4 前半）。「どの形にも一致しない」だけでは、
- * イベント名を打ち間違えた利用者が、名前が拒まれたのか数値が拒まれたのかを読み取れない。
+ * 「どの形にも一致しない」だけで済ませない（W-4 前半）。イベント名を打ち間違えた利用者が、
+ * 名前が拒まれたのか数値が拒まれたのかを読み取れない。
  */
 const acceptedFormHint = (error: ErrorObject): string | undefined =>
   WEBHOOK_EVENTS_PATH.test(error.instancePath)
@@ -347,9 +345,8 @@ export const validateSchema = (
 };
 
 /**
- * パイプラインに渡す形をここに置く。呼び出し側が `validateSchema(parsed.value)` と
- * 書いてしまうと、位置（DG-5）と V-A18 の判定に要る `isEmptySource`（Y-3）が
- * 黙って落ちる。落ちても検証は動くので、テストでも気付けない。
+ * 呼び出し側に `validateSchema(parsed.value)` と書かせない。位置（DG-5）と V-A18 に要る
+ * `isEmptySource`（Y-3）が黙って落ち、それでも検証は動くのでテストでも気付けない。
  */
 export const schemaStage: SchemaStage = (parsed) =>
   validateSchema(parsed.value, { source: parsed.source });

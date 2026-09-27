@@ -1,12 +1,10 @@
 import { type Action } from "../action";
+import { resolvePath } from "../ref";
 import { type ResolutionTable } from "../resolution";
 
 export type ActionFailure = {
   action: Action;
-  /**
-   * HTTP のやり取りが成立しなかった失敗では無い（§3.3 / core §7.0）。
-   * 消費側はこの有無で「Backlog が拒否した」と「Backlog に届かなかった」を判別する。
-   */
+  /** `0` などで埋めない。消費側は有無で「拒否された」と「届かなかった」を分ける（§3.3） */
   status?: number;
   errors: { message: string }[];
 };
@@ -16,8 +14,13 @@ export type ApplyOutcome =
   | { result: "rejected" }
   | { result: "aborted"; applied: Action[]; failed: ActionFailure; pending: Action[] };
 
-/**
- * 解決表を受け取るのは、失敗したリクエストの path を実 ID で示すため（§3.2）。
- * `Action.request.path` は `{$ref:...}` を含みうる。
- */
 export type ApplyOptions = { resolutions?: ResolutionTable };
+
+export const failedPath = (
+  { path }: NonNullable<Action["request"]>,
+  resolutions: ResolutionTable | undefined,
+): string => {
+  const resolved = resolutions === undefined ? undefined : resolvePath(path, resolutions);
+
+  return resolved?.resolved === true ? resolved.value : path;
+};

@@ -1,26 +1,26 @@
 /**
- * 送信層から返る値は core にとって外部入力である（要件定義 §7.0）。`as` で名乗らせると、
- * 形の違う応答がスナップショットの奥まで届き、差分算出の途中で `undefined` として
- * 現れる。どのリソースの取得で壊れたのかも分からなくなるので、取り込む場所で落とす。
+ * 応答を `as` で名乗らせない。形の違う応答が差分算出の途中で `undefined` として現れ、
+ * どの取得で壊れたのかも分からなくなる（要件定義 §7.0）。
  */
 const fail = (detail: string): never => {
   throw new TypeError(`Unexpected Backlog API response: ${detail}`);
 };
 
 /**
- * `ReadContext.get` と `ExecuteContext.send` が失敗したときに投げる形（§7.0）。
- *
- * `status` は任意である。HTTP のやり取りが成立しなかった失敗（タイムアウト・名前解決の
- * 失敗・ブラウザの CORS 失敗）には状態コードが存在せず、`0` などで埋めると消費側が
- * 「Backlog が拒否した」と「Backlog に届かなかった」を区別できなくなる（§7.2 / PO-7）。
- *
- * 404 もこの形で投げる。存在しないプロジェクトを情報として読むのは呼び出し側で、
- * 送信層に「どの 404 が情報か」を判断させると、その知識が core と送信層に分かれる。
+ * `status` を `0` などで埋めない。タイムアウトや CORS の失敗には状態コードが無く、埋めると
+ * 消費側が「Backlog が拒否した」と「Backlog に届かなかった」を区別できない（§7.0 / PO-7）。
  */
 export type HttpFailure = {
   status?: number;
   errors: { message: string }[];
 };
+
+/**
+ * `asRecord` で置き換えない。エラー本文やレート制限の本文の形が違ったときに投げると、
+ * API の失敗を報告する経路自体が別の例外で置き換わる。
+ */
+export const looseRecord = (value: unknown): Record<string, unknown> | undefined =>
+  typeof value === "object" && value !== null ? (value as Record<string, unknown>) : undefined;
 
 export const asArray = (value: unknown): unknown[] =>
   Array.isArray(value) ? value : fail("expected an array");
@@ -49,9 +49,8 @@ export const requiredString = (record: Record<string, unknown>, field: string): 
 };
 
 /**
- * `null` を `undefined` に寄せる。Backlog は未設定を `null` で返し、マニフェスト側の
- * 未記述は `undefined` である。K-3 が「省略は比較にも送信にも載せない」と決めている以上、
- * 取り込む時点で1つに寄せないと、同じ「未設定」が2つの値で現れる。
+ * Backlog の未設定（`null`）をマニフェストの未記述（`undefined`）に寄せる。寄せないと
+ * 同じ「未設定」が2つの値で現れ、K-3 の省略判定がずれる。
  */
 export const optionalString = (
   record: Record<string, unknown>,
@@ -110,26 +109,26 @@ export const numbers = (record: Record<string, unknown>, field: string): number[
   );
 };
 
-export const optionalStrings = (
+/**
+ * 時刻付きの日付をそのまま持たない。同じ日付でも毎回 update が出て NFR-4 が崩れる。
+ * マニフェストが書けるのは `yyyy-MM-dd` だけ（Y-1）なので、切り詰めても失うものは無い。
+ */
+const dateOnly = (value: string): string => value.slice(0, 10);
+
+export const optionalDate = (
   record: Record<string, unknown>,
   field: string,
-): string[] | undefined => {
-  const value = record[field];
+): string | undefined => {
+  const value = optionalString(record, field);
 
-  if (value === undefined || value === null) {
-    return undefined;
-  }
-
-  return asArrayOf(value, (item) =>
-    typeof item === "string" ? item : fail(`"${field}" must contain strings only`),
-  );
+  return value === undefined ? undefined : dateOnly(value);
 };
 
 /**
- * 数値型の `min` / `max` と日付型の `min` / `max` はキー名が同じで型が違う
- * （API 制約）。どちらで返ってきたかを取り込む側で決めない。
+ * 数値か日付かを取り込む側で決めない。数値型と日付型の `min` / `max` はキー名が同じで
+ * 型が違う（API 制約）。
  */
-export const numberOrString = (
+export const numberOrDate = (
   record: Record<string, unknown>,
   field: string,
 ): number | string | undefined => {
@@ -139,7 +138,9 @@ export const numberOrString = (
     return undefined;
   }
 
-  return typeof value === "number" || typeof value === "string"
-    ? value
-    : fail(`"${field}" must be a number or a string`);
+  if (typeof value === "string") {
+    return dateOnly(value);
+  }
+
+  return typeof value === "number" ? value : fail(`"${field}" must be a number or a string`);
 };

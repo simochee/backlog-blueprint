@@ -1,8 +1,6 @@
 /**
- * `packages/schema` が `$id` に入れる URL と、`export` が先頭行のコメントに書く URL は
- * 同じでなければならない（EX-15 / 要件定義 §7.1）。`packages/schema` が core に依存して
- * いるので逆向きの import はできず、core が唯一の出どころになる。`export` の関心事では
- * ないので `export/` の下には置かない。
+ * `export/` の下にも `packages/schema` にも置かない。`$id` と `export` の先頭行は同じ URL で
+ * なければならず（EX-15）、schema は core に依存しているので core にしか置けない。
  */
 export const SCHEMA_DISTRIBUTION_ORIGIN = "https://simochee.github.io/backlog-blueprint";
 

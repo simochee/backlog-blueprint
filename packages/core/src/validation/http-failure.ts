@@ -1,28 +1,35 @@
-/**
- * 投げられたものが `HttpFailure`（§7.0）である保証は型にできない。送信層は core の外に
- * あり（B-2）、通信そのものが成立しなかった失敗では別の例外が上がる。形が違えば
- * 読めたところまでで組み直し、無い値は無いまま扱う。
- */
-const record = (value: unknown): Record<string, unknown> | undefined =>
-  typeof value === "object" && value !== null ? (value as Record<string, unknown>) : undefined;
+import { type HttpFailure, looseRecord } from "../api-response";
 
-export const failureStatus = (error: unknown): number | undefined => {
-  const status = record(error)?.["status"];
-
-  return typeof status === "number" ? status : undefined;
-};
-
-const messagesOf = (error: unknown): string[] | undefined => {
-  const errors = record(error)?.["errors"];
+const messagesOf = (error: unknown): { message: string }[] | undefined => {
+  const errors = looseRecord(error)?.["errors"];
 
   if (!Array.isArray(errors)) {
     return undefined;
   }
 
-  const messages = errors.map((item) => record(item)?.["message"]);
+  const messages = errors.map((item) => looseRecord(item)?.["message"]);
 
-  return messages.every((message) => typeof message === "string") ? messages : undefined;
+  return messages.every((message) => typeof message === "string")
+    ? messages.map((message) => ({ message }))
+    : undefined;
 };
 
+/**
+ * 投げられたものを `HttpFailure`（§7.0）と決めつけない。送信層は core の外にあり（B-2）、
+ * 通信が成立しなかった失敗では別の例外が上がる。
+ */
+export const toHttpFailure = (error: unknown): HttpFailure => {
+  const status = looseRecord(error)?.["status"];
+  const errors = messagesOf(error) ?? [
+    { message: String(looseRecord(error)?.["message"] ?? error) },
+  ];
+
+  return typeof status === "number" ? { status, errors } : { errors };
+};
+
+export const failureStatus = (error: unknown): number | undefined => toHttpFailure(error).status;
+
 export const failureDetail = (error: unknown): string =>
-  messagesOf(error)?.join(", ") ?? String(record(error)?.["message"] ?? error);
+  toHttpFailure(error)
+    .errors.map(({ message }) => message)
+    .join(", ");

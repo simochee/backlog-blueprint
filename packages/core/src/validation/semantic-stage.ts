@@ -54,10 +54,8 @@ export const validateStaticSemantics = (manifest: Manifest, source: SourceMap): 
 
   const report = push("error");
 
-  /**
-   * 警告を出す口を分けて持つ。V-A24 は W-1（Backlog がイベントを増やしても CLI を
-   * 更新せず使える）を残すための警告で、エラーに寄せると前方互換が消える。
-   */
+  // V-A24 をエラーに寄せない。Backlog が増やしたイベントを CLI の更新なしに使える前方互換
+  // （W-1）が消える。
   const warn = push("warning");
 
   const resources = namedResources(manifest);

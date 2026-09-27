@@ -8,10 +8,6 @@ import { type SourceMap } from "./source-map";
 
 const minimal = { key: "PROJ_A", name: "プロジェクトA" };
 
-/**
- * 位置と「ソースに値が書かれていないか」は S1 が読み取る（DG-5 / Y-3）。
- * S3 のテストは S1 を走らせずに、その読み取り結果を固定値で差し替える。
- */
 const sourceMap = (overrides: Partial<SourceMap> = {}): SourceMap => ({
   positionAt: () => ({ line: 1, column: 1 }),
   isEmptySource: () => false,

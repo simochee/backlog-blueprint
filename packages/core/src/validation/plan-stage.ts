@@ -46,9 +46,8 @@ const selfExclusion = (actions: Action[], snapshot: Snapshot): Diagnostic[] => {
 };
 
 /**
- * API 制約「権限」が Administrator だけに許すと記録している操作に限る（V-B2）。
- * 記録の無い操作（ステータスの `reorder` など）まで推し量って足すと、実際には通る
- * 計画に警告が出る。
+ * API 制約「権限」に記録のある操作に限る（V-B2）。記録の無い操作（ステータスの `reorder`
+ * など）まで推し量って足すと、実際には通る計画に警告が出る。
  */
 const SPACE_ADMINISTRATOR_ONLY: Partial<Record<ResourceKind, Action["op"][]>> = {
   project: ["create"],
@@ -76,16 +75,14 @@ const spaceAdministratorOnly = (actions: Action[], snapshot: Snapshot): Diagnost
       ];
 };
 
-/** 振替先を要求する削除 API は課題種別とステータスの2つだけ（要件定義 §6） */
 const SUBSTITUTE_PARAMS: Record<string, string> = {
   substituteIssueTypeId: "issueTypes",
   substituteStatusId: "statuses",
 };
 
 /**
- * 振替先が削除対象自身かは、`Ref` の名前が削除対象の名前と一致するかで判定する（§5.2）。
- * 解決表を引いて ID まで確かめる形にはしない。それは未採用の V-C1（参照解決の
- * シミュレーション）を一部だけ持ち込むことになる。
+ * 解決表を引いて ID まで確かめない（§5.2）。未採用の V-C1（参照解決のシミュレーション）を
+ * 一部だけ持ち込むことになる。
  */
 const pointsAtSelf = (action: Action, substitute: Value): boolean => {
   if (typeof substitute === "number") {
@@ -192,14 +189,10 @@ export type PlanStageInput = {
   snapshot: Snapshot;
   snapshots: ResourceSnapshots;
   actions: Action[];
-  /** 描画に出すものと同じ値で判定する（plan の出力仕様 §1.4） */
   order: ResourceOrder;
 };
 
-/**
- * ネットワークを使わない（S7）。`plan()` が純粋関数である（C-2）以上、計画を
- * 根拠にする検証も追加の GET を必要としない。
- */
+/** `get` を受け取らない（S7）。計画を根拠にする検証に追加の GET が要るなら、それは C-2 の破れ */
 export const validatePlan = ({
   manifest,
   snapshot,

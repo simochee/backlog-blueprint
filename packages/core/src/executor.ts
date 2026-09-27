@@ -1,44 +1,35 @@
-/**
- * `import` に置き換えられない。`fetch.d.ts` は export を持たないグローバル宣言の
- * ファイルで、import すると module 扱いになって宣言がグローバルでなくなる。
- * 参照が要るのは、core を読む側（test-utils / cli / web）の program に
- * `fetch.d.ts` が入らず、`setTimeout` が下流でだけ見つからなくなるため。
- * consumer の `types` に足す案は、NFR-5 のガードを緩めるので採らない。
- */
+// `import` に置き換えない。import すると `fetch.d.ts` が module 扱いになり、宣言が
+// グローバルでなくなる。参照が無いと、core を読む側（test-utils / cli / web）でだけ
+// `setTimeout` が見つからない。読む側の `types` に足す案は NFR-5 のガードを緩める。
 // oxlint-disable-next-line typescript/triple-slash-reference
 /// <reference path="./fetch.d.ts" />
 
-import { type Action, type ProvidedRef } from "./action";
+import { type Action, executedActions, type ProvidedRef } from "./action";
 import {
   asArrayOf,
   asRecord,
   requiredNumber,
-  requiredString,
   type HttpFailure,
+  looseRecord,
+  requiredString,
 } from "./api-response";
 import { type ExecuteContext, type ExecutionEvent } from "./execution";
 import { resolveRequest } from "./ref";
 import { type ResolutionKey } from "./resolution";
 import { type ResourceKind } from "./resource";
+import { toHttpFailure } from "./validation/http-failure";
 
 const WRITE_INTERVAL_MS = 1000;
 
-/** X-4 が定める再試行の上限3回 */
 const RATE_LIMIT_RETRY_LIMIT = 3;
 
 /**
- * `refresh` が読み直す先は RF-1 が1箇所に定めており、`Action` には GET の
- * リクエストを載せる場所が無い（`HttpRequest` は更新系の3メソッドだけを持つ）。
- * reconciler 側に GET を戻すと C-2 の唯一の例外が例外でなくなるので、
- * 再取得の実体はここに置く。
+ * 再取得の path を reconciler の `Action.request` に持たせない。GET を reconciler ごとに
+ * 足せるようになり、C-2 の唯一の例外（RF-1）が例外でなくなる。
  */
 const REFRESHED = [
-  /**
-   * 課題種別だけ Action の `provides` を位置の順に当てる。既定の表示名はスペースの
-   * 言語設定で変わり、新規プロジェクトでは取得するまで分からないので、返ってきた名前で
-   * 登録すると計画が指す名前と食い違う（§4.1）。ステータスは ID が 1〜4 の固定値で、
-   * 計画が名前ではなく ID で指すため、返ってきた名前をそのまま使ってよい。
-   */
+  // 課題種別は返ってきた名前で登録しない。既定の表示名は言語設定で変わり、計画が指す
+  // 名前と食い違う（§4.1）。ステータスは計画が ID で指すので名前をそのまま使ってよい。
   {
     kind: "issueType",
     path: (projectKey: string) => `/api/v2/projects/${projectKey}/issueTypes`,
@@ -64,51 +55,14 @@ const delay = (milliseconds: number): Promise<void> =>
     setTimeout(() => resolve(), milliseconds);
   });
 
-/**
- * 応答の形を確かめる `asRecord` と違い、こちらは失敗しても投げない。ここで見るのは
- * エラー本文とレート制限の本文で、形が違えば「読めなかった」として扱う道が要る。
- * 投げると、API の失敗を報告する経路自体が別の例外で置き換わる。
- */
-const optionalRecord = (value: unknown): Record<string, unknown> | undefined =>
-  typeof value === "object" && value !== null ? (value as Record<string, unknown>) : undefined;
-
 const numericId = (value: unknown): number | undefined => {
-  const id = optionalRecord(value)?.["id"];
+  const id = looseRecord(value)?.["id"];
 
   return typeof id === "number" ? id : undefined;
 };
 
-const messagesOf = (value: unknown): { message: string }[] | undefined => {
-  const errors = optionalRecord(value)?.["errors"];
-
-  if (!Array.isArray(errors)) {
-    return undefined;
-  }
-
-  const messages = errors.map((error) => optionalRecord(error)?.["message"]);
-
-  return messages.every((message) => typeof message === "string")
-    ? messages.map((message) => ({ message }))
-    : undefined;
-};
-
-/**
- * 投げられたものが `HttpFailure` である保証は型にできないので、形が違えば
- * `message` から組み直す。`status` はあるときだけ載せる（§7.0）。
- */
-const toFailure = (error: unknown): HttpFailure => {
-  const status = optionalRecord(error)?.["status"];
-  const errors = messagesOf(error) ?? [
-    { message: String(optionalRecord(error)?.["message"] ?? error) },
-  ];
-
-  return typeof status === "number" ? { status, errors } : { errors };
-};
-
 const rateLimitReset = (body: unknown, section: "read" | "update"): number | undefined => {
-  const reset = optionalRecord(optionalRecord(optionalRecord(body)?.["rateLimit"])?.[section])?.[
-    "reset"
-  ];
+  const reset = looseRecord(looseRecord(looseRecord(body)?.["rateLimit"])?.[section])?.["reset"];
 
   return typeof reset === "number" ? reset : undefined;
 };
@@ -124,11 +78,7 @@ export const execute = async function* (
   actions: Action[],
   ctx: ExecuteContext,
 ): AsyncGenerator<ExecutionEvent, void> {
-  /**
-   * `noop` だけを落とし、`refresh` は残す。`refresh` は GET だが実行される Action で、
-   * 進捗の分母にも中断レポートの位置にも数える（§6.1 / plan の出力仕様 §1.3）。
-   */
-  const executed = actions.filter(({ op }) => op !== "noop");
+  const executed = executedActions(actions);
 
   let lastWriteAt: number | undefined;
 
@@ -188,12 +138,8 @@ export const execute = async function* (
       responses.push(response);
 
       for (const [slot, { id, name }] of toNamedResources(response).entries()) {
-        /**
-         * 枠に当てる名前が無ければ登録しない。返ってきた名前で埋めると、計画が
-         * 知らない名前が解決表に入るだけでなく、利用者がその名前を書いていた場合に
-         * 別の枠を指させる（§4.1）。登録されなければ、その枠を指す Action が
-         * 未解決参照として止まる。
-         */
+        // 枠に当てる名前が無くても返ってきた名前で埋めない。利用者がその名前を書いていると
+        // 別の枠を指させる（§4.1）。
         const ref = positional ? slots[slot] : { kind, name };
 
         if (ref === undefined) {
@@ -239,7 +185,7 @@ export const execute = async function* (
 
       return await send(action, action.request);
     } catch (error) {
-      return { ok: false, ...toFailure(error) };
+      return { ok: false, ...toHttpFailure(error) };
     }
   };
 
