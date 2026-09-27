@@ -114,7 +114,7 @@ export const expandEnvironment = (
           path,
           ...parsed.source.positionAt(path),
           message: `environment variable is not defined: ${name}`,
-          hint: `set ${name} in the environment, or write the value in the manifest. to keep the literal text, write $$\${${name}}`,
+          hint: `set ${name} in the environment, or write the value in the manifest. to keep the literal text, write $\${${name}}`,
         });
       }
 
