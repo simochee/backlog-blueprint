@@ -1554,6 +1554,12 @@ describe("ファイルの開閉の端", () => {
   });
 });
 
+/** 保存はファイルを選ぶ API の有無を await してからダウンロードするので、その後まで待つ */
+const settleSave = async (): Promise<void> =>
+  new Promise((resolve) => {
+    setTimeout(resolve, 0);
+  });
+
 describe("保存のショートカット", () => {
   it("Cmd+S でも Ctrl+S でも、フォーカスがエディタの外にあっても Save と同じく保存し、ブラウザのページ保存は出さない", async () => {
     const saved = capturingDownloads();
@@ -1583,6 +1589,7 @@ describe("保存のショートカット", () => {
     expect(fireEvent.keyDown(document.body, { key: "S", metaKey: true, shiftKey: true })).toBe(
       true,
     );
+    await settleSave();
     expect(saved).toHaveLength(0);
   });
 
@@ -1593,6 +1600,7 @@ describe("保存のショートカット", () => {
     await writeManifest(user, MANIFEST);
 
     expect(fireEvent.keyDown(document.body, { key: "s", metaKey: true, repeat: true })).toBe(false);
+    await settleSave();
     expect(saved).toHaveLength(0);
   });
 
