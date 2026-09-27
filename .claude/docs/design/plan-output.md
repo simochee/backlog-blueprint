@@ -340,6 +340,20 @@ The project must still have zero issues at that point.
 （[適用対象の限定 §7.3](validation-pipeline.md#73-中断後の再開は保証されない)）。
 「続きから進む」とだけ書いて、その条件を書かないのは嘘になる。
 
+更新系が応答を返さなかったとき（[X-7](core-reconciler.md#73-応答を待つ上限)）は、
+失敗した操作を「Failed」に置いたまま、エラー内容で適用済みかもしれないことを伝える。
+`status` は無いので行頭に数字は付かない。
+
+```
+ERROR  POST /api/v2/projects/PROJ_A/webhooks
+  No response from Backlog within 60 seconds.
+  The request may have been applied anyway.
+```
+
+「Not applied」に移す案は採らない。届いていた変更を利用者が手で作り直すと二重になる。
+何が起きたかは、案内どおりに `apply` をやり直せば read の時点で分かり、
+適用されていれば `noop` になる。
+
 確認プロンプトで拒否したときは1行で終える。
 
 ```
@@ -376,7 +390,11 @@ plan の構造に `result` と実行結果を足したもの。
 `failed.status` は**任意**である。タイムアウト・名前解決の失敗・ブラウザの CORS 失敗のように
 HTTP のやり取りが成立しなかった場合、ステータスは存在しない。そのときは `status` を省き、
 `errors[]` にだけ内容を入れる。消費側は `status` の有無で「Backlog が拒否した」と
-「Backlog に届かなかった」を判別できる。
+「Backlog から応答を得られなかった」を判別できる。
+
+`status` が無いことは「適用されなかった」を意味しない。更新系のタイムアウトは、届いて
+適用されたうえで応答だけが返らなかった場合を含む（[X-7](core-reconciler.md#73-応答を待つ上限)）。
+その `failed` は `pending` に入らず、`errors[]` の2件目が適用済みかもしれないことを述べる。
 
 存在しないステータスを `0` などで埋める案は採らない。未解決の `Ref` を偽の ID で
 埋めないこと（PO-5）と同じ理由で、無い値は無いまま表す。
