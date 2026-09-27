@@ -11,10 +11,10 @@ Create a [Backlog](https://backlog.com/) project from a YAML file.
 
 ![backlog-blueprint](https://raw.githubusercontent.com/simochee/backlog-blueprint/main/packages/brand/out/eyecatch.svg)
 
-The manifest lives in your repository, so a project's settings can be reviewed in a pull request and
-reused for the next project. `plan` shows what will change; `apply` makes the changes.
+**[Try it in your browser](https://simochee.github.io/backlog-blueprint/)** — no install, no server.
 
-A manifest can include:
+Keep the manifest in your repository to review a project's settings in a pull request and reuse them
+for the next project. A manifest can include:
 
 - basic project settings
 - issue types, statuses, and categories
@@ -22,21 +22,11 @@ A manifest can include:
 - teams, members, and administrators
 - webhooks
 
-## Requirements
-
-- Node.js 22 or later
-- A Backlog space and an API key
-
 ## Usage
 
-Run it with `npx`; there is nothing to install.
+You need Node.js 22 or later and a Backlog API key.
 
-```sh
-npx @simochee/backlog-blueprint --help
-```
-
-Write a manifest. The comment on the first line gives your editor completion and validation (see
-[JSON Schema](#json-schema)).
+Write a manifest. The first line gives your editor completion and validation.
 
 ```yaml
 # yaml-language-server: $schema=https://cdn.jsdelivr.net/npm/@simochee/backlog-blueprint@0.2.0/schema.json
@@ -75,16 +65,13 @@ webhooks:
       - issueUpdated
 ```
 
-Check the file without contacting Backlog:
+Check it offline, with no API key:
 
 ```sh
 npx @simochee/backlog-blueprint validate -f projects/PROJ_A.yaml
 ```
 
-`validate` needs no API key and no `${ENV}` values, so it can run in a pull request check. It cannot
-see your space, so it cannot report default statuses, existing members, or issue counts; `plan` can.
-
-See what `apply` would change. In this example, `PROJ_A` already exists and has no issues:
+See what would change:
 
 ```sh
 export BACKLOG_SPACE=example.backlog.com
@@ -115,19 +102,22 @@ Plan: 4 to add, 3 to change, 1 to destroy, 5 unchanged.
 Write requests: 8 (estimated 8s)
 ```
 
-Apply it:
+Apply it. `apply` shows the same plan and continues only if you type `yes`:
 
 ```sh
 npx @simochee/backlog-blueprint apply -f projects/PROJ_A.yaml
 ```
 
-`apply` prints the same plan and asks for confirmation before it writes anything. Only the word
-`yes` is accepted; any other answer exits with code 1.
+To start from a project you already have, print it as a manifest:
 
-[Writing a manifest](https://github.com/simochee/backlog-blueprint/blob/main/docs/manifest.md)
-explains the rest of the format.
+```sh
+npx @simochee/backlog-blueprint export PROJ_A > projects/standard.yaml
+```
 
-## Commands
+The output contains webhook URLs as they are, so replace secrets with `${NAME}` before you commit it.
+`export` gives you a starting point for a template; it is not a way to detect drift.
+
+## Reference
 
 | Command        | Contacts Backlog | Description                              |
 | -------------- | ---------------- | ---------------------------------------- |
@@ -136,26 +126,14 @@ explains the rest of the format.
 | `apply`        | read and write   | Apply the plan                           |
 | `export <key>` | read only        | Print an existing project as a manifest  |
 
-If validation fails, every command reports every problem it found and stops before the first write.
-
-### Options
-
 | Option               | Commands                  | Description                                       |
 | -------------------- | ------------------------- | ------------------------------------------------- |
 | `-f, --file <path>`  | `validate` `plan` `apply` | Manifest to read (required). `-` reads stdin      |
 | `--space <domain>`   | all                       | Backlog space, such as `example.backlog.com`      |
-| `--output <format>`  | `validate` `plan` `apply` | `text` (default) or `json`                        |
+| `--output <format>`  | `validate` `plan` `apply` | `text` (default) or `json` on stdout              |
 | `--no-color`         | all                       | Turn off colored output                           |
 | `--show-unchanged`   | `plan`                    | Also show resources that already match            |
 | `-y, --auto-approve` | `apply`                   | Skip the prompt. Required when stdin is not a TTY |
-
-Each run handles one manifest and one project: `-f` is accepted once, and `export` takes exactly one
-key. To process several projects, loop in the shell.
-
-With `--output json`, standard output contains only the JSON document. Progress, warnings, errors,
-and prompts are written to standard error.
-
-### Environment variables
 
 | Variable          | Description                                        |
 | ----------------- | -------------------------------------------------- |
@@ -163,100 +141,41 @@ and prompts are written to standard error.
 | `BACKLOG_SPACE`   | Same as `--space`                                  |
 | `NO_COLOR`        | Same as `--no-color`                               |
 
-There is no `--api-key` option, because command-line arguments show up in `ps`, shell history, and
-CI logs. `${NAME}` references in a manifest are also resolved from environment variables.
+`${NAME}` in a manifest is also read from the environment.
 
-### Exit codes
-
-| Code | Meaning                                            |
-| ---- | -------------------------------------------------- |
-| 0    | Success. For `plan`: no changes                    |
-| 1    | Error, including validation errors and failed runs |
-| 2    | `plan` only: there are changes to apply            |
-
-In CI, exit code 2 from `plan` tells you the manifest would change the space, without parsing the
-output.
-
-### Starting from an existing project
-
-`export` prints a project as a manifest. This lets you use an existing project as a template:
-
-```sh
-npx @simochee/backlog-blueprint export PROJ_A > projects/standard.yaml
-```
-
-Standard output carries only the YAML. If any read fails, nothing is written and the command exits
-with code 1.
-
-The output includes webhook URLs exactly as Backlog returns them; replace secrets with `${NAME}` and
-review the file before you commit it. Any project can be exported, even one with issues, but `plan`
-and `apply` still refuse a project that has issues, so change `key` and `name` before you apply the
-file.
-
-`export` writes what the project looks like right now, as a starting point for a template. It is not
-drift detection: the tool never compares two manifests.
+| Exit code | Meaning                                 |
+| --------- | --------------------------------------- |
+| 0         | Success. For `plan`: no changes         |
+| 1         | Error                                   |
+| 2         | `plan` only: there are changes to apply |
 
 ## Limitations
 
-backlog-blueprint sets up a project once. It does not keep Backlog in sync with the manifest
-afterwards.
+backlog-blueprint sets up a project once. It does not keep Backlog in sync with the manifest.
 
-- **Only projects without issues.** If the project already exists and has at least one issue, `plan`
-  and `apply` stop before making changes. You cannot turn off this check.
-- **No state.** There is no state file or drift detection. Each run reads the current project and
-  compares it with the manifest.
-- **Some operations need a space administrator's key.** Backlog accepts creating a project, changing
-  statuses, and adding project administrators only from a space administrator. `plan` warns you
-  (`V-B2`) when the plan includes an operation your key cannot perform.
-- **No rollback.** If `apply` fails partway through, it stops and reports what was applied, what
-  failed, and what was not attempted. Run the same manifest again to continue: work already applied
-  is skipped, as long as the project still has no issues.
+- **Only projects without issues.** `plan` and `apply` stop if the project already has issues.
+- **No state.** Each run reads the project and compares it with the manifest.
+- **Some operations need a space administrator's key:** creating a project, changing statuses, and
+  adding project administrators. `plan` warns you (`V-B2`) if your key cannot do them.
+- **No rollback.** If `apply` fails partway, it reports what was done. Run it again to continue.
 
-The following are also out of scope: Git repositories, issues, wiki pages, space settings, and
-deleting or archiving projects.
+Git repositories, issues, wiki pages, and space settings are out of scope.
 
 ## Security
 
-> **Warning:** push access to the repository that holds your manifests is, in effect, the access of
-> whoever owns the API key in CI. Anyone who can push a manifest, or edit the workflow that runs it,
-> can change every project that key can reach — the whole space, if the key belongs to a space
-> administrator.
+> **Warning:** anyone who can push to the repository that CI applies manifests from can change every
+> project the CI's API key can reach — the whole space, if the key belongs to a space administrator.
 
-Require reviews on the branch that CI applies from. Limit who can edit workflow files. Store the API
-key in the smallest secret scope that works.
-
-## Web UI
-
-<https://simochee.github.io/backlog-blueprint/> provides the same validation and planning in your
-browser. It is a static page that calls the Backlog API directly. Your space and API key stay in the
-tab's session storage, so a reload does not ask for them again; they are removed when you close the
-tab or click **Disconnect**.
-
-Paste or drop a manifest, or **Open** a file, then **Plan** and **Apply**. Unlike the CLI, **Apply**
-does not ask for confirmation, so read the plan first. **Save** (Cmd/Ctrl+S) writes back to the
-opened file in Chromium-based browsers and downloads a copy in others. **Import from Backlog** loads
-an existing project into the editor as the same YAML that `export` prints.
-
-## JSON Schema
-
-Each release ships a JSON Schema inside the npm package, served by jsDelivr:
-
-```
-https://cdn.jsdelivr.net/npm/@simochee/backlog-blueprint@<version>/schema.json
-```
-
-The version in the URL is the CLI version, and a published version's schema never changes. The CLI checks many
-things a schema cannot express, so a manifest your editor accepts can still fail `validate`.
+Require reviews on that branch, limit who can edit workflows, and scope the secret as narrowly as you
+can.
 
 ## Documentation
 
-- [Writing a manifest](https://github.com/simochee/backlog-blueprint/blob/main/docs/manifest.md):
-  deletion, `oldname`, default resources, ordering, `${ENV}`, `access`, `webhooks`, and why `apply`
-  can be slow
-- [DEVELOPMENT.md](https://github.com/simochee/backlog-blueprint/blob/main/DEVELOPMENT.md): how to
-  work on backlog-blueprint itself
+- [Writing a manifest](https://github.com/simochee/backlog-blueprint/blob/main/docs/manifest.md)
+- [DEVELOPMENT.md](https://github.com/simochee/backlog-blueprint/blob/main/DEVELOPMENT.md): working
+  on backlog-blueprint itself
 - [`.claude/docs/`](https://github.com/simochee/backlog-blueprint/tree/main/.claude/docs): the
-  specification in Japanese. IDs such as `[V-A6]` in error messages refer to it
+  specification (Japanese). IDs such as `[V-A6]` in messages refer to it
 
 ## License
 
