@@ -1,0 +1,21 @@
+{
+  "name": "@backlog-blueprint/brand",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "render": "tsx src/render.tsx",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@backlog-blueprint/tsconfigs": "workspace:*",
+    "@resvg/resvg-js": "catalog:",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "react": "catalog:",
+    "satori": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:"
+  }
+}

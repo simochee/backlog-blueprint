@@ -140,5 +140,6 @@ Each override in `.oxlintrc.json` is there for a specific problem. Check before 
   way to hand it one.
 - `import/no-unassigned-import` (`apps/web/src/test-setup.ts` only) — jest-dom matchers can only be
   registered by a side-effecting import.
-- `import/no-nodejs-modules` (`apps/cli/src/` only) — the CLI is a Node application and needs
-  `node:*` for file and stdin access. It stays enabled everywhere under `packages/` (NFR-5).
+- `import/no-nodejs-modules` (`apps/cli/src/` and `packages/brand/src/render.tsx` only) — the CLI
+  is a Node application and needs `node:*` for file and stdin access, and the brand renderer reads
+  fonts and writes images. It stays enabled everywhere else under `packages/` (NFR-5).

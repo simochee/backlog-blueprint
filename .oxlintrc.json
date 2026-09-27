@@ -95,7 +95,7 @@
   },
   "overrides": [
     {
-      "files": ["apps/cli/src/**"],
+      "files": ["apps/cli/src/**", "packages/brand/src/render.tsx"],
       "rules": {
         "import/no-nodejs-modules": "off"
       }

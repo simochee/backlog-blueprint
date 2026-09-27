@@ -1,0 +1,7 @@
+{
+  "extends": "@backlog-blueprint/tsconfigs/node.json",
+  "compilerOptions": {
+    "jsx": "react-jsx"
+  },
+  "include": ["src"]
+}
