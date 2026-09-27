@@ -147,8 +147,8 @@ not change is not rebuilt.
 
 ## Releasing
 
-The first release is `0.1.0`. `.release-please-manifest.json` starts at `0.0.0`, because nothing has
-been published yet, and `initial-version` in `release-please-config.json` names the version that a
+The first release is `0.1.0`. `.release-please-manifest.json` starts at `0.0.0`, because nothing had
+been released yet, and `initial-version` in `release-please-config.json` names the version that a
 repository in that state is released at — without it the first release would be `1.0.0`, which is
 release-please's default. The schema URL carries the same version as the npm package (D-2), and the
 documentation already points at `schema/0.1.0/project.json`, so the first published version has to
@@ -259,9 +259,11 @@ one of those says nothing about what a version does differently from the one bef
   deployment. A site built from `main` carries a schema for the version that is already on npm,
   built from source that has moved on since it was published; the published one has to win. During
   a release the version being released is not on the registry yet, because Pages is deployed first,
-  so nothing overwrites it. A package npm does not know at all is the first release and has nothing
-  to restore; any other failure to reach npm or Pages aborts the deployment rather than quietly
-  dropping a version.
+  so nothing overwrites it. `0.0.0` is skipped: it is the placeholder described in
+  [What the repository has to provide](#what-the-repository-has-to-provide), was never released,
+  and has no schema to restore. A package npm does not know at all has nothing to restore either;
+  any other failure to reach npm or Pages aborts the deployment rather than quietly dropping a
+  version.
 - **A breaking change to the manifest format bumps the major version** and ships as a new schema
   URL, leaving the old one in place. The CLI is then expected to recognize the superseded syntax and
   say how to rewrite it, rather than interpreting it in a way the author did not intend. The
@@ -276,6 +278,7 @@ The workflow cannot create any of these itself.
 | -------------------------- | --------------------------------------------------------------------------- |
 | Pages source               | Settings, Pages, Build and deployment, Source: **GitHub Actions**           |
 | npm trusted publisher      | On the package's npm settings: this repository, workflow `release.yml`, **no environment** |
+| npm publishing access      | On the package's npm settings: **Require two-factor authentication and disallow tokens** |
 | `github-pages` environment | Created by GitHub with the Pages source; must allow `main`                  |
 | Pull requests from Actions | Settings, Actions, General: **Allow GitHub Actions to create and approve pull requests** |
 
@@ -284,9 +287,12 @@ The repository holds no npm token. npm accepts the publish job's OIDC token inst
 `registry-url`. The environment field of the trusted publisher is left empty because that job runs
 in no environment; `github-pages` belongs to the Pages job, which does not talk to npm.
 
-Trusted publishing cannot cover a package's first release, though. A trusted publisher is
-configured on a package's settings page, and a package nobody has published yet has no settings
-page ([npm/cli#8544](https://github.com/npm/cli/issues/8544)). `0.1.0` therefore has to be
-published by hand — `npm login`, then `pnpm --filter @simochee/backlog-blueprint publish` from a
-local checkout of the `v0.1.0` tag — and the trusted publisher configured once it exists. Every
-release after it is the workflow's.
+Trusted publishing cannot create a package, though. A trusted publisher is configured on a
+package's settings page, and a package nobody has published yet has no settings page
+([npm/cli#8544](https://github.com/npm/cli/issues/8544)). So `0.0.0` was published by hand, only to
+bring that page into existence, and is deprecated; it contains nothing that was ever released, and
+the release workflow skips it when it restores schemas. Every real release, `0.1.0` included, is
+the workflow's.
+
+With the trusted publisher working, publishing access disallows tokens, so a leaked or forgotten
+token cannot publish either.
