@@ -549,7 +549,7 @@ Go CLI + TypeScript Web という案は、検証ロジックを2回実装する�
 | 対象 | 配布先 |
 | --- | --- |
 | CLI | npm `@simochee/backlog-blueprint`。実行ファイル名は `backlog-blueprint` |
-| Web UI | GitHub Pages `https://simochee.github.io/backlog-blueprint/` |
+| Web UI | GitHub Pages `https://backlog-blueprint.simochee.net/` |
 | JSON Schema | CLI の npm パッケージに `schema.json` として同梱し、jsDelivr の `https://cdn.jsdelivr.net/npm/@simochee/backlog-blueprint@<version>/schema.json` で配る |
 
 `$schema` の URL に含まれるバージョンは npm パッケージの semver と一致させる
