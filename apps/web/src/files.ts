@@ -7,7 +7,7 @@ const MANIFEST_FILES = [{ description: "Manifest", accept: { [YAML_TYPE]: [".yam
 
 export const UNTITLED_FILENAME = "manifest.yaml";
 
-/** 選択の画面を閉じただけなら何もしない（WU-44）。失敗として出さない */
+/** WU-44 */
 const cancelled = (error: unknown): boolean =>
   error instanceof DOMException && error.name === "AbortError";
 

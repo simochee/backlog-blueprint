@@ -51,6 +51,7 @@ import {
 import { PASTED, preparePlan } from "./plan";
 import { isRunning } from "./progress";
 import { secretRevisions, subscribeSecrets } from "./secrets";
+import { isSaveShortcut } from "./shortcut";
 import { pinTransport, transport } from "./transport";
 import { RESTORED_FORM_ID, useConnection } from "./use-connection";
 import { useDirectory } from "./use-directory";
@@ -245,7 +246,7 @@ export const App = () => {
     setFileFailure(undefined);
   };
 
-  /** WU-45。保存していない変更があるときだけ、差し替える前に確かめる。 */
+  /** WU-45 */
   const openDocument = (opened: OpenedDocument): void => {
     if (unsaved) {
       setReplacement(opened);
@@ -266,7 +267,7 @@ export const App = () => {
     }
   };
 
-  /** 書いているあいだに打った分は保存した内容に含まれないので、Unsaved のまま残る（WU-43）。 */
+  /** WU-43 / WU-44 */
   const saveFile = async (): Promise<void> => {
     const failure = `Could not save ${manifestDocument.name ?? UNTITLED_FILENAME}`;
 
@@ -274,7 +275,11 @@ export const App = () => {
       const saved = await saveManifestFile(manifestDocument, manifestText);
 
       if (saved !== undefined) {
-        setManifestDocument(saved);
+        /**
+         * 書き込みの許可を待つあいだに別の文書へ差し替えられていたら戻さない。戻すと、
+         * 表示は新しい文書のまま保存先だけが前のファイルになり、次の Save がそこを上書きする。
+         */
+        setManifestDocument((current) => (current === manifestDocument ? saved : current));
         setFileFailure(undefined);
       }
     } catch (error) {
@@ -282,18 +287,15 @@ export const App = () => {
     }
   };
 
-  /**
-   * WU-47。エディタの中だけで効かせない。Output や一覧を触った後に押すと、ブラウザが
-   * このページの HTML を保存する画面を開く。Shift+Cmd+S は「名前を付けて保存」に残す。
-   */
+  /** WU-47。押し続けた繰り返しでも、ページの保存は止めたまま保存だけしない。 */
   const saveOnShortcut = useEffectEvent((event: KeyboardEvent): void => {
-    if (
-      (event.metaKey || event.ctrlKey) &&
-      !event.shiftKey &&
-      !event.altKey &&
-      event.key.toLowerCase() === "s"
-    ) {
-      event.preventDefault();
+    if (!isSaveShortcut(event)) {
+      return;
+    }
+
+    event.preventDefault();
+
+    if (!event.repeat) {
       void saveFile();
     }
   });

@@ -262,11 +262,12 @@ not ask for them again. They are never written anywhere that outlives the tab, a
 removes them at once.
 
 You connect first, with your API key. The space and user you are connected as stay in the
-top-right corner, and that is also where you switch to another space. After that there are two
-pages. **Apply** walks through manifest, plan and apply. **Export** reads an
-existing project and gives you its manifest to copy or download, the same YAML that
-`backlog-blueprint export` prints. The exported YAML is not passed to the Apply page: change `key`
-and `name` first, then paste it there.
+top-right corner, and that is also where you switch to another space. After that you work in one
+editor: paste or drop a manifest, or **Open** a file, then **Plan** and **Apply**. **Save** (or
+Cmd/Ctrl+S) writes back to the file you opened in Chromium-based browsers, and downloads a copy in
+the others. **Import from Backlog** reads an existing project and opens its manifest in the editor,
+the same YAML that `backlog-blueprint export` prints. Change `key` and `name` before you plan it
+against a new project.
 
 ## JSON Schema
 

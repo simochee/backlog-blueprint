@@ -8,7 +8,7 @@ export type DiscardDialogProps = {
   onDiscard: () => void;
 };
 
-/** WU-45。差し替える中身を手に入れた後に出すので、何で置き換えるのかを名前で示せる。 */
+/** WU-45 */
 export const DiscardDialog = ({
   current,
   replacement,

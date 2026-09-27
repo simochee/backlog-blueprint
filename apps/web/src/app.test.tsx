@@ -1157,13 +1157,19 @@ describe("スペースのユーザーとチームの一覧", () => {
 type FakeFile = { handle: FileSystemFileHandle; contents: () => string };
 
 /** 書き込みは close で初めて中身に反映する。Chromium が一時ファイルに溜めて close で置き換えるのと同じ */
-const fakeFile = (name: string, initial: string, { failWrite = false } = {}): FakeFile => {
+const fakeFile = (
+  name: string,
+  initial: string,
+  { failWrite = false, writable = Promise.resolve() } = {},
+): FakeFile => {
   let contents = initial;
 
   const handle = {
     name,
     getFile: async () => new File([contents], name),
     createWritable: async () => {
+      await writable;
+
       let buffer = "";
 
       return {
@@ -1449,6 +1455,105 @@ describe("ファイルの開閉", () => {
   });
 });
 
+describe("ファイルの開閉の端", () => {
+  it("何も開いていない文書の計画は (pasted) を名乗る", async () => {
+    const user = await connected();
+
+    await writeManifest(user, MANIFEST);
+    await plan(user);
+    await user.click(within(region("Output")).getByRole("button", { name: "Copy JSON" }));
+
+    expect(JSON.parse(await navigator.clipboard.readText())).toMatchObject({
+      manifest: { path: "(pasted)" },
+    });
+  });
+
+  it("落としたファイルは保存先を持たないので、Save はその名前を候補に保存先を選ばせる", async () => {
+    const { showSaveFilePicker } = withPickers({ save: [fakeFile("dropped.yml", "").handle] });
+    const user = await connected();
+
+    fireEvent.drop(await manifestField(), {
+      dataTransfer: { files: [new File([MANIFEST], "dropped.yml")] },
+    });
+    await waitFor(async () => {
+      expect(await manifestField()).toHaveValue(MANIFEST);
+    });
+    await user.click(button("Save"));
+
+    await waitFor(() => {
+      expect(showSaveFilePicker).toHaveBeenCalledWith(
+        expect.objectContaining({ suggestedName: "dropped.yml" }),
+      );
+    });
+  });
+
+  it("ファイルを選ぶ API が無いブラウザでファイルの選択をやめたら、何も変わらない", async () => {
+    vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(function (
+      this: HTMLInputElement,
+    ) {
+      this.dispatchEvent(new Event("cancel"));
+    });
+
+    const user = await connected();
+
+    await writeManifest(user, MANIFEST);
+    await user.click(button("Open"));
+
+    expect(await manifestField()).toHaveValue(MANIFEST);
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(screen.queryByText(/Could not open/)).toBeNull();
+  });
+
+  it("ファイルを開けなければ失敗を出し、今の中身を残す", async () => {
+    vi.stubGlobal(
+      "showOpenFilePicker",
+      vi.fn(async () => {
+        throw new DOMException("The file could not be read.", "NotReadableError");
+      }),
+    );
+
+    const user = await connected();
+
+    await writeManifest(user, MANIFEST);
+    await user.click(button("Open"));
+
+    expect(await screen.findByText(/Could not open the file/)).toBeInTheDocument();
+    expect(await manifestField()).toHaveValue(MANIFEST);
+  });
+
+  it("書き込みの許可を待つあいだに別の文書へ差し替えたら、書き終わっても差し替えた文書のまま", async () => {
+    let allowWrite!: () => void;
+    const first = fakeFile("project.yaml", MANIFEST, {
+      writable: new Promise<void>((resolve) => {
+        allowWrite = resolve;
+      }),
+    });
+    const second = fakeFile("other.yaml", withCategory("開発"));
+
+    withPickers({ open: [first.handle, second.handle] });
+
+    const user = await connected();
+
+    await user.click(button("Open"));
+    await waitFor(async () => {
+      expect(await manifestField()).toHaveValue(MANIFEST);
+    });
+    await replaceManifest(user, withCategory("設計"));
+    await user.click(button("Save"));
+    await user.click(button("Open"));
+    await user.click(
+      within(await discardDialog()).getByRole("button", { name: "Discard and open" }),
+    );
+    allowWrite();
+
+    await waitFor(() => {
+      expect(first.contents()).toBe(withCategory("設計"));
+    });
+    expect(within(documentStatus()).getByText("other.yaml")).toBeInTheDocument();
+    expect(within(documentStatus()).queryByText("Unsaved")).toBeNull();
+  });
+});
+
 describe("保存のショートカット", () => {
   it("Cmd+S でも Ctrl+S でも、フォーカスがエディタの外にあっても Save と同じく保存し、ブラウザのページ保存は出さない", async () => {
     const saved = capturingDownloads();
@@ -1479,6 +1584,37 @@ describe("保存のショートカット", () => {
       true,
     );
     expect(saved).toHaveLength(0);
+  });
+
+  it("押し続けた繰り返しでは保存せず、ページの保存も出さない", async () => {
+    const saved = capturingDownloads();
+    const user = await connected();
+
+    await writeManifest(user, MANIFEST);
+
+    expect(fireEvent.keyDown(document.body, { key: "s", metaKey: true, repeat: true })).toBe(false);
+    expect(saved).toHaveLength(0);
+  });
+
+  it("Alt を足した組み合わせは奪わない", async () => {
+    const user = await connected();
+
+    await writeManifest(user, MANIFEST);
+
+    expect(fireEvent.keyDown(document.body, { key: "ß", metaKey: true, altKey: true })).toBe(true);
+  });
+
+  it("モーダルを開いているあいだも保存する", async () => {
+    const saved = capturingDownloads();
+    const user = await connected();
+
+    await writeManifest(user, MANIFEST);
+    await user.click(button("Import from Backlog"));
+
+    expect(fireEvent.keyDown(importDialog(), { key: "s", metaKey: true })).toBe(false);
+    await waitFor(() => {
+      expect(saved).toHaveLength(1);
+    });
   });
 
   it("接続する前は奪わない", async () => {
@@ -1668,6 +1804,58 @@ describe("Backlog からの読み込み", () => {
 
     await writeManifest(user, withCategory("開発"));
     await importProject(user, "PROJ_A");
+
+    expect(await discardDialog()).toHaveTextContent("Opening PROJ_A.yaml replaces them.");
+    expect(await manifestField()).toHaveValue(withCategory("開発"));
+  });
+
+  it("確かめられてやめれば、今の文書の中身と名前が残る", async () => {
+    withPickers({ open: [fakeFile("project.yaml", MANIFEST).handle] });
+
+    const user = await connected(EXPORTABLE);
+
+    await user.click(button("Open"));
+    await waitFor(async () => {
+      expect(await manifestField()).toHaveValue(MANIFEST);
+    });
+    await replaceManifest(user, withCategory("開発"));
+    await importProject(user, "PROJ_A");
+    await user.click(within(await discardDialog()).getByRole("button", { name: "Cancel" }));
+
+    expect(await manifestField()).toHaveValue(withCategory("開発"));
+    expect(within(documentStatus()).getByText("project.yaml")).toBeInTheDocument();
+  });
+
+  it("読み込んだ文書を保存すると <KEY>.yaml を候補に保存先を選ばせ、保存しても案内は残る", async () => {
+    const { showSaveFilePicker } = withPickers({ save: [fakeFile("PROJ_A.yaml", "").handle] });
+    const user = await connected({ ...EXPORTABLE, [ISSUES_COUNT]: { count: 3 } });
+
+    await importProject(user, "PROJ_A");
+    await imported();
+    await user.click(button("Save"));
+
+    await waitFor(() => {
+      expect(within(documentStatus()).queryByText("Unsaved")).toBeNull();
+    });
+    expect(showSaveFilePicker).toHaveBeenCalledWith(
+      expect.objectContaining({ suggestedName: "PROJ_A.yaml" }),
+    );
+    expect(screen.getByText(/PROJ_A holds 3 issues/)).toBeInTheDocument();
+  });
+
+  it("書き出している最中はモーダルを閉じられず、閉じようとしても書き出せば確かめてから読み込む", async () => {
+    const user = await connected(EXPORTABLE);
+
+    await writeManifest(user, withCategory("開発"));
+
+    const release = holding();
+
+    await importProject(user, "PROJ_A");
+    await user.keyboard("{Escape}");
+
+    expect(importDialog()).toBeInTheDocument();
+
+    release();
 
     expect(await discardDialog()).toHaveTextContent("Opening PROJ_A.yaml replaces them.");
     expect(await manifestField()).toHaveValue(withCategory("開発"));

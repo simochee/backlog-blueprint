@@ -103,7 +103,12 @@
     {
       "files": ["**/*.d.ts"],
       "rules": {
-        "typescript/consistent-type-definitions": "off",
+        "typescript/consistent-type-definitions": "off"
+      }
+    },
+    {
+      "files": ["apps/web/src/globals.d.ts"],
+      "rules": {
         "no-var": "off"
       }
     },

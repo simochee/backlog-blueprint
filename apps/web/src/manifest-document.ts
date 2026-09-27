@@ -17,10 +17,7 @@ export const UNTITLED: ManifestDocument = { savedText: "" };
 
 export const documentName = (document: ManifestDocument): string => document.name ?? "Untitled";
 
-/**
- * 打鍵で立てる印にしない。元に戻したときも保存した直後も、倒し忘れればその経路だけ
- * 印が残る。比べれば今の内容の派生になり、倒す処理そのものが無くなる（WU-4）。
- */
+/** 打鍵で立てる印にしない（WU-43）。 */
 export const hasUnsavedChanges = (document: ManifestDocument, text: string): boolean =>
   text !== document.savedText;
 
@@ -33,7 +30,7 @@ export const openedFile = (
   text,
 });
 
-/** Backlog から読んだだけで手元には無いので、保存先も保存した内容も持たない（WU-30 / WU-43） */
+/** WU-30 / WU-43 */
 export const importedDocument = (exported: ProjectExport): OpenedDocument => {
   const notes = renderExportNotes(exported);
 
