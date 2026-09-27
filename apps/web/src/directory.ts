@@ -10,11 +10,7 @@ import {
 
 export type DirectoryKind = "users" | "teams";
 
-/**
- * `value` はマニフェストに写す値（ユーザー ID かチーム ID。A-6 / A-7）、`label` は人が探すときに
- * 読む値で、写すときには行末のコメントになる（WU-23 / A-6）。`details` は見分けるための
- * 手掛かりで、表示と絞り込みにだけ使い、写さない（WU-26）。
- */
+/** `details` はマニフェストに写さない。表示と絞り込みのための手掛かりにすぎない（WU-26） */
 export type DirectoryEntry = {
   value: number;
   label: string;
@@ -41,9 +37,7 @@ const toUser = (item: unknown): DirectoryEntry => {
   };
 };
 
-/**
- * `members` の欠落で読み取りを落とさない。人数は探す手掛かりにすぎず、写す値ではない。
- */
+/** `members` の欠落で読み取りを落とさない。人数は探す手掛かりにすぎず、写す値ではない */
 const toTeam = (item: unknown): DirectoryEntry => {
   const team = asRecord(item);
   const members = Array.isArray(team["members"]) ? team["members"].length : 0;

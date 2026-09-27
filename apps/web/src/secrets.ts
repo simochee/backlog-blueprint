@@ -1,20 +1,16 @@
-import { type Environment } from "@backlog-blueprint/core";
-
 /**
- * 画面が入力値を直接読まずに済むだけの事実を載せる。React Compiler は描画中に
- * 読んだモジュール変数を依存に数えないので、`hasApiKey()` のような関数呼び出しで
- * 渡すと、値が変わっても結果が使い回される。購読の返り値に載っていれば依存になる。
+ * `hasApiKey()` のような関数で渡さない。React Compiler は描画中に読んだモジュール変数を
+ * 依存に数えないので、値が変わっても結果が使い回される。購読の返り値に載せれば依存になる。
  */
-export type SecretRevisions = {
+type SecretRevisions = {
   credentials: number;
   environment: number;
   hasApiKey: boolean;
 };
 
 /**
- * API キーを React の state に載せない（§2.4 / FR-7.4）。state に置くと値が props として
- * 画面の各所へ流れ、どこにも表示されないことを目視で確かめる仕事が残る。
- * モジュールスコープに閉じ、外に出すのは「何回書き換わったか」だけにする。
+ * API キーを React の state に載せない（§2.4 / FR-7.4）。値が props として画面の各所へ流れ、
+ * どこにも表示されないことを目視で確かめる仕事が残る。
  */
 let apiKey = "";
 
@@ -55,16 +51,3 @@ export const setEnvironmentValue = (name: string, value: string): void => {
 export const revealApiKey = (): string => apiKey;
 
 export const environmentValue = (name: string): string => environmentValues.get(name) ?? "";
-
-/**
- * 空欄の名前を環境に入れない。入れると core の展開（S2）が値として受け取ってしまい、
- * 「値が未入力」を判定できなくなる（検証パイプライン §4「Web UI での V-A4」）。
- */
-export const enteredEnvironment = (names: string[]): Environment =>
-  Object.fromEntries(
-    names.flatMap((name) => {
-      const value = environmentValue(name);
-
-      return value === "" ? [] : [[name, value] as [string, string]];
-    }),
-  );

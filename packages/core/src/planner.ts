@@ -49,9 +49,8 @@ export const readUpdateRateLimit = async (get: ReadContext["get"]): Promise<Rate
 };
 
 /**
- * 404 を投げない `get` を用意しない（§7.0）。404 を情報として読むのはフェーズ0の
- * この1箇所だけで、他のすべての GET では 404 は本物の失敗である。送信層に
- * 「どの 404 が情報か」を判断させると、その知識が core と送信層に分かれる。
+ * 404 を投げない `get` を送信層に用意させない。404 が情報なのはこの1箇所だけで、その知識が
+ * core と送信層に分かれる（§7.0）。
  */
 export const readProjectId = async (
   get: ReadContext["get"],
@@ -96,10 +95,8 @@ export const readSpaceSnapshot = async ({
       snapshot: { executor, updateRateLimit, project: { exists: true, id: projectId, issueCount } },
     };
   } catch (error) {
-    /**
-     * 取得できなかったことを握りつぶして先へ進めない（VP-5）。破壊的操作を止める
-     * 唯一のゲートなので、確認できたうえで0件のときだけ通す。
-     */
+    // 取得できなかったことを握りつぶして先へ進めない。破壊的操作を止める唯一のゲートで
+    // ある（VP-5）。
     return { diagnostics: [unconfirmedIssueCount(projectKey, failureDetail(error))] };
   }
 };
@@ -116,10 +113,7 @@ export const readResourceSnapshots = async (ctx: ReadContext): Promise<ResourceS
   webhooks: await webhooksReconciler.read(ctx),
 });
 
-/**
- * 依存グラフを作らず、要件定義 §6 のフェーズ順に並べたフラットな全順序にする（C-3）。
- * 順序を宣言から計算させると、§6 の表とコードの対応が失われる。
- */
+/** 順序を依存グラフから計算させない。要件定義 §6 の表とコードの対応が失われる（C-3）。 */
 export const planActions = (
   manifest: Manifest,
   snapshots: ResourceSnapshots,
@@ -145,7 +139,6 @@ export type Plan = {
   snapshots: ResourceSnapshots;
   actions: Action[];
   resolutions: ResolutionTable;
-  /** 適用後に実際どう並ぶか（plan の出力仕様 §1.4）。V-A15 が判定するのと同じ値 */
   order: ResourceOrder;
 };
 
@@ -161,16 +154,8 @@ export type CreatePlanOptions = {
   env?: Environment;
 };
 
-/**
- * `plan` が空なのは、どこかのステージがエラーを出して先へ進まなかったことを意味する
- * （VG-2）。適用できる計画と、描画だけできる計画を区別しない。
- */
 export type CreatePlanResult = { diagnostics: Diagnostic[]; plan?: Plan };
 
-/**
- * S5 から S7 まで（検証パイプライン §4 の `plan` / `apply`）。S1〜S4 を通った
- * マニフェストを受け取る。
- */
 export const buildPlan = async ({ manifest, get }: BuildPlanOptions): Promise<CreatePlanResult> => {
   const diagnostics: Diagnostic[] = [];
   const auth = await authenticateExecutor(get);
@@ -199,11 +184,8 @@ export const buildPlan = async ({ manifest, get }: BuildPlanOptions): Promise<Cr
     return { diagnostics };
   }
 
-  /**
-   * `seedResolutions` を `plan()` の前に必ず呼ぶ（§3.2）。既存プロジェクトの
-   * `applicableIssueTypes` が指す課題種別は、変更が無ければどの Action の `provides`
-   * にも現れないので、ここで登録しないと適用の実行時に未解決参照で中断する。
-   */
+  // 変更の無い既存リソースはどの Action の `provides` にも現れない。登録しないと、それを指す
+  // `applicableIssueTypes` が適用の途中で未解決参照として止まる（§3.2）。
   const resolutions = seedResolutions(snapshots);
   const actions = planActions(manifest, snapshots, { manifest, snapshot });
   const order = resultingOrder(manifest, snapshots, actions);
@@ -217,10 +199,6 @@ export const buildPlan = async ({ manifest, get }: BuildPlanOptions): Promise<Cr
   return { diagnostics, plan: { manifest, snapshot, snapshots, actions, resolutions, order } };
 };
 
-/**
- * S1 から S7 まで（検証パイプライン §4）。`validate` は S1〜S4 だけなので、
- * そちらは `validateManifest` を直に呼ぶ。
- */
 export const createPlan = async ({
   text,
   schemaStage,

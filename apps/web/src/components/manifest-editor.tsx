@@ -7,7 +7,7 @@ import { useEffect, useRef, type DragEvent } from "react";
 import { useAppearance } from "../appearance";
 import { manifestSchemaExtensions } from "../manifest-schema";
 
-export type ManifestEditorProps = {
+type ManifestEditorProps = {
   id: string;
   value: string;
   onChange: (text: string) => void;
@@ -29,13 +29,9 @@ export const ManifestEditor = ({ id, value, onChange, onFileDropped }: ManifestE
   const host = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView>(null);
   const theme = useRef(new Compartment());
-  /**
-   * 変更ハンドラを ref 越しに呼ぶ。view は一度しか作らないので、生成時の props を
-   * 閉じ込めると、2回目以降の入力が古い onChange に届く。
-   *
-   * 書き込みを効果に置くのは、描画中に ref を書くのが React の規則に反するため。
-   * 読むのは CodeMirror が DOM の入力で呼ぶときだけなので、commit の後に差し替われば間に合う。
-   */
+  // `onChange` を直接渡さない。view は一度しか作らないので、生成時の props を閉じ込めると
+  // 2回目以降の入力が古い onChange に届く。描画中に ref を書くのは React の規則に反するので、
+  // 差し替えは効果で行う。読むのは DOM の入力のときだけなので commit の後で間に合う。
   const notify = useRef(onChange);
 
   useEffect(() => {
@@ -59,7 +55,7 @@ export const ManifestEditor = ({ id, value, onChange, onFileDropped }: ManifestE
           manifestSchemaExtensions(),
           placeholder("Paste a manifest, drop a file here, or use Open or Import from Backlog"),
           theme.current.of(startedDark.current ? catppuccinMocha : catppuccinLatte),
-          /** ラベルは器の div に結び付かないので、編集領域そのものに持たせる。 */
+          // 器の div にラベルを付けない。編集領域に結び付かず、読み上げられない。
           EditorView.contentAttributes.of({ "aria-label": "Manifest" }),
           EditorView.updateListener.of((update) => {
             if (update.docChanged) {
@@ -88,10 +84,7 @@ export const ManifestEditor = ({ id, value, onChange, onFileDropped }: ManifestE
   useEffect(() => {
     const { current } = view;
 
-    /**
-     * 打っている最中に書き戻さない。同じ内容を差し替えると選択と undo の履歴が飛ぶので、
-     * 外から差し替わったとき（ファイルを開いたとき・読み込んだとき）だけ反映する。
-     */
+    // 打っている最中に書き戻さない。同じ内容を差し替えると選択と undo の履歴が飛ぶ。
     if (current !== null && current.state.doc.toString() !== value) {
       current.dispatch({ changes: { from: 0, to: current.state.doc.length, insert: value } });
     }

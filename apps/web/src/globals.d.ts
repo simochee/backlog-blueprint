@@ -1,8 +1,4 @@
-/**
- * ビルド時に `apps/cli/package.json` の版が埋め込まれる（vite.config.ts）。
- * スキーマの URL の版は npm の版と同じ番号でなければならない（D-2）ので、
- * 実行時に別の出所から取らない。
- */
+/** 実行時に別の出所から版を取らない。スキーマの版は npm の版と同じ番号でなければならない（D-2） */
 declare const __SCHEMA_VERSION__: string;
 
 type FilePickerAcceptType = { description?: string; accept: Record<string, string[]> };

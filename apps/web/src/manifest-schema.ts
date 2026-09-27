@@ -11,9 +11,8 @@ import {
 } from "codemirror-json-schema/yaml";
 
 /**
- * スキーマは走っているコードからその場で渡す。公開 URL を読ませると版がずれうるし、
- * 開くたびに通信が要る。`codemirror-json-schema` は draft-07 の型で受けるので、
- * 型の口だけ合わせる（中身は同じ JSON Schema の構造である）。
+ * 公開 URL を読ませない。版がずれうるし、開くたびに通信が要る。`as` は
+ * `codemirror-json-schema` が draft-07 の型で受けるためで、中身は同じ構造である。
  */
 const SCHEMA = projectSchema(__SCHEMA_VERSION__) as Parameters<typeof stateExtensions>[0];
 
@@ -32,9 +31,8 @@ type ValidationInternals = {
 type SchemaNode = { anyOf?: unknown };
 
 /**
- * 残った枝のうち最後のものを選ぶ。json-schema-library は `then` の `anyOf` を元の `anyOf` の
- * 後ろに連結するので、最後の枝がその位置でいちばん具体的な制約になる（数値型の `min` なら
- * 数値・日付の和ではなく数値）。
+ * 最初の枝を選ばない。json-schema-library は `then` の `anyOf` を元の `anyOf` の後ろに
+ * 連結するので、最後の枝がその位置でいちばん具体的な制約になる。
  */
 const constraintOf = (branches: unknown[]): unknown => {
   const constraint = branches.filter((branch) => !isEnvReferenceBranch(branch)).at(-1);
@@ -44,10 +42,9 @@ const constraintOf = (branches: unknown[]): unknown => {
 };
 
 /**
- * `JSONValidation` の非公開メンバーを差し替える。公開されている `formatError` は型に
- * あるだけで 0.8 の実装から呼ばれない。参照の枝を足した `anyOf` の違反は、そのままだと
- * 枝の配列を JSON で並べた1文になり、元のノードが言えた「10色のどれか」が読めなくなる（E-9）。
- * `oneOf` の違反は枝ごとの違反を並べて文にするので、その中身も同じように置き換える。
+ * 公開の `formatError` ではなく非公開メンバーを差し替える。`formatError` は型にあるだけで
+ * 0.8 の実装から呼ばれない。差し替えないと、参照の枝を足した `anyOf` の違反が枝の配列を
+ * JSON で並べた1文になり、「10色のどれか」が読めなくなる（E-9）。
  */
 export const manifestLinter = (): ((
   view: EditorView,

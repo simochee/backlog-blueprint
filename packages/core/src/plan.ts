@@ -21,14 +21,8 @@ export type ResourceSnapshots = {
 };
 
 /**
- * 既存リソースの名前 → ID を、各 reconciler ではなく `plan()` を呼ぶ側がまとめて
- * 登録する（§3.2）。reconciler 側で登録する形にすると、自分のスナップショットしか
- * 知らない reconciler が他フェーズのために解決表を書くことになり、
- * 「reconciler どうしは互いを知らない」（§6）が崩れる。
- *
- * これが無いと、既存プロジェクトの `applicableIssueTypes` が指す課題種別は
- * どの Action の `provides` にも現れず（変更が無ければ `noop` なので）、
- * 適用の実行時に未解決参照で中断する。
+ * 各 reconciler に登録させない。自分のスナップショットしか知らない reconciler が他フェーズの
+ * ために解決表を書くことになり、reconciler どうしが互いを知らない形（§6）が崩れる（§3.2）。
  */
 export const seedResolutions = (snapshots: ResourceSnapshots): ResolutionTable => {
   const resolutions: ResolutionTable = new Map<ResolutionKey, number>();
@@ -47,11 +41,8 @@ export const seedResolutions = (snapshots: ResourceSnapshots): ResolutionTable =
     }
   }
 
-  /**
-   * 未作成のプロジェクトの既定ステータスは登録しない。表示名はスペースの言語設定で
-   * 変わり、計画が選んだ組は推測でしかない（API 制約「既定リソースの表示名」）。
-   * 実名は RF-1 の `refresh` が登録する。
-   */
+  // 未作成のプロジェクトの既定ステータスは登録しない。計画が選んだ表示名の組は推測でしかなく、
+  // 実名は RF-1 の `refresh` が登録する（API 制約「既定リソースの表示名」）。
   if (snapshots.statuses.source === "project") {
     for (const { id, name } of snapshots.statuses.statuses) {
       put(`status:${name}`, id);

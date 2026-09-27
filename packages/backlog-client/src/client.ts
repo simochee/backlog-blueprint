@@ -1,13 +1,17 @@
 import { Backlog } from "backlog-js";
 
-import { type ExecuteContext, type ReadContext } from "@backlog-blueprint/core";
-
-import { BacklogHttpFailureError, toHttpFailure } from "./failure";
-import { prepareParams } from "./params";
+import {
+  type ExecuteContext,
+  type HttpFailure,
+  type ReadContext,
+  type ResolvedValue,
+} from "@backlog-blueprint/core";
 
 type Configure = ConstructorParameters<typeof Backlog>[0];
 
 type TransportParams = NonNullable<Parameters<Backlog["request"]>[0]["params"]>;
+
+type ErrorMessages = { message: string }[];
 
 const API_PREFIX = "/api/v2/";
 
@@ -16,10 +20,14 @@ const REQUEST_TIMEOUT_SECONDS = 60;
 const MILLISECONDS_PER_SECOND = 1000;
 
 /**
- * backlog-js は `https://<host>/api/v2/<path>` を組み立てるので、core が持つ
- * 絶対 path から接頭辞を外す。core 側を相対 path に寄せる案は採らない。
- * `Action.request.path` は plan の出力にそのまま載る（PO-3）ので、
- * 読み手が Backlog の API ドキュメントと突き合わせられる形のままにする。
+ * `qs` は空配列をキーごと落とすので、`applicableIssueTypes[]=`（絞りの解除）が本文に
+ * 現れないまま apply が成功し、次の plan でも同じ差分が出続ける（API 制約「空配列を送る方法」）。
+ */
+const EMPTY_ARRAY = [""];
+
+/**
+ * core の path を相対に寄せる案は採らない。`Action.request.path` は plan の出力に
+ * そのまま載る（PO-3）ので、Backlog の API ドキュメントと突き合わせられる形のままにする。
  */
 const relative = (path: string): string => {
   if (!path.startsWith(API_PREFIX)) {
@@ -27,6 +35,81 @@ const relative = (path: string): string => {
   }
 
   return path.slice(API_PREFIX.length);
+};
+
+const prepared = (value: ResolvedValue): unknown => {
+  if (Array.isArray(value)) {
+    return value.length === 0 ? EMPTY_ARRAY : value.map((item) => prepared(item));
+  }
+
+  return value;
+};
+
+/**
+ * 空配列のほかは値の形を変えない。boolean や `null` をここで文字列に畳むと、
+ * `Action.request` が実際に飛ぶリクエストでなくなる（PO-3）。
+ */
+const prepareParams = (params: Record<string, ResolvedValue>): Record<string, unknown> =>
+  Object.fromEntries(Object.entries(params).map(([key, value]) => [key, prepared(value)]));
+
+const asRecord = (value: unknown): Record<string, unknown> | undefined =>
+  typeof value === "object" && value !== null ? (value as Record<string, unknown>) : undefined;
+
+const bodyMessages = (error: Record<string, unknown>): ErrorMessages | undefined => {
+  const errors = asRecord(error["body"])?.["errors"];
+
+  if (!Array.isArray(errors) || errors.length === 0) {
+    return undefined;
+  }
+
+  const messages = errors.map((entry) => asRecord(entry)?.["message"]);
+
+  return messages.every((message) => typeof message === "string")
+    ? messages.map((message) => ({ message }))
+    : undefined;
+};
+
+/**
+ * リクエストの本文もヘッダも載せない。API キーはヘッダにあり、足した瞬間に CI の
+ * ログへ流れる経路ができる（NFR-3 / AC-10）。
+ */
+const describe = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
+
+export class BacklogHttpFailureError extends Error implements HttpFailure {
+  readonly status?: number;
+
+  readonly errors: ErrorMessages;
+
+  constructor(errors: ErrorMessages, status?: number) {
+    super(errors.map(({ message }) => message).join("\n"));
+
+    this.name = "BacklogHttpFailureError";
+    this.errors = errors;
+    this.status = status;
+  }
+}
+
+/**
+ * 状態コードの無い失敗を `0` で埋めない（core §7.0）。埋めると「Backlog が拒否した」と
+ * 「Backlog に届かなかった」を区別できなくなる。
+ */
+const toHttpFailure = (error: unknown): BacklogHttpFailureError => {
+  if (error instanceof BacklogHttpFailureError) {
+    return error;
+  }
+
+  const record = asRecord(error);
+  const status = record?.["status"];
+
+  if (record === undefined || typeof status !== "number") {
+    return new BacklogHttpFailureError([{ message: describe(error) }]);
+  }
+
+  const described = describe(error);
+  const fallback = described === "" ? `HTTP ${status}` : described;
+
+  return new BacklogHttpFailureError(bodyMessages(record) ?? [{ message: fallback }], status);
 };
 
 export type BacklogClientOptions = {
@@ -41,22 +124,20 @@ export type BacklogClient = {
 };
 
 /**
- * `BacklogClient` に入れない。core の reconciler と Executor が使うのは JSON を返す口だけで、
- * 画像を読むのは Web UI のアイコン（WU-35）だけである。入れると CLI の送信層の差し替えまで
- * 使わない口を実装することになる。
+ * `BacklogClient` に入れない。画像を読むのは Web UI のアイコン（WU-35）だけで、入れると
+ * CLI の送信層の差し替えまで使わない口を実装することになる。
  */
 export type BacklogBinaryReader = {
-  /** 画像などの本文をバイト列のまま返す。API キーは他の取得と同じくヘッダで送る */
   getBytes: (path: string) => Promise<ArrayBuffer>;
 };
 
 /**
  * `Blob` を型に書かない。このパッケージは DOM の型を読まない（NFR-5）ので、backlog-js の
- * `download()` が返す `Blob` は型として解決できない。`ArrayBuffer` は ES2022 にある。
+ * `download()` が返す `Blob` は解決できない。
  */
 type BinaryResponse = { arrayBuffer: () => Promise<ArrayBuffer> };
 
-/** 更新系にだけ2件目を足す（X-7）。GET は届いていても何も変えない */
+/** GET には2件目を足さない（X-7）。届いていても何も変えない */
 const timeoutFailure = (method: string): BacklogHttpFailureError =>
   new BacklogHttpFailureError([
     { message: `No response from Backlog within ${REQUEST_TIMEOUT_SECONDS} seconds.` },
@@ -64,13 +145,11 @@ const timeoutFailure = (method: string): BacklogHttpFailureError =>
   ]);
 
 /**
- * 型付きのエンドポイント別メソッドを使わない。`request` 以外を経由すると、
- * 送られる本文がメソッドの実装に決められ、`Action.request` が「実際に飛ぶ
- * リクエスト」でなくなる（PO-3）。
+ * 型付きのエンドポイント別メソッドを使わない。本文がメソッドの実装に決められ、
+ * `Action.request` が実際に飛ぶリクエストでなくなる（PO-3）。
  *
- * 429 の待機も再試行も持たない。間隔と再試行は Executor の仕事（X-1 / X-4）で、
- * ここにも置くと待ち時間が二重になり、進捗の `waiting` が実態とずれる。
- * タイムアウトも再試行しない（X-6）。更新系は届いていれば二重に適用される。
+ * 429 の待機も再試行も持たない。Executor の仕事で（X-1 / X-4）、ここにも置くと待ちが
+ * 二重になり、進捗の `waiting` が実態とずれる。タイムアウトも再試行しない（X-6）。
  */
 export const createBacklogClient = ({
   space,
@@ -80,32 +159,24 @@ export const createBacklogClient = ({
   const transport = fetch ?? globalThis.fetch;
 
   /**
-   * リクエストごとに作る。backlog-js の `request` は `fetch` に渡す `init` を外から
-   * 受け取らず、打ち切りの `signal` を載せられるのは `fetch` を包む関数の中だけである。
-   * 1つの Backlog を共有して `signal` を外の変数で渡すと、同時に走る取得（Web UI の
-   * アイコンなど）が互いの `signal` を上書きする。
+   * リクエストごとに作る。backlog-js の `request` は `fetch` の `init` を受け取らず、
+   * `signal` を載せられるのは `fetch` を包む中だけで、1つを共有すると同時に走る取得
+   * （Web UI のアイコンなど）が互いの `signal` を上書きする。
    *
-   * backlog-js の `timeout` 設定は使わない。`init.timeout` に入れるだけで、組み込みの
-   * `fetch` はそれを無視する（X-5）。
+   * backlog-js の `timeout` 設定は使わない。組み込みの `fetch` は無視する（X-5）。
    */
   const connect = (signal: AbortSignal): Backlog =>
     new Backlog({
       host: space,
       apiKey,
-      /**
-       * backlog-js は渡した関数を `this.fetch = ...` に置き、`this.fetch(url, init)` と
-       * 呼ぶ（0.20.1)。ブラウザの `fetch` はレシーバが Window でないと
-       * `Illegal invocation` を投げるので、そのままでは Web UI からの通信が全て失敗する。
-       * Node の fetch は `this` を見ないため CLI では露見しない。
-       * この包みはレシーバを捨てるためでもあり、外すと Web UI が壊れる。
-       */
+      // 包みを外さない。backlog-js は `this.fetch(url, init)` と呼び（0.20.1）、ブラウザの
+      // `fetch` はレシーバが Window でないと `Illegal invocation` を投げる。Node では露見しない。
       fetch: (input, init) => transport(input, { ...init, signal }),
     });
 
   /**
-   * `signal` だけに頼らず、自前の待ちと競わせる。`signal` を無視する `fetch` の実装でも
-   * 必ず上限で返すためで、`signal` は止まった接続を手放させるために別に送る。
-   * 本文を読み終えるまでを `run` に含めるので、本文の途中で止まる接続も打ち切られる。
+   * `signal` だけに頼らず自前の待ちと競わせる。`signal` を無視する `fetch` の実装でも
+   * 上限で返すためで、本文を読み終えるまでを `run` に含めて本文の途中で止まる接続も打ち切る。
    */
   const withinTimeout = async <T>(
     method: string,
@@ -132,11 +203,8 @@ export const createBacklogClient = ({
 
   const call = (method: string, path: string, params: Record<string, unknown>): Promise<unknown> =>
     withinTimeout(method, async (backlog) => {
-      /**
-       * backlog-js の `Params` は数値と文字列とその配列しか認めないが、実際の
-       * シリアライズは `qs` が行い、boolean も `null` も入れ子の配列も扱える。
-       * 型に合わせて値を畳むと、畳んだ側が本文のバイト列を決めることになる。
-       */
+      // 型に合わせて値を畳まない。backlog-js の `Params` は数値と文字列しか認めないが、
+      // シリアライズする `qs` は boolean も `null` も扱い、畳んだ側が本文を決めることになる。
       const response = await backlog.request({
         method,
         path,
@@ -147,10 +215,7 @@ export const createBacklogClient = ({
     });
 
   return {
-    /**
-     * 404 を `undefined` に読み替えない（§7.0）。存在しないプロジェクトを情報として
-     * 読むのはフェーズ0だけで、どの 404 が情報かを知っているのは core の側である。
-     */
+    // 404 を `undefined` に読み替えない（core §7.0）。どの 404 が情報かを知っているのは core。
     get: (path) => call("GET", relative(path), {}),
     getBytes: (path) =>
       withinTimeout("GET", async (backlog) => {

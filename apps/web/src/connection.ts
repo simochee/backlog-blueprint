@@ -19,25 +19,21 @@ const SPACE_PATH = "/api/v2/space";
 const SPACE_ICON_PATH = "/api/v2/space/image";
 
 export type Connection = {
-  /** ログイン ID。本人が見慣れた値として表示にだけ使う（§2.2）。返らなければ表示名か ID */
+  /** 表示にだけ使う。`access` に書くのは `userId`（A-7） */
   user: string;
-  /** 数値のユーザー ID。`access` に書く値（A-7 / WU-35） */
   userId: number;
-  /** 表示名。ユーザー ID をコピーするときのコメントにだけ使う（WU-35） */
   userName?: string;
   spaceAdministrator: boolean;
   space: string;
-  /** アイコンを取る path（WU-35）。利用者のものは数値の id で引く */
   icons: { space: string; user: string };
   updateRateLimit: RateLimit;
 };
 
-export type ConnectionResult = { diagnostics: Diagnostic[]; connection?: Connection };
+type ConnectionResult = { diagnostics: Diagnostic[]; connection?: Connection };
 
 /**
- * `get` の応答を覚えてから認証ステージに渡す。S5 が返すのは判定に要る id と roleType
- * だけで、画面に出す名前は返さない。名前のためにもう一度 `GET /users/myself` を送る形に
- * すると、同じ応答を2度取りに行くことになる。
+ * 名前のためにもう一度 `GET /users/myself` を送らない。S5 は判定に要る id と roleType しか
+ * 返さないので、認証ステージに渡す `get` の応答を覚えておいて読む。
  */
 export const connect = async (get: ReadContext["get"]): Promise<ConnectionResult> => {
   const responses = new Map<string, unknown>();

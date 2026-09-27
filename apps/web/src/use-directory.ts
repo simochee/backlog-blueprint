@@ -12,7 +12,6 @@ export type Directory = DirectoryAttempt & {
   settled: boolean;
 };
 
-/** WU-15 / WU-22。一覧は接続の印に紐づけ、別の接続で取ったものは `fresh` が弾く。 */
 export const useDirectory = (kind: DirectoryKind, connectionKey: string): Directory => {
   const [attempt, load, loading] = useActionState<Derived<DirectoryAttempt> | undefined>(
     async () => {

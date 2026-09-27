@@ -17,25 +17,18 @@ import { toManifest } from "./to-manifest";
 export type CreateExportOptions = {
   projectKey: string;
   get: ReadContext["get"];
-  /** 実行中のツールの版。`$schema` の URL に入る（EX-15） */
   version: string;
 };
 
 export type ProjectExport = {
   projectKey: string;
-  /** stdout に書く完成品（EX-17）。呼び出し側は加工しない */
   yaml: string;
-  /** EX-18 (1) の往復テストと Web UI（EX-20）のために持つ */
+  /** `yaml` から読み戻せても落とさない。EX-18 (1) の往復テストと Web UI（EX-20）が使う */
   manifest: ManifestInput;
-  /** CL-8 の案内に使う。0 なら案内は出ない */
   issueCount: number;
 };
 
-/**
- * `CreatePlanResult` と同じ形にする。`export` も `plan` も「診断を出して止まったか、
- * 結果が揃ったか」の2つしかないので、呼び出し側が同じ分岐で書ける。
- * `export` が予約語なので名前は `exported` になる。
- */
+/** `CreatePlanResult` と形を揃え、呼び出し側が同じ分岐で書けるようにする。`export` は予約語 */
 export type CreateExportResult = { diagnostics: Diagnostic[]; exported?: ProjectExport };
 
 const isProjectKey = (value: string): boolean => new RegExp(PROJECT_KEY_PATTERN).test(value);
@@ -46,11 +39,8 @@ export const createExport = async ({
   get,
   version,
 }: CreateExportOptions): Promise<CreateExportResult> => {
-  /**
-   * 呼び出し側ではなくここで判定する（EX-3 / CL-7）。`projectKey` は下の `read*` が
-   * URL のパスに埋める値で、GET を出すこの層の外へ移すと呼び出し側ごとに同じ検査が
-   * 要る（NFR-6）。
-   */
+  // 呼び出し側に移さない（EX-3 / CL-7）。`projectKey` は `read*` が URL のパスに埋める値で、
+  // 外へ出すと呼び出し側ごとに同じ検査が要る（NFR-6）。
   if (!isProjectKey(projectKey)) {
     return { diagnostics: [invalidProjectKey(projectKey)] };
   }
@@ -67,18 +57,12 @@ export const createExport = async ({
     return { diagnostics: [projectDoesNotExist(projectKey)] };
   }
 
-  /**
-   * 失敗を捕まえない（EX-3）。`export` は課題件数でゲートしないので、読めなかった
-   * ときに VP-5 の文言を借りると「ゲートで止めた」という意味が付く。
-   */
+  // 失敗を捕まえない（EX-3）。`export` は課題件数でゲートしないので、VP-5 の文言を借りると
+  // 「ゲートで止めた」という意味が付く。
   const issueCount = await readIssueCount(get, projectId);
 
-  /**
-   * 書き込みをしない `export` にも更新系の残量を読ませる。`Snapshot` から
-   * `updateRateLimit` を省略可能にすれば1回の GET は減るが、reconciler の
-   * `ReadContext` が弱まり、X-4 の待ち時間を計算する側が「無いかもしれない値」を
-   * 扱うことになる。GET 1回のほうが安い。
-   */
+  // 書き込まなくても更新系の残量を読む。`updateRateLimit` を省略可能にすると、X-4 の待ち時間を
+  // 計算する側が「無いかもしれない値」を扱うことになる。GET 1回のほうが安い。
   const updateRateLimit = await readUpdateRateLimit(get);
   const snapshot: Snapshot = {
     executor: auth.executor,

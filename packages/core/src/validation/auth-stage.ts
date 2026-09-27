@@ -8,8 +8,8 @@ import { ROOT_PATH } from "./source-map";
 const MYSELF_PATH = "/api/v2/users/myself";
 
 /**
- * `roleType: 1` がスペース管理者（API 制約「権限」）。1 以外の値も実在するが、
- * V-B2 と V-B11 が問うのはスペース管理者か否かだけなので、判定は「1 か、それ以外か」でよい。
+ * 1 以外の `roleType` を区別しない。V-B2 と V-B11 が問うのはスペース管理者か否かだけ
+ * （API 制約「権限」）。
  */
 export const SPACE_ADMINISTRATOR_ROLE_TYPE = 1;
 
@@ -25,9 +25,8 @@ const authDiagnostic = (id: string, message: string, hint: string): Diagnostic =
 });
 
 /**
- * スナップショットの取得より前に、単独のステージとして実行者を確かめる（S5）。
- * キーが無効と分かった時点で以後のすべての GET が無駄になるので、reconciler の
- * `read()` と同じ流れに混ぜない。
+ * reconciler の `read()` と同じ流れに混ぜない（S5）。キーが無効なら以後の GET は
+ * すべて無駄になる。
  */
 export const authenticateExecutor = async (get: ReadContext["get"]): Promise<AuthStageResult> => {
   let response: unknown;

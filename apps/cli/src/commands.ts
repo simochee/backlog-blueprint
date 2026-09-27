@@ -1,6 +1,7 @@
 import { type BacklogClient } from "@backlog-blueprint/backlog-client";
 
 import {
+  APPLY_CONFIRMATION,
   execute,
   hasError,
   orderDiagnostics,
@@ -14,7 +15,6 @@ import {
   type Manifest,
 } from "@backlog-blueprint/core";
 
-import { confirmApply } from "./confirm";
 import { isCredentialsError, resolveCredentials, type Credentials } from "./credentials";
 import { EXIT_CHANGES, EXIT_ERROR, EXIT_SUCCESS } from "./exit-code";
 import { type Io } from "./io";
@@ -32,14 +32,11 @@ import {
 import { TOOL } from "./version";
 
 /**
- * 本文は stdout、診断・進捗・警告は stderr に出る（CLI 仕様 §1.3）ので、色は
- * 書き出す先ごとに持つ（plan の出力仕様 §1.2）。1つの真偽値にまとめると、
- * パイプしたときに本文から色が消えないか、端末の stderr から色が消えるかの
- * どちらかになる。
+ * 1つの真偽値にまとめない。本文は stdout、診断は stderr に出る（CLI 仕様 §1.3）ので、
+ * パイプした本文から色が消えないか、端末の stderr から色が消えるかのどちらかになる。
  */
 export type ColorOptions = { stdout: boolean; stderr: boolean };
 
-/** 全コマンドが持つ。`export` はこれだけを持つ（CL-7）。 */
 export type ConnectionOptions = { space?: string; color: ColorOptions };
 
 export type CommonOptions = ConnectionOptions & { file: string; output: "text" | "json" };
@@ -74,6 +71,29 @@ type Prepared =
       manifest: Manifest;
     };
 
+const NOT_A_TERMINAL =
+  "ERROR  apply requires confirmation, but stdin is not a terminal.\n  → pass --auto-approve to skip the confirmation\n";
+
+type Confirmation = { confirmed: boolean } | { error: string };
+
+/**
+ * 全文の `yes` だけを通す（CL-5）。1文字で通すと Enter の連打で削除まで通ってしまう。
+ * 非 TTY でプロンプトを出さずに拒否するのは、CI で確認待ちのままハングさせないため（CL-6）。
+ */
+const confirmApply = async (io: Io): Promise<Confirmation> => {
+  if (!io.isStdinTty) {
+    return { error: NOT_A_TERMINAL };
+  }
+
+  io.err(APPLY_CONFIRMATION);
+
+  const answer = await io.readLine();
+
+  io.err("\n");
+
+  return { confirmed: answer.trim() === "yes" };
+};
+
 const bodyRender = ({ color }: ConnectionOptions): RenderOptions => ({ color: color.stdout });
 
 const noticeRender = ({ color }: ConnectionOptions): RenderOptions => ({ color: color.stderr });
@@ -103,10 +123,7 @@ const validateStatically = async (
   };
 };
 
-/**
- * 未解決の `${ENV}` を警告に下げる（VP-1）。`validate` が答えるのは
- * 「マニフェストの書き方が正しいか」であって「この環境で実行できるか」ではない。
- */
+/** 未解決の `${ENV}` をエラーにしない（VP-1）。`validate` はこの環境で実行できるかを問わない */
 export const runValidate = async (options: CommonOptions, deps: Deps): Promise<number> => {
   const { io, output } = deps;
   const { path, diagnostics } = await validateStatically(options, deps, "warning");
@@ -179,10 +196,7 @@ const prepare = async (
   }
 };
 
-/**
- * `--output json` のときだけ診断を stderr へ写す。text のときは計画の本文が
- * `Warnings:` を持つ（plan の出力仕様 §1.1）ので、写すと二重に出る。
- */
+/** text では写さない。計画の本文が `Warnings:` を持ち（plan の出力仕様 §1.1）、二重に出る */
 const echoWarnings = (plan: PlanResult, options: CommonOptions, deps: Deps): void => {
   if (options.output === "json" && plan.diagnostics.length > 0) {
     deps.io.err(deps.output.diagnostics(plan.diagnostics, noticeRender(options)));
@@ -276,10 +290,7 @@ export const runApply = async (options: ApplyOptions, deps: Deps): Promise<numbe
 
   echoWarnings(plan, options, deps);
 
-  /**
-   * `--output json` では計画の本文を書かない。stdout に出てよいのは最後の
-   * JSON 1つだけで（PO-7）、本文を先に書くと `| jq` が素通しで動かなくなる。
-   */
+  // json では計画の本文を書かない。stdout は最後の JSON 1つだけで（PO-7）、先に書くと `| jq` が壊れる。
   if (options.output === "text") {
     io.out(output.plan({ context, plan }, { ...bodyRender(options), showUnchanged: false }));
   }

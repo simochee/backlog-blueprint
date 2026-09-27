@@ -20,8 +20,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # Corepack has to run before setup-node so that `cache: pnpm` finds the pnpm version
-      # pinned in the root package.json's `packageManager` field.
+      # setup-node より後に回さない。`cache: pnpm` がルートの package.json の `packageManager` で
+      # 固定した pnpm を見つけられなくなる。
       - name: Enable Corepack
         run: corepack enable
 
@@ -41,8 +41,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # lint and typecheck are separate checks and both have to pass: one is fast static
-      # analysis, the other is the type checker.
       - name: Lint
         run: pnpm run lint
 

@@ -2,10 +2,6 @@ import { type Action } from "../action";
 import { type Diagnostic } from "../diagnostic";
 import { type PlanReport, type ValidateReport } from "./report";
 
-/**
- * plan の出力仕様 §1.1 の通し例を固定値で組み立てる。テストは実 API も
- * reconciler も通さず、この `Action[]` を描画した結果だけを確かめる。
- */
 export const walkthroughActions = (): Action[] => [
   {
     id: "project/create/PROJ_A",

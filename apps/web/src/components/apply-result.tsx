@@ -6,8 +6,6 @@ import { projectUrl } from "../plan";
 import { isRunning, type ApplyProgress, type ApplyRun } from "../progress";
 import { CopyButton } from "./copy-button";
 
-export type ApplyResultProps = { run: ApplyRun };
-
 const resultText = ({ progress, resolutions }: ApplyRun): string => {
   const { outcome } = progress;
 
@@ -17,7 +15,7 @@ const resultText = ({ progress, resolutions }: ApplyRun): string => {
 const percent = ({ completed, total }: ApplyProgress): number =>
   total === 0 ? 0 : Math.round((completed / total) * 100);
 
-export const ApplyResult = ({ run }: ApplyResultProps) => {
+export const ApplyResult = ({ run }: { run: ApplyRun }) => {
   const { progress, failure } = run;
   const text = resultText(run);
   const succeeded = progress.outcome?.result === "succeeded";

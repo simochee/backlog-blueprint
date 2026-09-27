@@ -8,14 +8,12 @@ export type OutputEntry = {
   startedAt: number;
   space: string;
   projectKey: string;
-  /** 計画を作ったときの入力の印（WU-3）。今の印と違えば、この計画は今の入力から作ったものではない */
   stamp: string;
   attempt: PlanAttempt;
 };
 
 export type NewEntry = Omit<OutputEntry, "id">;
 
-/** 適用した項目の記録。項目の番号で引く */
 export type ApplyRuns = Record<number, ApplyRun>;
 
 export const appendEntry = (history: OutputEntry[], entry: NewEntry): OutputEntry[] => [
@@ -29,13 +27,12 @@ export type ApplyContext = {
   history: OutputEntry[];
   runs: ApplyRuns;
   planKey: string;
-  /** 次の計画を組み立てている最中。それが足されれば今の最新は最新でなくなる */
   pending: boolean;
 };
 
 /**
- * WU-3。押せるかどうかを state に持たず、履歴と入力から導く。持てば条件が外れる経路ごとに
- * 倒す処理が要り、1つ漏れれば古い計画を適用できる。
+ * 押せるかどうかを state に持たない。持てば条件が外れる経路ごとに倒す処理が要り、
+ * 1つ漏れれば古い計画を適用できる（WU-3）。
  */
 export const applicableEntry = ({
   history,
@@ -88,12 +85,11 @@ export const entryLabel = ({ startedAt, projectKey }: OutputEntry, run?: ApplyRu
 
 export type Section = "plan" | "apply";
 
-export type ScrollPosition = { scrollTop: number; clientHeight: number; scrollHeight: number };
+type ScrollPosition = { scrollTop: number; clientHeight: number; scrollHeight: number };
 
 /**
- * WU-42。`applyStart` は Apply へ飛んだときに止まる位置。最後までスクロールしたら Apply に
- * する — 適用のログが短いと区切りが上端まで上がりきらない。スクロールできない長さ（`scrollTop`
- * が 0 のまま）なら両方が見えているので、先頭の Plan にしておく。
+ * `applyStart` を越えたかだけで決めない。適用のログが短いと区切りが上端まで上がりきらないので、
+ * 最後までスクロールしたら Apply にする。スクロールできない長さなら両方見えているので Plan（WU-42）。
  */
 export const sectionAt = (
   { scrollTop, clientHeight, scrollHeight }: ScrollPosition,

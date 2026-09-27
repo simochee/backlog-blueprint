@@ -1,13 +1,23 @@
 import { renderHttpFailure, type Diagnostic } from "@backlog-blueprint/core";
 import { ExternalLinkIcon } from "@radix-ui/react-icons";
-import { Button, Flex, Link, Text, TextField } from "@radix-ui/themes";
+import {
+  Button,
+  Card,
+  Dialog,
+  Flex,
+  Heading,
+  Link,
+  Spinner,
+  Text,
+  TextField,
+} from "@radix-ui/themes";
 import { useEffect, useState } from "react";
 
 import { setApiKey } from "../secrets";
 import { apiKeyPageUrl } from "../space";
 import { DiagnosticList } from "./diagnostics";
 
-export type ConnectFormProps = {
+type ConnectFormProps = {
   initialSpace: string;
   hasApiKey: boolean;
   connecting: boolean;
@@ -17,8 +27,7 @@ export type ConnectFormProps = {
   submitLabel?: string;
 };
 
-/** 接続画面と切り替えのモーダルが同じものを使う（WU-34 / WU-36） */
-export const ConnectForm = ({
+const ConnectForm = ({
   initialSpace,
   hasApiKey,
   connecting,
@@ -31,10 +40,8 @@ export const ConnectForm = ({
   const apiKeyPage = apiKeyPageUrl(space);
   const canConnect = space.trim() !== "" && hasApiKey && !connecting;
 
-  /**
-   * 開いた時点で API キーの下書きを空にする。欄は非制御で初期値を持てない（§2.4）ので、
-   * 前に打った値が secrets.ts に残っていると、空に見える欄のまま Connect が押せる。
-   */
+  // 開いた時点で API キーの下書きを空にする。欄は非制御で初期値を持てない（§2.4）ので、
+  // 前に打った値が secrets.ts に残っていると、空に見える欄のまま Connect が押せる。
   useEffect(() => {
     setApiKey("");
   }, []);
@@ -94,3 +101,58 @@ export const ConnectForm = ({
     </form>
   );
 };
+
+type ConnectScreenProps = ConnectFormProps & { reconnectingTo?: string };
+
+export const ConnectScreen = ({ reconnectingTo, ...form }: ConnectScreenProps) => (
+  <Flex align="center" className="connect-screen" justify="center" px="4">
+    <Card size="4" style={{ width: "100%", maxWidth: "28rem" }}>
+      {reconnectingTo === undefined ? (
+        <Flex direction="column" gap="5">
+          <Flex direction="column" gap="2">
+            <Heading as="h1" size="6">
+              Connect to Backlog
+            </Heading>
+            <Text color="gray" size="2">
+              Use your Backlog API key. Creating a project, changing its statuses and granting the
+              project administrator role need a Space Administrator. The key stays in this tab and
+              is removed when you close it or disconnect.
+            </Text>
+          </Flex>
+          <ConnectForm {...form} />
+        </Flex>
+      ) : (
+        <Flex align="center" direction="column" gap="3" py="4">
+          <Spinner size="3" />
+          <Text color="gray" size="2">
+            Reconnecting to {reconnectingTo}...
+          </Text>
+        </Flex>
+      )}
+    </Card>
+  </Flex>
+);
+
+type ConnectDialogProps = Omit<ConnectFormProps, "submitLabel"> & {
+  open: boolean;
+  onClose: () => void;
+};
+
+export const ConnectDialog = ({ open, onClose, ...form }: ConnectDialogProps) => (
+  <Dialog.Root
+    onOpenChange={(next) => {
+      if (!next) {
+        onClose();
+      }
+    }}
+    open={open}
+  >
+    <Dialog.Content maxWidth="28rem" size="3">
+      <Dialog.Title size="4">Switch connection</Dialog.Title>
+      <Dialog.Description color="gray" mb="4" size="2">
+        The current connection stays until the new one is confirmed.
+      </Dialog.Description>
+      <ConnectForm {...form} submitLabel="Switch" />
+    </Dialog.Content>
+  </Dialog.Root>
+);

@@ -15,20 +15,26 @@ export const SYNTAX_ID = "V-A23";
 export const MULTIPLE_DOCUMENTS_ID = "Y-5";
 
 /**
- * `resolveKnownTags: false` と `schema: "core"` はどちらも外せない（Y-1）。
- * 外すと `!!timestamp 2026-10-01` が `Date` に解決され、日付が文字列でなくなる。
- * `version` を明示しないと `%YAML 1.1` ディレクティブを書いた利用者だけ別の
- * スキーマで読まれる。`prettyErrors: false` は、`message` に位置と原文の抜粋を
- * 混ぜさせないため。位置は `Diagnostic.line` / `column` が持つ（DG-5）。
+ * どれも外せない（Y-1）。`resolveKnownTags` と `schema` を外すと `!!timestamp` が `Date` になり、
+ * `version` が無いと `%YAML 1.1` を書いた利用者だけ別のスキーマで読まれる。書き出し（EX-5）と
+ * 版がずれると、YAML 1.1 で真偽値になる `yes` / `on` などの名前だけが読み戻せなくなる。
  */
-const PARSE_OPTIONS = {
+export const YAML_SCHEMA_OPTIONS = {
   version: "1.2",
   schema: "core",
   resolveKnownTags: false,
-  prettyErrors: false,
 } as const;
 
+/** `prettyErrors` を外さない。`message` に位置と原文が混ざる（位置は DG-5 で別に持つ） */
+const PARSE_OPTIONS = { ...YAML_SCHEMA_OPTIONS, prettyErrors: false } as const;
+
 type SourceEntry = { offset: number; emptySource: boolean };
+
+const positionOf = (lineCounter: LineCounter, offset: number): SourcePosition => {
+  const { line, col } = lineCounter.linePos(offset);
+
+  return { line, column: col };
+};
 
 const collectEntries = (node: unknown, path: string, entries: Map<string, SourceEntry>): void => {
   if (isMap(node)) {
@@ -78,23 +84,17 @@ const buildSourceMap = (contents: unknown, lineCounter: LineCounter): SourceMap 
 
   const rootOffset = (isNode(contents) ? contents.range?.[0] : undefined) ?? 0;
 
-  const positionOf = (offset: number): SourcePosition => {
-    const { line, col } = lineCounter.linePos(offset);
-
-    return { line, column: col };
-  };
-
   return {
     positionAt: (path) => {
       for (let current = path; ; current = parentPath(current)) {
         const entry = entries.get(current);
 
         if (entry) {
-          return positionOf(entry.offset);
+          return positionOf(lineCounter, entry.offset);
         }
 
         if (current === ROOT_PATH) {
-          return positionOf(rootOffset);
+          return positionOf(lineCounter, rootOffset);
         }
       }
     },
@@ -107,11 +107,6 @@ export type SyntaxStageResult = { diagnostics: Diagnostic[]; parsed?: ParsedDocu
 export const parseManifestSyntax = (text: string): SyntaxStageResult => {
   const lineCounter = new LineCounter();
   const documents = parseAllDocuments(text, { ...PARSE_OPTIONS, lineCounter });
-  const positionOf = (offset: number): SourcePosition => {
-    const { line, col } = lineCounter.linePos(offset);
-
-    return { line, column: col };
-  };
 
   const [first, second] = documents;
 
@@ -124,12 +119,9 @@ export const parseManifestSyntax = (text: string): SyntaxStageResult => {
     severity: "error",
     stage: "syntax",
     path: ROOT_PATH,
-    ...positionOf(error.pos[0]),
+    ...positionOf(lineCounter, error.pos[0]),
     message: error.message,
-    /**
-     * パーサの診断そのものは何が起きたかしか言わない。DG-2 が hint に求めるのは
-     * どう直すかなので、YAML で最も多い2つの原因を名指しする。
-     */
+    // パーサの文言で済ませない。何が起きたかしか言わず、DG-2 が hint に求めるどう直すかが無い。
     hint: 'fix the YAML at this position: check the indentation, and quote values that contain ":" or start with "#"',
   }));
 
@@ -139,7 +131,7 @@ export const parseManifestSyntax = (text: string): SyntaxStageResult => {
       severity: "error",
       stage: "syntax",
       path: ROOT_PATH,
-      ...positionOf(second.range[0]),
+      ...positionOf(lineCounter, second.range[0]),
       message: "a manifest must contain exactly one YAML document",
       hint: 'one file describes one project. remove the "---" separator, or move the other documents into their own files',
     });
@@ -149,14 +141,8 @@ export const parseManifestSyntax = (text: string): SyntaxStageResult => {
     return { diagnostics };
   }
 
-  /**
-   * `toJS()` を裸で呼ばない。解決できないエイリアスは `errors` に載らず、ここで
-   * 初めて throw する。S1 の仕事は壊れた YAML を診断に変えることなので、例外を
-   * そのまま上へ出すと、利用者には理由の分からない白い画面だけが残る。
-   *
-   * Backlog のユーザー ID は `*` で始まることがある。引用符を付けずに書くと
-   * YAML はそれをエイリアス参照として読むので、これは実際に踏まれる経路である。
-   */
+  // `toJS()` を裸で呼ばない。解決できないエイリアスは `errors` に載らずここで初めて throw し、
+  // 利用者には理由の分からない白い画面だけが残る。`*` で始まる値を引用符なしで書けば踏む。
   try {
     return {
       diagnostics,

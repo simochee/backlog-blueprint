@@ -7,17 +7,15 @@ import { type ExportAttempt } from "../export";
 import { SectionBoundary } from "./boundary";
 import { DiagnosticList } from "./diagnostics";
 
-export type ImportDialogProps = {
+type ImportDialogProps = {
   onImport: (projectKey: string) => Promise<ExportAttempt>;
   onImported: (exported: ProjectExport) => void;
 };
 
-/** WU-27。WU-32 は呼び出し側が key で作り直して受け持つ。 */
 export const ImportDialog = ({ onImport, onImported }: ImportDialogProps) => {
   const [open, setOpen] = useState(false);
   const [projectKey, setProjectKey] = useState("");
 
-  /** WU-30 */
   const [attempt, runImport, importing] = useActionState<ExportAttempt | undefined>(async () => {
     try {
       const imported = await onImport(projectKey);
@@ -46,11 +44,8 @@ export const ImportDialog = ({ onImport, onImported }: ImportDialogProps) => {
   return (
     <Dialog.Root
       onOpenChange={(next) => {
-        /**
-         * 書き出している最中は閉じさせない（WU-30）。この Action は押した時点の
-         * `onImported` を掴んだまま解決するので、閉じた後に打った書きかけも、切り替えた後の
-         * 接続も知らずに、確認なしでエディタを置き換える。
-         */
+        // 書き出している最中は閉じさせない（WU-30）。この Action は押した時点の `onImported` を
+        // 掴んだまま解決するので、閉じた後に打った書きかけも切り替えた後の接続も知らずに置き換える。
         if (!importing) {
           setOpen(next);
         }

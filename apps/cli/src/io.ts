@@ -1,9 +1,8 @@
 import { createInterface } from "node:readline";
 
 /**
- * stdout と stderr を1つのロガーにまとめない。`--output json` のとき stdout に
- * 書いてよいのは JSON だけで（PO-7）、書き分けを呼び出し側の規律に任せると
- * `| jq` が黙って壊れる。
+ * stdout と stderr を1つのロガーにまとめない。json の stdout は JSON だけで（PO-7）、
+ * 書き分けを呼び出し側の規律に任せると `| jq` が黙って壊れる。
  */
 export type Io = {
   out: (text: string) => void;

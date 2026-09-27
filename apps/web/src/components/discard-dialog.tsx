@@ -1,14 +1,12 @@
 import { AlertDialog, Button, Code, Flex } from "@radix-ui/themes";
 
-export type DiscardDialogProps = {
+type DiscardDialogProps = {
   current: string;
-  /** 差し替える先の名前。`undefined` のあいだは閉じている */
   replacement?: string;
   onCancel: () => void;
   onDiscard: () => void;
 };
 
-/** WU-45 */
 export const DiscardDialog = ({
   current,
   replacement,

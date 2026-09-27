@@ -29,7 +29,7 @@ export type ApplyRun = {
   failure?: unknown;
 };
 
-/** WU-17。`execute` は必ず `finished` か `aborted` で終わる（core §7）ので、結末の有無で足りる。 */
+/** 実行中の真偽値を別に持たない。結末と食い違う状態が書けてしまう（WU-17） */
 export const isRunning = ({ progress, failure }: ApplyRun): boolean =>
   progress.outcome === undefined && failure === undefined;
 
@@ -46,10 +46,7 @@ const withLine = (state: ApplyProgress, event: ExecutionEvent): ApplyProgress =>
   };
 };
 
-/**
- * 進捗の行は成否が分かってから足す。位置を持つのは `actionStarted` だけで、成否を持つのは
- * その次のイベントである（core §7）。色は CSS で付けるので `painter(false)` を渡す。
- */
+/** 進捗の行を `actionStarted` で足さない。成否を持つのはその次のイベントである（core §7） */
 export const foldExecutionEvent = (state: ApplyProgress, event: ExecutionEvent): ApplyProgress => {
   if (event.type === "started") {
     return { ...state, total: event.total };

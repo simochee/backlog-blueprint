@@ -1,15 +1,11 @@
 import { defineConfig } from "vite";
 
 /**
- * 依存をすべて束ねる。`packages/core` と `packages/backlog-client` は TypeScript の
- * ソースを `exports` にしている（B-1）ので、external にすると `dist` が
- * `.ts` を import する形になって Node が読めない。相対 import に拡張子を書かない
- * 決まり（AGENTS.md）も、Node の ESM 解決では成立しない。
+ * 依存を external にしない。ワークスペースのパッケージは `.ts` のソースを `exports` にしており
+ * （B-1）、拡張子の無い相対 import も含めて Node には読めない。`--configLoader runner` が
+ * 要るのも同じ理由で、既定のローダはそれらを external にして Node に読ませる。
  *
- * `--configLoader runner` が要るのも同じ理由で、既定のローダはワークスペースの
- * パッケージを external にして Node に読ませる（apps/web/vite.config.ts と同じ）。
- *
- * shebang は `src/main.ts` が持つ。ここで `banner` を足すと2行になる。
+ * `banner` で shebang を足さない。`src/main.ts` が持っており、2行になる。
  */
 export default defineConfig({
   build: {

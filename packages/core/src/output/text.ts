@@ -1,9 +1,8 @@
 import { type Action } from "../action";
 import { type ExecutionEvent } from "../execution";
-import { resolvePath } from "../ref";
 import { type ResolutionTable } from "../resolution";
 import { actionLine, changeLines } from "./action-line";
-import { type ActionFailure, type ApplyOptions, type ApplyOutcome } from "./apply";
+import { type ActionFailure, type ApplyOptions, type ApplyOutcome, failedPath } from "./apply";
 import { painter } from "./color";
 import { renderWarnings } from "./diagnostics";
 import { type PlanReport, summarize } from "./report";
@@ -17,7 +16,6 @@ const CHANGE_INDENT = "      ";
 
 export type TextOptions = { showUnchanged?: boolean; color?: boolean };
 
-/** 60 秒以上は `2m 30s`（§1.3）。CLI と Web が同じ形で出す（NFR-6） */
 export const formatDuration = (seconds: number): string =>
   seconds < SECONDS_PER_MINUTE
     ? `${seconds}s`
@@ -68,10 +66,6 @@ export const APPLY_CONFIRMATION = [
   "  Enter a value: ",
 ].join("\n");
 
-/**
- * 待機は X-1 の1秒間隔では流れない。`waitingSeconds` を持つ行が出るのは 429 を
- * 受けたときだけである（§3.1 / core §7.1）。
- */
 export type ProgressOutcome = "done" | "failed" | { waitingSeconds: number };
 
 /**
@@ -91,7 +85,7 @@ export const progressOutcome = (event: ExecutionEvent): ProgressOutcome | undefi
 };
 
 export type ProgressLine = {
-  /** `ExecutionEvent.actionStarted` の添字は0始まりなので、ここで +1 する（core §7） */
+  /** `actionStarted` の0始まりの添字をそのまま渡す。+1 は描画側で行う */
   index: number;
   total: number;
   action: Action;
@@ -134,9 +128,7 @@ const failedRequest = (
     return action.id;
   }
 
-  const path = resolutions === undefined ? undefined : resolvePath(request.path, resolutions);
-
-  return `${request.method} ${path?.resolved === true ? path.value : request.path}`;
+  return `${request.method} ${failedPath(request, resolutions)}`;
 };
 
 const errorLines = ({ status, errors }: ActionFailure): string[] =>
@@ -149,9 +141,8 @@ const actionList = (title: string, actions: Action[], paint: ReturnType<typeof p
   ].join("\n");
 
 /**
- * 「もう一度実行すれば続きから進む」だけを書かない。再実行までに課題が1件でも
- * 作られると V-B3 で止まり、そのプロジェクトは二度と触れなくなる
- * （検証パイプライン §7.3）。条件を省くと案内が嘘になる。
+ * 「再実行すれば続きから進む」だけを書かない。再実行までに課題が1件でも作られると V-B3 で
+ * 止まり、そのプロジェクトは二度と触れなくなる（検証パイプライン §7.3）。
  */
 const RESUME_NOTICE = [
   "Re-run apply with the same manifest to continue. Already applied changes become no-ops.",
@@ -179,7 +170,6 @@ export const renderApplyAbort = (
   ]);
 };
 
-/** 拒否したときの1行（§3.2） */
 export const APPLY_CANCELLED = "Apply cancelled. Nothing has been applied.";
 
 export const renderApplyResult = (
@@ -198,9 +188,8 @@ export const renderApplyResult = (
 };
 
 /**
- * 失敗の中身だけを書き、リクエストの本文もヘッダも書かない。API キーはヘッダにしか
- * 存在しないので、ここに要求の中身を足した瞬間に CI のログへ流れる経路ができる
- * （NFR-3 / AC-10）。
+ * リクエストの本文もヘッダも書かない。足した瞬間に API キーが CI のログへ流れる経路が
+ * できる（NFR-3 / AC-10）。
  */
 export const renderHttpFailure = (error: unknown, options: TextOptions = {}): string => {
   const paint = painter(options.color === true);

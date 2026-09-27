@@ -58,7 +58,6 @@ import {
 
 export type ToManifestResult = {
   diagnostics: Diagnostic[];
-  /** 診断にエラーが1件でもあれば undefined（EX-9 / EX-17） */
   manifest?: ManifestInput;
   accessLabels?: AccessLabels;
 };
@@ -70,10 +69,8 @@ type Named = { name: string };
 const path = (...segments: (string | number)[]): string => segments.join("/");
 
 /**
- * E-3 の逆写像（EX-5）。`${` を無条件に置き換えない。S2 が展開するのは
- * `envReferencePattern` に一致する完全な参照だけなので、`${foo` のように閉じない値まで
- * 置き換えると、読み戻しても `$` が剥がれず往復が壊れる。置換後の文字列を関数で返すのは、
- * 置換文字列では `$$` が `$` 1文字を表すエスケープで、`$` を足したつもりが消えるため。
+ * `${` を無条件に置き換えない（EX-5）。`${foo` のように閉じない値まで置き換えると、読み戻しても
+ * `$` が剥がれず往復が壊れる。置換を関数で返すのは、置換文字列では `$$` が `$` 1文字になるため。
  */
 export const escaped = (value: string): string =>
   value.replace(envReferencePattern(), (match) => `$${match}`);
@@ -394,13 +391,10 @@ const NO_SOURCE: SourceMap = {
 };
 
 /**
- * 書き出す前に、自分の出力へ S3 と S4 を当てる（EX-9h）。日付の形や `min` と `max` の
- * 前後関係のように、写像が壊しうる規則は既にスキーマと S4 が持っている。同じ規則を
- * 書き出し側にもう一度書くと、M-1 が退けた二重管理になる。
+ * 写像が壊しうる規則を書き出し側にもう一度書かない（EX-9h）。M-1 が退けた二重管理になる。
  *
- * 警告は落とす。`export` は警告を出さない（CL-8）し、V-A24 の数値イベントは
- * EX-12 が意図して通している。同じ位置に EX-9 の指摘が既にあるものも落とす。
- * 直し方は EX-9 の側が具体的に言えるので、重ねると同じ1行に2つの hint が付く。
+ * 警告は落とす。`export` は警告を出さず（CL-8）、V-A24 の数値イベントは EX-12 が意図して
+ * 通している。同じ位置に EX-9 の指摘があるものも落とす。重ねると1行に hint が2つ付く。
  */
 const unwritableValues = (manifest: ManifestInput, reported: Diagnostic[]): Diagnostic[] => {
   const covered = new Set(reported.map((diagnostic) => diagnostic.path));

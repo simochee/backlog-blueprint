@@ -1,18 +1,18 @@
-import { type Action, type Change } from "../action";
+import { declaredOnly, differs, fieldChanges, type Action, type Change } from "../action";
 import { CUSTOM_FIELD_TYPE_IDS, INITIAL_VALUE_TYPE_IDS, type CustomField } from "../manifest";
 import { type Reconciler } from "../reconciler";
 import {
   asArrayOf,
   asRecord,
-  numberOrString,
+  numberOrDate,
   numbers,
   optionalBoolean,
+  optionalDate,
   optionalNumber,
   optionalString,
   requiredNumber,
   requiredString,
 } from "../api-response";
-import { type Value } from "../value";
 
 type CustomFieldFields = {
   name: string;
@@ -37,9 +37,8 @@ export type ExistingCustomField = {
 } & CustomFieldFields;
 
 /**
- * 課題種別も一緒に持つ（§4.1）。マニフェストは課題種別を名前で指し、カスタム属性の
- * 応答が持つのは ID なので、対応表が無いと `applicableIssueTypes` を突き合わせられない。
- * 突き合わせを諦めると「`applicableIssueTypes` だけを変えても差分が出ない」穴ができる。
+ * 課題種別の対応表も持つ。応答は ID で、マニフェストは名前で指すので、無いと
+ * `applicableIssueTypes` だけを変えても差分が出ない（§4.1）。
  */
 export type CustomFieldsSnapshot = {
   customFields: ExistingCustomField[];
@@ -64,9 +63,8 @@ const FIELDS = [
 ] as const;
 
 /**
- * `typeId` を更新のリクエストに載せない。`PATCH` のパラメータに無い（API 制約）ので、
- * 載せても型は変わらない。載せたままにすると、型を変えたつもりの利用者に
- * 「送ったのに変わらない」計画を見せることになる（§6.3a）。
+ * `typeId` を更新に載せない。`PATCH` は受け付けず（API 制約）、型を変えたつもりの利用者に
+ * 「送ったのに変わらない」計画を見せる（§6.3a）。
  */
 const UPDATABLE_FIELDS = FIELDS.filter((field) => field !== "typeId");
 
@@ -78,17 +76,7 @@ const issueTypesPath = (projectKey: string) => `/api/v2/projects/${projectKey}/i
 
 const memberPath = (projectKey: string, id: number) => `${collectionPath(projectKey)}/${id}`;
 
-/**
- * 日付型の `min` / `max` / `initialDate` は `yyyy-MM-dd` の文字列で、数値型の
- * `min` / `max` は数値である（API 制約）。応答が時刻付きの日付を返した場合に
- * 毎回 update が出るのを避けるため、文字列のときだけ日付部分に切り詰める。
- */
-const asRange = (value: number | string | null | undefined) =>
-  typeof value === "string" ? value.slice(0, 10) : (value ?? undefined);
-
-const asDate = (value: string | null | undefined) => value?.slice(0, 10);
-
-/** リスト型の選択肢は `{ id, name }` の配列で返る（API 制約）。比較に要るのは名前だけ */
+/** 選択肢の `id` は持たない。応答は `{ id, name }` だが、マニフェストは名前しか書けない。 */
 const itemsOf = (record: Record<string, unknown>): string[] | undefined => {
   const { items } = record;
 
@@ -126,39 +114,23 @@ const findExistingCustomField = (
   snapshot.find((customField) => customField.name === name) ??
   snapshot.find((customField) => customField.name === oldname);
 
-/**
- * マニフェストに書かれていないキーは比較にも送信にも載せない（K-3）。
- * `applicableIssueTypes` は ID と名前の突き合わせが要るので、この表には載せない。
- */
+/** `applicableIssueTypes` はここで比べない。ID と名前の突き合わせが要る。 */
 const changesOf = (
   desired: CustomFieldFields,
   existing: ExistingCustomField | undefined,
   fields: readonly (keyof CustomFieldFields)[],
 ): Change[] =>
-  fields
-    .filter((field) => desired[field] !== undefined)
-    .map((field) => ({
-      field,
-      before: existing?.[field] ?? null,
-      after: desired[field] ?? null,
-    }));
-
-const sameValue = (before: Value | null, after: Value | null) => {
-  if (Array.isArray(before) && Array.isArray(after)) {
-    return before.length === after.length && before.every((item, index) => item === after[index]);
-  }
-
-  return before === after;
-};
+  fieldChanges(
+    declaredOnly(Object.fromEntries(fields.map((field) => [field, desired[field]]))),
+    existing ?? {},
+  );
 
 /**
- * 送信は課題種別の ID を要求する（API 制約）が、差分は名前のまま持つ（PO-12）。ID は適用の
- * 途中でしか分からないものが混ざるため、参照をそのまま前後差分に置くと
- * 「何がどう変わるのか」が読めなくなる。`statuses` の displayOrder と同じ扱い。
+ * 差分に参照を置かない。送信は ID を要求するが、適用の途中でしか分からない ID が混ざり、
+ * 何がどう変わるのかが読めなくなる（PO-12）。
  *
- * 空の配列を「送らない」に畳まない。`applicableIssueTypes` は配列キーなので
- * 省略は空配列であり（K-1）、空は絞りの解除を意味する（§9）。畳むと、既に絞られている
- * カスタム属性からキーを消しても絞りが残る。
+ * 空の配列を「送らない」に畳まない。空は絞りの解除で（K-1 / §9）、畳むとキーを消しても
+ * 絞りが残る。
  */
 const paramsOf = (changes: Change[], applicableIssueTypes: string[] | undefined) => ({
   ...Object.fromEntries(
@@ -173,10 +145,7 @@ const paramsOf = (changes: Change[], applicableIssueTypes: string[] | undefined)
       }),
 });
 
-/**
- * 並びを無視した集合として比べる。Backlog が返す順序はマニフェストの記述順と
- * 関係が無く、順序で比べると一致していても毎回 update が出て NFR-4 が崩れる。
- */
+/** 順序で比べない。Backlog が返す順序は記述順と関係が無く、毎回 update が出て NFR-4 が崩れる。 */
 const sameNames = (left: string[], right: string[]): boolean => {
   const expected = new Set(right);
 
@@ -214,11 +183,11 @@ export const customFieldsReconciler: Reconciler<CustomField[], CustomFieldsSnaps
         typeId: requiredNumber(customField, "typeId"),
         description: optionalString(customField, "description"),
         required: optionalBoolean(customField, "required"),
-        min: asRange(numberOrString(customField, "min")),
-        max: asRange(numberOrString(customField, "max")),
+        min: numberOrDate(customField, "min"),
+        max: numberOrDate(customField, "max"),
         initialValue: optionalNumber(customField, "initialValue"),
         unit: optionalString(customField, "unit"),
-        initialDate: asDate(optionalString(customField, "initialDate")),
+        initialDate: optionalDate(customField, "initialDate"),
         initialValueType: optionalNumber(customField, "initialValueType"),
         initialShift: optionalNumber(customField, "initialShift"),
         items: itemsOf(customField),
@@ -241,10 +210,7 @@ export const customFieldsReconciler: Reconciler<CustomField[], CustomFieldsSnaps
     for (const customField of desired) {
       const fields = fieldsOf(customField);
       const found = findExistingCustomField(snapshot, customField);
-      /**
-       * 型が変わったら作り直す（§6.3a）。同名のまま `PATCH` すると、型は変わらないのに
-       * 成功が返り、マニフェストと現実が食い違ったまま apply が完了する。
-       */
+      // 型が変わったら `PATCH` で済ませない。成功が返るのに型は変わらない（§6.3a）。
       const recreated = found !== undefined && found.typeId !== fields.typeId;
       const existing = recreated ? undefined : found;
       const declared = changesOf(
@@ -258,14 +224,8 @@ export const customFieldsReconciler: Reconciler<CustomField[], CustomFieldsSnaps
           ? undefined
           : applicableNames(existing.applicableIssueTypes, issueTypes);
       const applicableMatches = current !== undefined && sameNames(current, applicable);
-      /**
-       * 絞りを解除するときだけ、空の配列を差分にも送信にも載せる（§9）。新しく作る
-       * カスタム属性には解除する絞りが無いので、書かれていないキーは送らない（K-3）。
-       *
-       * `current` の判定を畳むと、解除（`applicable` が空で `current` が空でない）が
-       * 差分にも本文にも現れなくなる。空配列を `applicableIssueTypes[]=` にするのは
-       * 送信層の仕事である（API 制約「空配列を送る方法」）。
-       */
+      // `current` の判定を畳まない。解除（`applicable` が空で `current` が空でない）が
+      // 差分にも本文にも現れなくなる（§9）。
       const filters = applicable.length > 0 || (current !== undefined && current.length > 0);
       const changes = [
         ...declared,
@@ -296,7 +256,7 @@ export const customFieldsReconciler: Reconciler<CustomField[], CustomFieldsSnaps
 
       kept.add(existing.id);
 
-      if (applicableMatches && declared.every(({ before, after }) => sameValue(before, after))) {
+      if (applicableMatches && !differs(declared)) {
         updates.push({
           id: `customFields/noop/${customField.name}`,
           phase: 6,

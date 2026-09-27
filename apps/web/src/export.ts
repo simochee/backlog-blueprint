@@ -14,7 +14,7 @@ export type ExportAttempt = {
   exported?: ProjectExport;
 };
 
-/** 止まったときは Yaml を渡さない（WU-30 / EX-17）。CLI の `runExport` と同じ分岐にする。 */
+/** 止まったときに途中までの Yaml を渡さない。半端なマニフェストがエディタに入る（WU-30 / EX-17） */
 export const prepareExport = async (
   projectKey: string,
   get: ReadContext["get"],

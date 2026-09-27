@@ -92,10 +92,7 @@ const withoutNarrowedCustomField = MANIFEST.replace(
   "",
 );
 
-/**
- * 実行者。スペース管理者なのでプロジェクト管理者にはなれず（A-5）、
- * プロジェクトに残すなら `access.members` に書く。
- */
+/** スペース管理者なのでプロジェクト管理者にはなれない（A-5） */
 const YAMADA = { id: 1, userId: "yamada", roleType: 1, name: "山田 太郎" };
 
 /** スペース管理者ではない。作成済みのプロジェクトのプロジェクト管理者として適用する */
@@ -140,7 +137,6 @@ const managedBySuzuki = {
   administrators: ["suzuki"],
 };
 
-/** どの受け入れも同じスペースから始める。違うのは投入する前提だけ */
 const space = (options: MockBacklogOptions = {}): MockBacklog =>
   mockBacklog({
     executor: YAMADA,
@@ -178,10 +174,7 @@ const ENVIRONMENT = {
   SLACK_WEBHOOK_URL,
 };
 
-/**
- * 実 API を叩かない（開発上の禁止事項）。`fetch` そのものを差し替えるので、
- * 送信層の URL 組み立てと本文の符号化まで含めて経路が通る。
- */
+/** 送信層ではなく `fetch` を差し替える。URL の組み立てと符号化まで経路に含めるため */
 const cliOn = (
   backlog: MockBacklog,
   manifest: string,

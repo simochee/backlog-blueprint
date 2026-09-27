@@ -14,8 +14,8 @@ import { type Snapshot } from "../snapshot";
 import { SPACE_ADMINISTRATOR_ROLE_TYPE } from "./auth-stage";
 
 /**
- * 位置を持たせない（DG-5）。S6 の判定はマニフェストだけでは成り立たず、
- * 行を指しても「そこを直せ」にならない場合がある。
+ * 位置を持たせない（DG-5）。S6 の判定はマニフェストだけでは成り立たず、行を指しても
+ * 「そこを直せ」にならない場合がある。
  */
 const snapshotDiagnostic = (
   id: string,
@@ -25,9 +25,8 @@ const snapshotDiagnostic = (
 ): Diagnostic => ({ id, severity: "error", stage: "snapshot", path, message, hint });
 
 /**
- * 既定ステータスの ID は全プロジェクト共通の固定値で、スペースの言語設定にも
- * プロジェクトにも依存しない（API 制約「ステータス」）。既定かどうかは ID で判定し、
- * 名前の一致では判定しない。
+ * 既定かどうかを名前で判定しない。表示名はスペースの言語で変わり、ID は変わらない
+ * （API 制約「ステータス」）。
  */
 const DEFAULT_STATUS_IDS = new Set(DEFAULT_STATUSES_JA.map(({ id }) => id));
 
@@ -40,9 +39,8 @@ const nameList = (statuses: ExistingStatus[]): string =>
   statuses.map(({ name }) => name).join(", ");
 
 /**
- * 既定ステータスの出どころを1箇所にする。既存プロジェクトは `GET` が実名を返すので
- * スナップショットの ID 1〜4 が答えで、未作成のプロジェクトだけが日英2組の表を引く
- * （API 制約「既定リソースの表示名」）。
+ * 日英2組の表を引くのは未作成のプロジェクトだけにする。既存プロジェクトの実名は
+ * スナップショットにあり、表と食い違いうる（API 制約「既定リソースの表示名」）。
  */
 const defaultStatuses = (
   declaredNames: string[],
@@ -72,10 +70,6 @@ const missingDefaults = (declaredNames: string[], defaults: ExistingStatus[]): D
       ),
     );
 
-/**
- * 既定ステータスの色は10色パレットの外にある特別な値で、API は変更を受け付けない
- * （API 制約「ステータス」）。`oldname` も同じ理由で書けない。
- */
 const defaultStatusFields = (declared: Status, index: number): Diagnostic[] => [
   ...(declared.color === undefined
     ? []
@@ -100,9 +94,8 @@ const defaultStatusFields = (declared: Status, index: number): Diagnostic[] => [
 ];
 
 /**
- * `POST /projects/:key/statuses` は `color` を必須パラメータに取る（API 制約「ステータス」）。
- * スキーマの `required` に入れられないのは、既定に `color` を書くことを V-A6a が禁じており、
- * どれが既定かを ID でしか判定できない（K-5）ためである。
+ * スキーマの `required` に入れない。既定には `color` を書けず（V-A6a）、どれが既定かは
+ * ID でしか判定できない（K-5）。
  */
 const customStatusFields = (declared: Status, index: number): Diagnostic[] =>
   declared.color === undefined
@@ -131,8 +124,8 @@ const declaredDefaults = (
   );
 
 /**
- * 並びの制約も ID で判定する（API 制約「ステータス」）。「未対応が先頭」を名前で
- * 判定すると、表示名が日本語以外のスペースで成り立たない。
+ * 「未対応が先頭」を名前で判定しない。表示名が日本語以外のスペースで成り立たない
+ * （API 制約「ステータス」）。
  */
 const statusOrder = (positions: Map<number, DeclaredDefault>, total: number): Diagnostic[] => {
   const diagnostics: Diagnostic[] = [];
@@ -185,11 +178,8 @@ const statusDiagnostics = (manifest: Manifest, snapshot: StatusesSnapshot): Diag
   const declaredNames = manifest.statuses.map(({ name }) => name);
   const defaults = defaultStatuses(declaredNames, snapshot);
 
-  /**
-   * どれが既定か決まらないときは V-A6 だけを出す。既定と自作の区別が付かないまま
-   * V-A6a / V-A26 / V-A14 を走らせると、既定を指すべき指摘が利用者の自作ステータスに
-   * 付き、直しようのないエラーになる。
-   */
+  // 既定が決まらないまま V-A6a / V-A26 / V-A14 を走らせない。既定を指すべき指摘が
+  // 利用者の自作ステータスに付き、直しようのないエラーになる。
   if (defaults === undefined) {
     return [missingDefaultSet(manifest.key)];
   }
@@ -223,9 +213,8 @@ const issueCount = (manifest: Manifest, snapshot: Snapshot): Diagnostic[] =>
     : [];
 
 /**
- * 課題件数を確認できなかった場合の V-B3（VP-5）。`Snapshot` の課題件数は必須の
- * `number` なので「確認できなかった」はスナップショットとして表せず、判定できるのは
- * 取得を行う側だけである。文言を件数0でない場合と同じ場所に置くために公開する。
+ * 「確認できなかった」は `Snapshot` で表せず（VP-5）、判定は取得する側が行う。
+ * 文言を件数0でない場合と同じ場所に置くためだけに公開する。
  */
 export const unconfirmedIssueCount = (projectKey: string, detail: string): Diagnostic =>
   snapshotDiagnostic(
@@ -269,10 +258,6 @@ const spaceMembers = (manifest: Manifest, access: AccessSnapshot): Diagnostic[] 
   ];
 };
 
-/**
- * スペース管理者はプロジェクト管理者になれない（A-5。`Only normal-user role can be
- * a project administrator.`）。書いた計画は適用の途中で必ず落ちる。
- */
 const spaceAdministrators = (manifest: Manifest, access: AccessSnapshot): Diagnostic[] => {
   const administrators = new Map(
     access.spaceUsers
@@ -297,9 +282,8 @@ const spaceAdministrators = (manifest: Manifest, access: AccessSnapshot): Diagno
 };
 
 /**
- * 省略された `subtaskingEnabled` を `false` と見なさない（K-3）。送らなければ現状が
- * 保たれるので、真かどうかは現状を見なければ決まらない。現状を持たない S4 に
- * 置けないのはこのためである。
+ * 省略された `subtaskingEnabled` を `false` と見なさない（K-3）。送らなければ現状が保たれる
+ * ので、現状を持たない S4 には置けない。
  */
 const currentSubtasking = (project: ProjectSnapshot): boolean | undefined =>
   project.exists ? project.settings.subtaskingEnabled === true : undefined;
@@ -317,11 +301,8 @@ const grandchildIssues = (manifest: Manifest, project: ProjectSnapshot): Diagnos
     return [];
   }
 
-  /**
-   * 未作成のプロジェクトで省略された場合もエラーにする。送らないキーの値を決めるのは
-   * Backlog であり、ツールがその既定を持たない（K-3）以上、真であることを確認できない。
-   * 現状が無いことと、現状が偽であることは別なのでメッセージも分ける。
-   */
+  // 未作成のプロジェクトで省略されたときも通さない。送らないキーの値を決めるのは Backlog で、
+  // ツールはその既定を持たない（K-3）。
   const message = (): string => {
     if (subtaskingEnabled !== undefined) {
       return "grandchildIssueEnabled requires subtaskingEnabled to be true";

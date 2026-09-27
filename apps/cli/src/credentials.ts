@@ -7,9 +7,7 @@ export const SPACE_VARIABLE = "BACKLOG_SPACE";
 export type Credentials = { space: string; apiKey: string };
 
 /**
- * API キーを引数から受ける道を作らない（CL-2）。`ps` で他の利用者から見え、
- * シェル履歴に残り、CI のコマンドログに出る。NFR-3 を守っても、渡し方が
- * 漏洩経路になっていては意味がない。
+ * API キーを引数から受ける道を作らない（CL-2）。`ps` で見え、シェル履歴と CI のログに残る。
  */
 export const resolveCredentials = (
   space: string | undefined,

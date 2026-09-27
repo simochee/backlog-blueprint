@@ -1,6 +1,6 @@
 const STORAGE_KEY = "backlog-blueprint:connection";
 
-export type StoredCredentials = { space: string; apiKey: string };
+type StoredCredentials = { space: string; apiKey: string };
 
 const isStoredCredentials = (value: unknown): value is StoredCredentials =>
   typeof value === "object" &&

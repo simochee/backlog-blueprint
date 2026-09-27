@@ -22,11 +22,8 @@ import { type Directory } from "../use-directory";
 import { SectionBoundary } from "./boundary";
 import { CopyButton, CopyIconButton } from "./copy-button";
 
-/**
- * Radix Icons には人の集まりを表すものが無い（`GroupIcon` は図形のグループ化）。
- * ユーザーの `PersonIcon` と同じ 15px の格子と線の太さで描き、並べたときに揃える。
- */
-export const TeamIcon = () => (
+/** Radix の `GroupIcon` を使わない。人の集まりではなく図形のグループ化を表す */
+const TeamIcon = () => (
   <svg aria-hidden fill="none" height="15" viewBox="0 0 15 15" width="15">
     <g stroke="currentColor" strokeLinecap="round">
       <circle cx="5.5" cy="4.5" r="2" />
@@ -163,7 +160,7 @@ const EntryTable = ({ heading, entries, selected, onToggle, onToggleAll }: Entry
   );
 };
 
-export type DirectoryPaneProps = {
+type DirectoryPaneProps = {
   kind: DirectoryKind;
   open: boolean;
   directory: Directory;
@@ -193,7 +190,7 @@ export const DirectoryPane = ({ kind, open, directory, onClose, onReload }: Dire
     });
   };
 
-  /** 絞り込みで隠れている選択は外さない。探し直すたびに前の選択が消えると、何件選んだかを覚えていられない。 */
+  // 絞り込みで隠れている選択は外さない。探し直すたびに前の選択が消えると、何件選んだかを覚えていられない。
   const toggleShown = (checked: boolean): void => {
     setSelected((previous) => {
       const next = new Set(previous);

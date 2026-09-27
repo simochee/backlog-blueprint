@@ -1,9 +1,10 @@
-import { type Action, type Change } from "../action";
+import { declaredOnly, differs, fieldChanges, paramsOf, type Action, type Change } from "../action";
 import { type Milestone } from "../manifest";
 import { type Reconciler } from "../reconciler";
 import {
   asArrayOf,
   asRecord,
+  optionalDate,
   optionalString,
   requiredNumber,
   requiredString,
@@ -22,35 +23,20 @@ export type MilestonesSnapshot = ExistingMilestone[];
 
 const FIELDS = ["name", "description", "startDate", "releaseDueDate"] as const;
 
-/** マイルストーンの取得は `versions`（core のデータモデル §4.1） */
+/** path を `milestones` に直さない。API 上の名前は `versions` である（§4.1）。 */
 const collectionPath = (projectKey: string) => `/api/v2/projects/${projectKey}/versions`;
 
 const memberPath = (projectKey: string, id: number) => `${collectionPath(projectKey)}/${id}`;
-
-/**
- * 応答の日付をそのまま持たない。時刻付きで返ってきた場合に、同じ日付でも
- * 毎回 update が出て NFR-4 が崩れる。マニフェストが表せるのは Y-1 の
- * `yyyy-MM-dd` だけなので、切り詰めても比較できる情報は減らない。
- */
-const asDate = (value: string | null | undefined) => value?.slice(0, 10);
 
 const findExisting = (snapshot: MilestonesSnapshot, { name, oldname }: Milestone) =>
   snapshot.find((milestone) => milestone.name === name) ??
   snapshot.find((milestone) => milestone.name === oldname);
 
-/**
- * マニフェストに書かれていないキーは比較にも送信にも載せない（K-3）。
- * 載せると、書いていない値をツールの既定で上書きすることになる。
- */
 const changesOf = (desired: MilestoneFields, existing: ExistingMilestone | undefined): Change[] =>
-  FIELDS.filter((field) => desired[field] !== undefined).map((field) => ({
-    field,
-    before: existing?.[field] ?? null,
-    after: desired[field] ?? null,
-  }));
-
-const paramsOf = (changes: Change[]) =>
-  Object.fromEntries(changes.map(({ field, after }) => [field, after]));
+  fieldChanges(
+    declaredOnly(Object.fromEntries(FIELDS.map((field) => [field, desired[field]]))),
+    existing ?? {},
+  );
 
 export const milestonesReconciler: Reconciler<Milestone[], MilestonesSnapshot> = {
   kind: "milestone",
@@ -68,8 +54,8 @@ export const milestonesReconciler: Reconciler<Milestone[], MilestonesSnapshot> =
         id: requiredNumber(version, "id"),
         name: requiredString(version, "name"),
         description: optionalString(version, "description"),
-        startDate: asDate(optionalString(version, "startDate")),
-        releaseDueDate: asDate(optionalString(version, "releaseDueDate")),
+        startDate: optionalDate(version, "startDate"),
+        releaseDueDate: optionalDate(version, "releaseDueDate"),
       };
     });
   },
@@ -105,7 +91,7 @@ export const milestonesReconciler: Reconciler<Milestone[], MilestonesSnapshot> =
 
       kept.add(existing.id);
 
-      if (changes.every(({ before, after }) => before === after)) {
+      if (!differs(changes)) {
         updates.push({
           id: `milestones/noop/${milestone.name}`,
           phase: 5,

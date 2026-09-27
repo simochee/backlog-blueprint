@@ -1,6 +1,5 @@
 import { type Diagnostic } from "../diagnostic";
 import { ManifestSchema } from "../manifest";
-import { admittedTypes, descend, schemaCursor, type SchemaCursor } from "./schema-cursor";
 import { ROOT_PATH, childPath, type ParsedDocument } from "./source-map";
 
 export const UNRESOLVED_ENV_ID = "V-A4";
@@ -10,10 +9,8 @@ const SENTINEL_PREFIX = "\0unresolved-env:";
 const SENTINEL_SUFFIX = "\0";
 
 /**
- * 未解決の `${NAME}` を空文字や名前そのもので置き換えない（VG-3）。空文字は
- * `minLength` に、名前そのものは重複や参照の判定に紛れ込み、環境変数が足りない
- * だけの利用者に S3 / S4 の嘘の違反を見せることになる。ここでしか作れない
- * 不透明な文字列にしておけば、後段は `hasEnvSentinel` で判定を飛ばせる。
+ * 空文字や名前そのもので置き換えない（VG-3）。空文字は `minLength` に、名前は重複や参照の
+ * 判定に紛れ込み、環境変数が足りないだけの利用者に S3 / S4 の嘘の違反を見せる。
  */
 const envSentinel = (name: string): string => `${SENTINEL_PREFIX}${name}${SENTINEL_SUFFIX}`;
 
@@ -21,10 +18,8 @@ export const hasEnvSentinel = (value: unknown): boolean =>
   typeof value === "string" && value.includes(SENTINEL_PREFIX);
 
 /**
- * 正規表現そのものを共有しない。書き出し（EX-5）は S2 が参照と見なすものだけを
- * 同じ規則で見つける必要があるが、`g` 付きの `RegExp` は `lastIndex` を持ち、
- * `exec` / `test` と混ざると2回目の呼び出しだけ結果が変わる。呼ぶたびに作れば、
- * 使う側がどのメソッドを選んでも状態が残らない。
+ * 正規表現そのものを共有しない（EX-5 と共用）。`g` 付きの `RegExp` は `lastIndex` を持ち、
+ * `exec` / `test` と混ざると2回目の呼び出しだけ結果が変わる。
  */
 export const envReferencePattern = (): RegExp => /\$\$\{([^}]+)\}|\$\{([^}]+)\}/g;
 
@@ -61,14 +56,63 @@ const expandString = (value: string, env: Environment): StringExpansion => {
   return { text, unresolved: [...unresolved] };
 };
 
+type SchemaNode = Record<string, unknown>;
+
+/**
+ * 枝を1つに絞らない。どの `anyOf` / `oneOf` の枝や `then` が効くかは値を検証しないと決まらず、
+ * 展開はスキーマ検証（S3）より前に走る。
+ */
+type SchemaCursor = readonly SchemaNode[];
+
+const isNode = (value: unknown): value is SchemaNode =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+const nodesIn = (value: unknown): SchemaNode[] =>
+  Array.isArray(value) ? value.filter(isNode) : [];
+
+/**
+ * `if` はたどらない（E-10）。枝を選ぶ条件で、その位置に書ける値を述べていない。`if` に型を
+ * 書いた時点で、判別条件が変換の根拠に紛れ込む。
+ */
+const alternativesOf = (node: SchemaNode): SchemaNode[] => [
+  node,
+  ...[...nodesIn(node.anyOf), ...nodesIn(node.oneOf)].flatMap(alternativesOf),
+  ...nodesIn(node.allOf)
+    .flatMap(({ then }) => (isNode(then) ? [then] : []))
+    .flatMap(alternativesOf),
+];
+
+const schemaCursor = (schema: unknown): SchemaCursor => (isNode(schema) ? [schema] : []);
+
+const childOf = (node: SchemaNode, segment: string | number): unknown => {
+  if (typeof segment === "number") {
+    return node.items;
+  }
+
+  return isNode(node.properties) ? node.properties[segment] : undefined;
+};
+
+const descend = (cursor: SchemaCursor, segment: string | number): SchemaCursor =>
+  cursor
+    .flatMap(alternativesOf)
+    .map((node) => childOf(node, segment))
+    .filter(isNode);
+
+const admittedTypes = (cursor: SchemaCursor): Set<string> =>
+  new Set(
+    cursor
+      .flatMap(alternativesOf)
+      .flatMap(({ type }) => (Array.isArray(type) ? type : [type]))
+      .filter((type): type is string => typeof type === "string"),
+  );
+
 const WHOLE_REFERENCE = /^\$\{[^}]+\}$/;
 
 const JSON_NUMBER = /^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$/;
 
 /**
  * 解決した値を YAML として読み直さない（E-10）。`#e30000` はコメントとして `null` になり、
- * 文字列の欄に渡した `123` まで数値になる。変換するのは、その位置のスキーマが
- * 受け付ける型の JSON 表記だけである。
+ * 文字列の欄に渡した `123` まで数値になる。
  */
 const coerceWholeReference = (text: string, cursor: SchemaCursor): unknown => {
   const types = admittedTypes(cursor);

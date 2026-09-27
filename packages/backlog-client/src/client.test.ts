@@ -2,8 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { type ResolvedHttpRequest } from "@backlog-blueprint/core";
 
-import { createBacklogClient } from "./client";
-import { BacklogHttpFailureError } from "./failure";
+import { BacklogHttpFailureError, createBacklogClient } from "./client";
 
 const API_KEY = "api-key-must-never-be-printed";
 
@@ -63,7 +62,6 @@ const rejecting = (error: unknown) =>
     fetch: (() => Promise.reject(error)) as never,
   });
 
-/** ブラウザの fetch と同じく、Window 以外のレシーバで呼ばれたら投げる。 */
 const brandChecked = function (this: unknown, url: string) {
   if (this !== undefined && this !== globalThis) {
     throw new TypeError("Failed to execute 'fetch' on 'Window': Illegal invocation");
@@ -245,7 +243,7 @@ describe("失敗", () => {
 
 describe("バイト列の取得", () => {
   it("本文を解釈せずにバイト列のまま返す", async () => {
-    /** PNG の先頭4バイト。16進で書くと oxfmt が小文字に、oxlint が大文字に直させ合う */
+    // 16進で書かない。oxfmt が小文字に、oxlint が大文字に直させ合う
     const bytes = new Uint8Array([137, 80, 78, 71]).buffer;
     const { client } = clientWith({ status: 200, bytes });
 
@@ -274,7 +272,7 @@ const TIMEOUT_MS = 60_000;
 
 type Stalled = { signals: AbortSignal[]; client: ReturnType<typeof createBacklogClient> };
 
-/** 接続は張れたが Backlog が何も返さない。`signal` を見ない実装として、打ち切られても黙ったまま */
+/** `signal` を見ない。打ち切りが `signal` だけに頼っていないことを確かめるため */
 const stalled = (): Stalled => {
   const signals: AbortSignal[] = [];
 
@@ -292,7 +290,6 @@ const stalled = (): Stalled => {
   };
 };
 
-/** ヘッダまでは返るが、本文が届かない */
 const stalledBody = () =>
   createBacklogClient({
     space: "example.backlog.com",

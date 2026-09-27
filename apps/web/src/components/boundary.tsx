@@ -2,7 +2,7 @@ import { CrossCircledIcon } from "@radix-ui/react-icons";
 import { Button, Callout, Flex } from "@radix-ui/themes";
 import { Component, type ReactNode } from "react";
 
-export type SectionBoundaryProps = { children: ReactNode };
+type SectionBoundaryProps = { children: ReactNode };
 
 type SectionBoundaryState = { failed: boolean };
 
@@ -10,10 +10,7 @@ const reload = (): void => {
   globalThis.location.reload();
 };
 
-/**
- * WU-18。受け止めた error を props にも画面にも渡さないので、この器が覚えるのは
- * 受け止めたことだけになる。React に他の書き方が無いのでクラスで書く。
- */
+/** 関数で書かない。error boundary を書く方法はクラスしか無い */
 export class SectionBoundary extends Component<SectionBoundaryProps, SectionBoundaryState> {
   override state: SectionBoundaryState = { failed: false };
 

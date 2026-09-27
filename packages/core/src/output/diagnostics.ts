@@ -3,9 +3,8 @@ import { orderDiagnostics } from "../validation/gate";
 import { type Paint, plain } from "./color";
 
 /**
- * 表示では添字を落とし、ドットで継ぐ。`path` がスラッシュ区切りで配列に添字を持つ
- * のは消費側のための約束（DG-4）で、利用者が読むのはマニフェストのキーである
- * （§1.1 の `access.members` / §5.3 の `statuses`）。
+ * `path` をそのまま見せない。スラッシュ区切りと添字は消費側のための約束（DG-4）で、
+ * 利用者が読むのはマニフェストのキー（§1.1 の `access.members`）。
  */
 export const displayPath = (path: string): string =>
   path
@@ -28,9 +27,8 @@ const indent = (width: number, lines: string[]): string[] =>
   lines.map((line) => `${" ".repeat(width)}${line}`);
 
 /**
- * `Nothing has been applied.` を添えるかは呼び出し側が決める（要件定義 §5.3）。
- * `validate` と `plan` はもともと何も適用しないので、そこで言うと意味をなさない。
- * `export` は適用しないが書き出しはしないので、そこだけ差し替える（CL-9）。
+ * `Nothing has been applied.` を常には添えない（要件定義 §5.3）。`validate` と `plan` は
+ * もともと何も適用せず、`export` は「書き出していない」と言う（CL-9）。
  */
 export type DiagnosticOptions = {
   paint?: Paint;
@@ -60,10 +58,7 @@ const errorSummary = (
   return [nothingWritten ? `${errors} Nothing has been written.` : errors];
 };
 
-/**
- * 並べ替えをここでもう一度行う。`orderDiagnostics` は冪等なので、呼び出し側が
- * 通し忘れても DG-3 の順が出力に出る。
- */
+/** 並べ済みでも並べ直す。呼び出し側が通し忘れても DG-3 の順で出る */
 export const renderDiagnostics = (
   diagnostics: Diagnostic[],
   { paint = plain, nothingApplied = false, nothingWritten = false }: DiagnosticOptions = {},

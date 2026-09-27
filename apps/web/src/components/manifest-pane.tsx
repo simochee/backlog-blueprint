@@ -14,17 +14,14 @@ import { DiagnosticList } from "./diagnostics";
 import { EnvironmentDialog } from "./environment-dialog";
 import { ImportDialog } from "./import-dialog";
 
-/**
- * エディタとスキーマ一式は、スペースに繋がるまで現れないので最初の読み込みに
- * 載せない。接続前の画面がエディタを待つ理由が無い。
- */
+/** 最初の読み込みに載せない。エディタは接続まで現れず、接続前の画面が待つ理由が無い */
 const ManifestEditor = lazy(async () => {
   const loaded = await import("./manifest-editor");
 
   return { default: loaded.ManifestEditor };
 });
 
-export type ManifestPaneProps = {
+type ManifestPaneProps = {
   text: string;
   onTextChange: (text: string) => void;
   onFileDropped: (name: string, text: string) => void;
@@ -34,12 +31,11 @@ export type ManifestPaneProps = {
   fileFailure?: string;
   onOpen: () => void;
   onSave: () => void;
-  /** 接続が変われば Import のモーダルを作り直す（WU-32） */
   importKey: string;
   onImport: (projectKey: string) => Promise<ExportAttempt>;
   onImported: (exported: ProjectExport) => void;
   /**
-   * 入力欄の一覧を検証結果から取らない。検証は入力が止まってから走る（§2.2）ので、
+   * 入力欄の一覧を最新の検証結果から取らない。検証は入力が止まってから走る（§2.2）ので、
    * 途中の状態で欄が消えると、環境変数を打っている最中に focus が外れる。
    */
   names: string[];
@@ -47,7 +43,6 @@ export type ManifestPaneProps = {
   canPlan: boolean;
   planning: boolean;
   onPlan: () => void;
-  /** 押せるのは今の入力で作った、変更のある、まだ適用していない計画があるときだけ（WU-3） */
   canApply: boolean;
   applying: boolean;
   onApply: () => void;

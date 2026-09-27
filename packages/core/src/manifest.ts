@@ -3,12 +3,9 @@ import { Type, type SchemaOptions, type Static, type TProperties } from "@sincla
 import { WEBHOOK_EVENTS, type WebhookEvent } from "./webhook-events";
 
 /**
- * `Type.Union([Type.Literal(...)])` に置き換えない。TypeBox の Union は
- * `anyOf` の `const` 列を出し、`enum` キーワードを出さない。マニフェストのスキーマ定義
- * §5 / §6 / §7 / §9 は色や型を `enum` と決めており、生成物を読む人と
- * エディタの補完が見るキーワードは決定どおりでなければならない。
- * `Type.Unsafe` は TypeBox 自身の `Value` 検証を素通りさせるが、検証は Ajv が
- * このオブジェクトをそのまま JSON Schema として読んで行うので効力は落ちない。
+ * `Type.Union([Type.Literal(...)])` に置き換えない。`enum` ではなく `anyOf` の `const` 列を
+ * 出し、スキーマ定義 §5 / §6 / §7 / §9 の決定と食い違う。`Type.Unsafe` が素通りさせるのは
+ * TypeBox の `Value` 検証だけで、検証する Ajv には効かない。
  */
 const StringEnum = <const Values extends readonly string[]>(
   values: Values,
@@ -146,9 +143,8 @@ const FORBIDDEN_KEYS_BY_INITIAL_VALUE_TYPE = {
 } as const satisfies Record<InitialValueType, ForbiddenKeys>;
 
 /**
- * 書き出し（EX-11）が型ごとの許可キーを自前の表で持たない形にするための入口。
- * 条件表と射影が別々の表を引くと、M-1 が「手書きの JSON Schema と実行時バリデータを
- * 二重に持つと必ずズレる」として退けた形に戻る。
+ * 書き出し（EX-11）に許可キーの表を別に持たせない。条件表と2つになり、M-1 が退けた
+ * 二重定義に戻る。
  */
 export const typeSpecificCustomFieldKeys = (
   type: CustomFieldType,
@@ -172,15 +168,11 @@ const NUMBER_RANGE = rangeOf({ type: "number" });
 const DATE_RANGE = rangeOf({ type: "string", pattern: DATE_PATTERN });
 
 /**
- * 8種の型を判別共用体にして `oneOf` を出す形は採らない。どの分岐にも一致しない入力に
- * 対してエディタが出せるのは「どの分岐にも一致しない」だけで、V-A11 が指したい
- * 「この型にはこのキーが要る」にならない。§9 が `allOf` + `if`/`then` を指定しているのは
- * この違いによる。
+ * 判別共用体の `oneOf` にしない。エディタが「どの分岐にも一致しない」しか言えず、V-A11 の
+ * 「この型にはこのキーが要る」にならない（§9）。
  *
- * 各 `if` の `required` は省略できない。判別キー（`type` / `initialValueType`）が
- * 書かれていないとき `properties` だけの `if` は真になるため、`required` を外すと
- * すべての分岐の `then` が同時に成立し、型固有キーが一律に禁止された結果として
- * 「どのキーも書けない」というエラーが並ぶ。
+ * 各 `if` の `required` を外さない。判別キーが無いと `properties` だけの `if` は真になり、
+ * すべての `then` が同時に成立して「どのキーも書けない」エラーが並ぶ。
  */
 const CUSTOM_FIELD_CONDITIONS = [
   {
@@ -243,9 +235,8 @@ const CUSTOM_FIELD_CONDITIONS = [
 ];
 
 /**
- * 名前がそのまま意味になる項目（`useWiki` / `useGit` など）には説明を置かない。
- * キー名を言い換えただけの文はホバーに何も足さず、説明のある項目とない項目の差が
- * 「ここには言うべきことがある」という合図として働かなくなる。
+ * 名前がそのまま意味になる項目（`useWiki` など）に説明を足さない。言い換えはホバーに何も
+ * 足さず、説明の有無が「ここには言うべきことがある」という合図として働かなくなる。
  */
 const SettingsSchema = StrictObject(
   {
@@ -463,9 +454,8 @@ const CustomFieldSchema = StrictObject(
 );
 
 /**
- * `administrators` の説明にだけ Backlog 側の制約を書く。V-B11 はこれを判定できるが、
- * 判定には `GET /users` の `roleType` が要るので、`plan` まで待たないと言えない。
- * スキーマの説明はエディタが書いている最中に出せる唯一の地点である。
+ * `administrators` の説明にだけ Backlog 側の制約を書く。V-B11 は `plan` まで待たないと
+ * 言えず、書いている最中に出せるのはスキーマの説明だけである。
  */
 const AccessSchema = StrictObject(
   {
@@ -588,7 +578,7 @@ export const ManifestSchema = StrictObject({
 
 export type Settings = Static<typeof SettingsSchema>;
 
-/** 射影（EX-10）が14個のキーを並べ直さずに済むよう、スキーマの並びをそのまま渡す */
+/** キーを手で並べない。射影（EX-10）の並びとスキーマの並びがずれる。 */
 export const SETTINGS_KEYS = Object.keys(SettingsSchema.properties) as (keyof Settings)[];
 
 export type IssueType = Static<typeof IssueTypeSchema>;

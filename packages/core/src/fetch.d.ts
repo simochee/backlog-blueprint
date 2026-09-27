@@ -1,13 +1,9 @@
 /**
- * `lib` に `DOM` を足す案と `@types/web` を入れる案は採らない。どちらも
- * `document` / `localStorage` / `window` まで型が通り、core の本体から
- * ランタイム固有の API を締め出すガード（NFR-5）が緩む。とくに `localStorage` を
- * 引ける状態は、API キーを永続化しないこと（FR-7.4）を型で見張れなくする。
- * 代わりに、実際に使う面だけをここに写す。
+ * `lib` に `DOM` を足す案と `@types/web` を入れる案は採らない。`document` や `localStorage` まで
+ * 型が通り、NFR-5 のガードも、API キーを永続化しないこと（FR-7.4）の見張りも緩む。
  *
- * `FetchResponse` にヘッダを持たせないのは X-3 による。レート制限の残量は常に
- * `GET /rateLimit` の本文から取る決まりで、ブラウザは `access-control-expose-headers`
- * が返らずヘッダを読めない。読める型を置くと、Node でだけ動く経路を書けてしまう。
+ * `FetchResponse` にヘッダを持たせない。ブラウザでは `X-RateLimit-*` を読めず、Node でだけ
+ * 動く経路を書けてしまう（X-3）。
  */
 
 interface FetchResponse {
@@ -35,9 +31,7 @@ declare const AbortSignal: {
 };
 
 /**
- * 戻り値を `unknown` にしておく。Node は `Timeout` オブジェクトを、ブラウザは数値を
- * 返す。どちらかの型に決めると、決めた側でしか `clearTimeout` を書けない形になる。
- * NFR-5 が許すのは X-1 / X-4 の待機に要る呼び出しだけなので、`clearTimeout` は
- * 宣言しない。
+ * 戻り値を Node の `Timeout` にもブラウザの数値にも決めない。決めた側でしか動かない
+ * `clearTimeout` を書けてしまう。`clearTimeout` 自体も、X-1 / X-4 の待機に要らないので宣言しない。
  */
 declare function setTimeout(callback: () => void, milliseconds: number): unknown;

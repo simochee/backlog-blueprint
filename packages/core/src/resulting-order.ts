@@ -17,10 +17,7 @@ type OrderedResource = {
   existing: (snapshots: ResourceSnapshots) => string[];
 };
 
-/**
- * 並べ替え API があるのはステータスだけなので、ステータスはここに入らない
- * （要件定義 §2.4）。この4つは既存の順序を保ち、新規が末尾に付く。
- */
+/** ステータスを入れない。並べ替え API があるのはステータスだけである（要件定義 §2.4）。 */
 export const FIXED_ORDER_SECTIONS = [
   "issueTypes",
   "categories",
@@ -57,10 +54,6 @@ const ORDERED_RESOURCES: Record<FixedOrderSection, OrderedResource> = {
 const renamedFrom = (action: Action): string | undefined =>
   action.notes?.find(({ type }) => type === "renamed")?.from;
 
-/**
- * 既存の順序を保ち、新規は末尾に付く（要件定義 §2.4）。未作成のプロジェクトでは
- * 既存が無いので、生成される順がそのまま並びになる。
- */
 const afterApply = (existing: string[], actions: Action[]): string[] => {
   const kept = new Map<string, string>();
   const created: string[] = [];
@@ -91,14 +84,6 @@ export const declaredOrder = (manifest: Manifest): ResourceOrder => ({
   customFields: ORDERED_RESOURCES.customFields.declared(manifest),
 });
 
-/**
- * 適用後に実際どう並ぶか（plan の出力仕様 §1.4 / V-A15）。
- *
- * ステータスだけは記述順そのものになる。新規カスタムは「完了」の直前に挿入されるが、
- * フェーズ3の最後に `updateDisplayOrder` が記述順で並べ直すため（要件定義 §2.4 / §6）、
- * 適用が終わった時点の並びは常に記述順である。挿入位置の予測が要るのは
- * 「並べ直しが要るか」を決める側で、そこは statuses の reconciler が持っている。
- */
 export const resultingOrder = (
   manifest: Manifest,
   snapshots: ResourceSnapshots,
@@ -115,6 +100,8 @@ export const resultingOrder = (
 
   return {
     issueTypes: after("issueTypes"),
+    // 挿入位置を予測しない。フェーズ3の最後の `updateDisplayOrder` が記述順に並べ直す
+    // （要件定義 §2.4 / §6）。予測が要るのは並べ直しの要否を決める statuses の reconciler だけ。
     statuses: manifest.statuses.map(({ name }) => name),
     categories: after("categories"),
     milestones: after("milestones"),

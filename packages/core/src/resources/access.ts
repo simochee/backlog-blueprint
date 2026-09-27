@@ -5,19 +5,13 @@ import { type Reconciler } from "../reconciler";
 import { type Value } from "../value";
 
 /**
- * ログイン ID（`userId`）は取り込まない。スペース管理者でないキーには本人以外の
- * `userId` が `null` で返る（API 制約「スペースのユーザー一覧」）ので、必須にすると
- * 一般ユーザーの読み取りがここで落ちる。マニフェストも数値 ID で書く（A-7）。
- *
- * `name` を `optionalString` にするのは、表示のための項目が欠けていることで読み取りを
- * 落としたくないため。
+ * ログイン ID（`userId`）を取り込まない。スペース管理者でないキーには本人以外の `userId` が
+ * `null` で返り（API 制約「スペースのユーザー一覧」）、一般ユーザーの読み取りが落ちる（A-7）。
+ * 表示にしか使わない `name` も、欠けていて読み取りを落とさないよう必須にしない。
  */
 export type AccessUser = { id: number; name?: string };
 
-/**
- * `roleType` はスペース全体の権限で、`GET /users` だけが返す（API 制約「権限」）。
- * プロジェクト単位の取得には現れないので、`AccessUser` とは別の型にする。
- */
+/** `AccessUser` に `roleType` を足さない。`GET /users` にしか現れない（API 制約「権限」）。 */
 export type SpaceUser = AccessUser & { roleType: number };
 
 export type AccessTeam = { id: number; name: string };
@@ -47,8 +41,8 @@ const teamsPath = (projectKey: string): string => `/api/v2/projects/${projectKey
 const usersPath = (projectKey: string): string => `/api/v2/projects/${projectKey}/users`;
 
 /**
- * `excludeGroupMembers=true` を外すとチーム経由の参加者まで返る（要件定義 §2.6 / §6.3）。
- * 既定値のまま取ると、差集合が「チームの所属者を個人として削除する」Action を生む。
+ * `excludeGroupMembers=true` を外さない。チーム経由の参加者まで返り、差集合がチームの
+ * 所属者を個人として削除する（要件定義 §2.6 / §6.3）。
  */
 const personalMembersPath = (projectKey: string): string =>
   `${usersPath(projectKey)}?excludeGroupMembers=true`;
@@ -86,9 +80,8 @@ const toSpaceTeams = (value: unknown): SpaceTeam[] =>
   }));
 
 /**
- * 一致している Action にも既存の ID を載せる（§6.1）。`--output json` の消費側は
- * `noop` から「このリソースは意図的に一致している」を読むので、どのリソースと
- * 一致しているのかを指せないと、名前だけを頼りに引き直すことになる。
+ * `noop` にも既存の ID を載せる。無いと `--output json` の消費側が、どれと一致したのかを
+ * 名前だけで引き直すことになる（§6.1）。
  */
 const matched = (kind: AccessKind, key: string, name: string, target: number): Action => ({
   id: `${SECTIONS[kind]}/noop/${key}`,
@@ -137,11 +130,7 @@ const removed = (
 const unique = (ids: number[]): number[] => [...new Set(ids)];
 
 export const accessReconciler: Reconciler<Access, AccessSnapshot> = {
-  /**
-   * フェーズ7の1つの reconciler が3種の `ResourceKind` を出す（§2.1）。`Reconciler` が
-   * 持てる kind は1つなので、この値は代表にすぎない。実行も描画も個々の Action の
-   * kind を見るため、ここを増やしても読む側は増えない。
-   */
+  // 3種の kind を出す reconciler の代表にすぎない（§2.1）。実行も描画も Action の kind を見る。
   kind: "projectTeam",
   phase: PHASE,
 
@@ -163,13 +152,8 @@ export const accessReconciler: Reconciler<Access, AccessSnapshot> = {
   plan: (desired, snapshot, { manifest }) => {
     const projectKey = manifest.key;
 
-    /**
-     * `administrators` を差し引かずに合併する。§6.3 の表は「`members` ∪
-     * （`administrators` のうち未参加の人）」と書いているが、それを削除側にも使うと、
-     * `members` に書かれていない既参加の管理者が「Yaml に無い」と判定されて
-     * 個人削除の対象になる。A-3（管理者は参加者でなければならない）を自分で壊す。
-     * 追加側は差集合を取る段階で同じ結果になるので、合併で足りる。
-     */
+    // §6.3 の表どおり未参加の管理者だけを足す形にしない。削除側にも使うと、`members` に
+    // 書かれていない既参加の管理者が個人削除の対象になり、A-3 を自分で壊す。
     const desiredMembers = unique([...desired.members, ...desired.administrators]);
 
     const joinedMembers = new Set(snapshot.members.map(({ id }) => id));
@@ -182,11 +166,8 @@ export const accessReconciler: Reconciler<Access, AccessSnapshot> = {
       )?.name || `#${id}`;
     const grantedAdministrators = new Set(snapshot.administrators.map(({ id }) => id));
 
-    /**
-     * `Action.id` と表示名を分ける。名前はスペース内で重なりうる（A-6 / A-7）ので、
-     * 名前で `id` を作ると同名の2件が同じ Action を指し、中断レポートがどちらまで
-     * 進んだかを言えなくなる。表示は人が読むためにスペースの現在の名前で出す。
-     */
+    // `Action.id` を名前で作らない。名前は重なりうるので（A-6 / A-7）、同名の2件が
+    // 同じ Action を指し、中断レポートがどちらまで進んだかを言えなくなる。
     const teamsToAdd = desired.teams.map((id) =>
       joinedTeams.has(id)
         ? matched("projectTeam", String(id), teamName(id), id)
