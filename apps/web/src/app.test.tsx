@@ -10,22 +10,19 @@ import userEvent, { type UserEvent } from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from "vitest";
 
 /**
- * 送信層を丸ごと差し替える。`fetch` を差し替える形（CLI の端から端まで）では
- * backlog-js が読み込まれ、ブラウザ環境で動かす意味の無い URL 組み立てまで
- * 巻き込む。ここで確かめたいのは画面の挙動である。
+ * `fetch` を差し替えない（CLI の端から端までのテストの形）。backlog-js が読み込まれ、
+ * ブラウザ環境で動かす意味の無い URL 組み立てまで巻き込む。
  */
 let respond: (path: string, space?: string) => Promise<unknown>;
 
 let deliver: (request: ResolvedHttpRequest) => Promise<unknown>;
 
-/** アイコンを取りに行った先。取った中身は描画の対象にしない（happy-dom は画像を読まない） */
+/** 取った中身を確かめない。happy-dom は画像を読まない */
 let bytesRequested: string[] = [];
 
 /**
- * Monaco は happy-dom では動かない。レイアウトの測定に実ブラウザの API を使うので、
- * 読み込んだだけで落ちる。ここで確かめたいのは画面の挙動なので、入力の口と
- * ファイルの受け口だけを持つ textarea に差し替える。エディタ自体の結線は
- * manifest-editor.tsx の Why-not コメントが守る範囲であり、テストの対象にしない。
+ * 本物のエディタを読み込まない。CodeMirror はレイアウトの測定に実ブラウザの API を使い、
+ * happy-dom では動かない。エディタ自体の結線はこのテストの対象にしない。
  */
 vi.mock("./components/manifest-editor", () => ({
   ManifestEditor: ({
@@ -93,13 +90,10 @@ const withWebhook = (hookUrl: string): string =>
   `${MANIFEST}webhooks:\n  - name: notify\n    hookUrl: ${hookUrl}\n    events:\n      - issueCreated\n`;
 
 /**
- * モジュールスコープに閉じた API キーと送信層（§2.4）は、テストのあいだも1つしかない。
- * 読み込み直さないと、前のテストが打った API キーと開いた接続が次のテストに残る。
- *
- * その代わり、各テストが依存の木を評価し直す費用を払う。1件目は変換も伴う。他の
- * パッケージのテストと並んで CPU が混むと、それだけで既定のタイムアウト（5秒）を越える。
- * 越えたテストの描画は `cleanup` の後に終わって DOM に残り、次のテストを複数一致で
- * 道連れにする。タイムアウトはこのファイルの費用に合わせて延ばしておく。
+ * タイムアウトを既定（5秒）に戻さない。モジュールスコープの API キーと送信層（§2.4）を
+ * テストごとに捨てるため、各テストが依存の木を評価し直す。他のパッケージのテストと並んで
+ * CPU が混むとそれだけで5秒を越え、越えたテストの描画が `cleanup` の後に DOM に残って
+ * 次のテストを複数一致で道連れにする。
  */
 vi.setConfig({ testTimeout: 30_000 });
 
@@ -117,10 +111,7 @@ const startApp = async (responses: Record<string, unknown> = {}): Promise<UserEv
   return user;
 };
 
-/**
- * 待ってから掴む。エディタは遅延読み込みなので（manifest.tsx）、接続した直後には
- * まだ DOM に無い。
- */
+/** `getBy*` で掴まない。エディタは遅延読み込みで、接続した直後にはまだ DOM に無い */
 const manifestField = async (): Promise<HTMLElement> => screen.findByLabelText(/^Manifest/);
 
 const button = (name: string): HTMLElement => screen.getByRole("button", { name });
@@ -128,14 +119,13 @@ const button = (name: string): HTMLElement => screen.getByRole("button", { name 
 const pane = (name: string): HTMLElement => screen.getByRole("complementary", { name });
 
 /**
- * 文言は領域の中で引く。エディタで出た診断は計画の警告にも持ち込まれる（plan.ts）ので、
+ * 文言を画面全体から引かない。エディタで出た診断は計画の警告にも持ち込まれるので、
  * `getByText` はエディタの下と Output の同じ文言を両方拾う。
  */
 const region = (name: string): HTMLElement => screen.getByRole("region", { name });
 
 const ACCOUNT = "yamada at Example Inc.";
 
-/** 接続できたかは右上のアカウント表示で見る（WU-35） */
 const signedIn = async (): Promise<HTMLElement> => screen.findByRole("button", { name: ACCOUNT });
 
 const connect = async (user: UserEvent): Promise<void> => {
@@ -149,7 +139,6 @@ const writeManifest = async (user: UserEvent, text: string): Promise<void> => {
   await user.paste(text);
 };
 
-/** 環境変数の欄はボタンの中に畳まれている（manifest.tsx）。開いてから掴む。 */
 const openEnvironment = async (user: UserEvent): Promise<void> => {
   await user.click(await screen.findByRole("button", { name: /Environment values/ }));
 };
@@ -169,10 +158,7 @@ const reach = async (user: UserEvent): Promise<void> => {
   await plan(user);
 };
 
-/**
- * 入力の値だけでなく属性も見る。React は `defaultValue` を value 属性に書き戻すので、
- * 値だけを見ると欄の外へ写った属性を見落とす。
- */
+/** 入力の値だけを見ない。React は `defaultValue` を value 属性に書き戻すので、属性を見落とす */
 const carrying = (value: string): string[] =>
   [...document.querySelectorAll("*")]
     .filter(
@@ -182,9 +168,6 @@ const carrying = (value: string): string[] =>
     )
     .map((element) => `${element.tagName}:${element.getAttribute("type") ?? ""}`);
 
-/**
- * 応答を握ったまま離さない。押している最中の姿を確かめるには、通信が終わらない窓が要る。
- */
 const holding = (): (() => void) => {
   const answered = respond;
 
@@ -205,7 +188,6 @@ const holding = (): (() => void) => {
 const beforeUnloadCalls = (spy: MockInstance<typeof globalThis.addEventListener>): number =>
   spy.mock.calls.filter(([type]) => type === "beforeunload").length;
 
-/** Apply は今出ている計画を適用する。確認は挟まない（WU-3 / WU-5） */
 const apply = async (user: UserEvent): Promise<void> => {
   await waitFor(() => {
     expect(button("Apply")).toBeEnabled();
@@ -213,10 +195,8 @@ const apply = async (user: UserEvent): Promise<void> => {
   await user.click(button("Apply"));
 };
 
-/**
- * 接続の資格情報は sessionStorage に残る（WU-38）。消さないと、前のテストで繋いだ
- * 接続を次のテストが読み込み時に自動で繋ぎ直し、接続画面から始まらない。
- */
+// sessionStorage を残さない。前のテストで繋いだ接続を次のテストが読み込み時に自動で繋ぎ直し
+// （WU-38）、接続画面から始まらない。
 beforeEach(() => {
   deliver = recordingSend(() => ({ id: 900 })).send;
   globalThis.sessionStorage.clear();
@@ -247,7 +227,6 @@ const OTHER_SPACE = "other.backlog.com";
 
 const KEY_REJECTED = httpFailure({ status: 401, errors: [{ message: "Authentication failure." }] });
 
-/** 別のスペースでは API キーを受け付けない。切り替えが V-B1 で落ちる経路を作る */
 const keyRejectedOn = (domain: string): void => {
   const answered = respond;
 
@@ -375,7 +354,7 @@ describe("接続の切り替え", () => {
     await user.type(within(dialog).getByLabelText("Space domain"), "x");
     await user.type(within(dialog).getByLabelText("API key"), "typing");
 
-    /** モーダルの背面は読み上げから外れるので、隠れた要素も含めて探す */
+    // モーダルの背面は読み上げから外れるので、隠れた要素も含めて探す。
     expect(screen.getByRole("button", { name: ACCOUNT, hidden: true })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Copy JSON", hidden: true })).toBeInTheDocument();
     expect(screen.queryByText("Outdated")).toBeNull();
@@ -830,10 +809,6 @@ describe("離脱の警告", () => {
   });
 });
 
-/**
- * 保留中は Action が解決するまでで決まる（WU-15）。押しっぱなしで固まらないことと、
- * 走っているあいだ二重に走らせられないことの両方が、ここで初めて見える。
- */
 describe("通信しているあいだの押せなさ", () => {
   it("繋いでいるあいだ Connect は押せない", async () => {
     const user = await startApp();
@@ -1163,7 +1138,7 @@ describe("スペースのユーザーとチームの一覧", () => {
 
 type FakeFile = { handle: FileSystemFileHandle; contents: () => string };
 
-/** 書き込みは close で初めて中身に反映する。Chromium が一時ファイルに溜めて close で置き換えるのと同じ */
+/** 書き込みを即座に中身へ反映しない。Chromium は一時ファイルに溜めて close で置き換える */
 const fakeFile = (
   name: string,
   initial: string,
@@ -1200,7 +1175,6 @@ const fakeFile = (
 
 const PICKER_CLOSED = new DOMException("The user aborted a request.", "AbortError");
 
-/** Chromium の File System Access API がある環境にする（WU-44）。 */
 const withPickers = ({
   open = [],
   save = [],
@@ -1233,7 +1207,6 @@ const withPickers = ({
   return { showOpenFilePicker, showSaveFilePicker };
 };
 
-/** Firefox と Safari のように、ファイルを選ぶ API が無い環境で Open したときに選ばれるファイル */
 const choosingOnInput = (file: File): void => {
   vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(function (
     this: HTMLInputElement,
@@ -1243,7 +1216,7 @@ const choosingOnInput = (file: File): void => {
   });
 };
 
-/** object URL はアイコンも作る（WU-35）ので、リンクを押してダウンロードさせたものだけを数える */
+/** object URL をすべて数えない。アイコンも作る（WU-35） */
 const capturingDownloads = (): { filename: string; blob?: Blob }[] => {
   const blobs = new Map<string, Blob>();
   const saved: { filename: string; blob?: Blob }[] = [];
@@ -1561,7 +1534,7 @@ describe("ファイルの開閉の端", () => {
   });
 });
 
-/** 保存はファイルを選ぶ API の有無を await してからダウンロードするので、その後まで待つ */
+/** クリックの直後に確かめない。保存はファイルを選ぶ API の有無を await してからダウンロードする */
 const settleSave = async (): Promise<void> =>
   new Promise((resolve) => {
     setTimeout(resolve, 0);
@@ -1710,7 +1683,7 @@ describe("保存していない変更の差し替え", () => {
 });
 
 describe("Backlog からの読み込み", () => {
-  /** 課題種別が0件のプロジェクトはマニフェストにできない（EX-9h）ので、1件持たせる。 */
+  // 課題種別を空にしない。0件のプロジェクトはマニフェストにできない（EX-9h）。
   const EXPORTABLE = {
     "/api/v2/projects/PROJ_A/issueTypes": [{ id: 1, name: "タスク", color: "#7ea800" }],
   };

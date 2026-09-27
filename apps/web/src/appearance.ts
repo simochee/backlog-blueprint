@@ -2,11 +2,7 @@ import { useSyncExternalStore } from "react";
 
 const QUERY = "(prefers-color-scheme: dark)";
 
-/**
- * `matchMedia` の有無を確かめる。happy-dom で走るテストと、埋め込まれた WebView が
- * これを持たないことがあり、持たない環境で落ちると画面全体が描画されない。
- * 配色の話で画面を失うのは割に合わない。
- */
+/** `matchMedia` があると決めつけない。happy-dom や埋め込みの WebView には無く、落ちると画面全体が消える */
 const media = (): MediaQueryList | undefined =>
   typeof globalThis.matchMedia === "function" ? globalThis.matchMedia(QUERY) : undefined;
 

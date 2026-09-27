@@ -3,18 +3,9 @@ import { execute, type Plan } from "@backlog-blueprint/core";
 
 import { foldExecutionEvent, idleProgress, type ApplyRun } from "./progress";
 
-export type ApplyInput = {
-  plan: Plan;
-  space: string;
-  /** 呼び出し時点で掴んだクライアント（WU-37）。途中で接続を差し替えても、残りはここへ送る */
-  client: BacklogClient;
-};
+type ApplyInput = { plan: Plan; space: string; client: BacklogClient };
 
-/**
- * 実行を画面の外に置く。`for await` を含む関数は React Compiler が扱えず、抱えている
- * 部品ごと素通しになる（App 全体が最適化の対象から外れる）。ここに出せば、記録を進める
- * 手続きと、それを描く部品とが別々に読める。
- */
+/** App の中に書かない。`for await` を含む関数は React Compiler が扱えず、App ごと最適化から外れる */
 export const runApply = async (
   { plan, space, client }: ApplyInput,
   show: (run: ApplyRun) => void,

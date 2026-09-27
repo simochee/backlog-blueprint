@@ -1,16 +1,9 @@
 /**
- * Radix Themes の色トークンを Catppuccin に差し替える。Latte（明）と Mocha（暗）の対で、
- * エディタ（@catppuccin/codemirror）と同じフレーバーに揃える。
+ * グレーの中間値を作らない。Catppuccin の中立色（crust〜text）はちょうど 12 段で Radix の
+ * 1〜12 の役割と並びが一致し、作ればそこだけコントラストの根拠が無い色になる。
  *
- * グレーは 12 段を 1 対 1 で写している。Catppuccin の中立色は crust / mantle / base /
- * surface0-2 / overlay0-2 / subtext0-1 / text のちょうど 12 段で、Radix の 1〜12 の役割
- * （1 が地、9 が実体、11 が副文字、12 が主文字）と並びが一致するため、中間値を作らずに済む。
- * 作ると、そこだけコントラストの根拠が無い色になる。
- *
- * アクセントは mauve。Radix の 12 段すべては持てないので、実際に描画に出る段
- * （9 実体・10 ホバー・11 文字・a3/a4 の淡い地）だけを差し替え、残りは Radix の violet に
- * 任せる。中途半端に見えるが、ホバーや押下の状態色は Radix 側がコントラストを検証済みで、
- * そこを手で作り直す理由が無い。
+ * アクセントの mauve は描画に出る段（9・10・11・a3・a4）だけを差し替え、残りを Radix の
+ * violet に任せる。中途半端に見えるが、状態色は Radix 側がコントラストを検証済みである。
  */
 
 .light,
@@ -40,9 +33,8 @@
   --red-11: #d20f39;
   --cyan-11: #179299;
 
-  /**
-   * crust（地）→ mantle（カード）→ base（エディタ）の順に明るくする。Catppuccin の
-   * エディタ配色が base を前提に作られているので、カードを base にすると
+  /*
+   * カードを base にしない。Catppuccin のエディタ配色が base を前提に作られているので、
    * エディタが背景に溶けて、どこが編集領域か分からなくなる。
    */
   --color-background: #dce0e8;
@@ -68,7 +60,7 @@
   --accent-9: #cba6f7;
   --accent-10: #dbb8ff;
   --accent-11: #cba6f7;
-  /** mauve は明るいので、その上の文字は地の色で抜く。 */
+  /* mauve は明るいので、その上の文字を白にしない。 */
   --accent-contrast: #1e1e2e;
   --accent-a3: color-mix(in srgb, #cba6f7 14%, transparent);
   --accent-a4: color-mix(in srgb, #cba6f7 20%, transparent);

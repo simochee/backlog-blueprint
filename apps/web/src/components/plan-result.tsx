@@ -14,7 +14,7 @@ import { badgedAction } from "../view";
 import { CopyButton } from "./copy-button";
 import { DiagnosticList } from "./diagnostics";
 
-export type PlanResultProps = {
+type PlanResultProps = {
   prepared?: PreparedPlan;
   diagnostics: Diagnostic[];
   failure?: unknown;
@@ -71,10 +71,8 @@ export const PlanResult = ({
   const { actions } = prepared.plan;
   const summary = summarize(actions);
   const shown = showUnchanged ? actions : actions.filter(({ op }) => op !== "noop");
-  /**
-   * `renderWarnings` は端末向けの整形で、`Warnings:` の見出しと字下げを自分で持つ。
-   * 画面では重大度が色で出るので、診断の並べ方は 1 箇所（DiagnosticList）に寄せる。
-   */
+  // `renderWarnings` を使わない。端末向けに `Warnings:` の見出しと字下げを自分で持つので、
+  // 画面では診断の並べ方を DiagnosticList の1箇所に寄せる。
   const warnings = prepared.report.diagnostics.filter(({ severity }) => severity === "warning");
 
   return (

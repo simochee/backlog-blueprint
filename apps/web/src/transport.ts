@@ -8,9 +8,8 @@ type WebClient = BacklogClient & BacklogBinaryReader;
 
 /**
  * API キーを内包するクライアントも React の state に載せない（§2.4 / FR-7.4）。
- * 「API キーを持つものはモジュールスコープにしかない」と言い切れれば grep で確かめられる
- * ので、表示も永続化もしないから state でよい、という例外を作らない。
- * 接続が有効かどうかは、値ではなく印だけを state に置けば表せる。
+ * 表示も永続化もしないから state でよい、という例外を作ると、「API キーを持つものは
+ * モジュールスコープにしかない」を grep で確かめられなくなる。
  */
 let client: WebClient | undefined;
 
@@ -37,7 +36,7 @@ export const closeTransport = (): void => {
   client = undefined;
 };
 
-/** WU-37。適用は始めた時点のクライアントを最後まで使う。 */
+/** 適用に `transport` を渡さない。途中で繋ぎ直すと、残りの書き込みが別のスペースへ行く（WU-37）。 */
 export const pinTransport = (): BacklogClient => opened();
 
 export const transport: WebClient = {

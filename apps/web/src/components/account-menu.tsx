@@ -7,18 +7,15 @@ import { initialOf } from "../avatar";
 import { type Connection } from "../connection";
 import { CopyIconButton } from "./copy-button";
 
-export type AccountMenuProps = {
+type AccountMenuProps = {
   domain: string;
   connection: Connection;
-  /** 送信層で取ったアイコンの `blob:` URL（WU-35）。取れるまでは頭文字で描く */
   icons: { space?: string; user?: string };
-  /** WU-37。適用の最中は切り替えも切断もさせない */
   locked: boolean;
   onSwitch: () => void;
   onDisconnect: () => void;
 };
 
-/** ヘッダーでは隣のボタンの高さに収め、ポップオーバーでは見出しの大きさにする */
 type AvatarsSize = "header" | "menu";
 
 const Avatars = ({
@@ -101,7 +98,7 @@ export const AccountMenu = ({
               <Text className="mono" size="1" weight="medium">
                 {user}
               </Text>
-              {/**
+              {/*
                * 表示しているログイン ID を写さない。`access` に書くのは数値の ID で（A-7）、
                * 名前のコメントも付けるので、Users のペインと同じ書き出しを通す（WU-23）。
                */}

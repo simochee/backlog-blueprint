@@ -8,17 +8,16 @@ import { ApplyResult } from "./apply-result";
 import { SectionBoundary } from "./boundary";
 import { PlanResult } from "./plan-result";
 
-export type OutputView = {
+type OutputView = {
   entry: OutputEntry;
   outdated: boolean;
   run?: ApplyRun;
 };
 
-export type OutputPanelProps = {
+type OutputPanelProps = {
   entries: OutputEntry[];
   runs: ApplyRuns;
   view?: OutputView;
-  /** 次の項目を組み立てている最中で、かつ最新の項目を追って表示している */
   preparing: boolean;
   expanded: boolean;
   onExpandedChange: (expanded: boolean) => void;
@@ -28,22 +27,18 @@ export type OutputPanelProps = {
 };
 
 /**
- * 読み上げの名前を表示と分ける。表示のまま Plan / Apply と読ませると、エディタの上の
- * Plan / Apply（計画を作る・適用する）と同じ名前のボタンが2つずつ並び、押して何が起きるかが
- * 名前から区別できない。
+ * 表示のまま Plan / Apply と読ませない。エディタの上の Plan / Apply と同じ名前のボタンが
+ * 2つずつ並び、押して何が起きるかが名前から区別できない。
  */
 const SECTIONS: { section: Section; title: string; label: string }[] = [
   { section: "plan", title: "Plan", label: "Jump to plan" },
   { section: "apply", title: "Apply", label: "Jump to apply" },
 ];
 
-/** Apply へ飛んだとき、区切りの上に残す余白。`.output-body` の padding と揃える */
+/** `.output-body` の padding と揃える */
 const SECTION_MARGIN = 12;
 
-/**
- * `<hr>` と Radix の `Separator` を使わない。どちらも線だけで名前を持てず、読み上げでも
- * 見た目でも「ここから先が適用」を言えない。
- */
+/** `<hr>` や Radix の `Separator` を使わない。線だけで名前を持てず、「ここから先が適用」を言えない */
 const ApplyDivider = ({ ref }: { ref: Ref<HTMLDivElement> }) => (
   <div aria-label="Apply" className="output-divider" ref={ref} role="separator">
     <Text color="gray" size="1" weight="medium">
@@ -113,10 +108,8 @@ export const OutputPanel = ({
 }: OutputPanelProps) => {
   const bodyRef = useRef<HTMLDivElement>(null);
   const applyRef = useRef<HTMLDivElement>(null);
-  /**
-   * 読んでいる部分は、どの項目のものかと組にして持つ。項目を移ったら Plan から読み始めるが、
-   * 移るたびに倒す処理を書くと、移る経路（メニュー・新しい計画）ごとに書き足すことになる。
-   */
+  // 項目を移るたびに Plan へ倒す処理を書かない。移る経路（メニュー・新しい計画）ごとに
+  // 書き足すことになるので、どの項目のものかと組にして持つ。
   const [reading, setReading] = useState<{ entryId: number; section: Section }>();
   const entryId = view?.entry.id;
   const section = reading !== undefined && reading.entryId === entryId ? reading.section : "plan";
@@ -171,7 +164,7 @@ export const OutputPanel = ({
               </DropdownMenu.Content>
             </DropdownMenu.Root>
           )}
-          {/* 畳んでいても見える場所に出す。Apply が押せない理由がここで読める（WU-3）。 */}
+          {/* 本文の中にだけ出さない。畳んでいても Apply が押せない理由が読めるように（WU-3）。 */}
           {view?.outdated && view.run === undefined ? (
             <Badge color="amber" variant="solid">
               Outdated
@@ -210,7 +203,7 @@ export const OutputPanel = ({
         </IconButton>
       </Flex>
       {expanded ? (
-        /* 項目ごとに器を作り直し、別の項目へ移ったら先頭から表示する（WU-42）。 */
+        /* `key` を外さない。別の項目へ移ってもスクロール位置が残る（WU-42）。 */
         <div className="output-body" key={entryId} onScroll={track} ref={bodyRef}>
           <SectionBoundary>
             {preparing ? (

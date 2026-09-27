@@ -2,17 +2,15 @@ import { CheckIcon, CopyIcon } from "@radix-ui/react-icons";
 import { Button, IconButton, Tooltip } from "@radix-ui/themes";
 import { useEffect, useState } from "react";
 
-export type CopyButtonProps = { label: string; text: () => string; disabled?: boolean };
+type CopyButtonProps = { label: string; text: () => string; disabled?: boolean };
 
 const FEEDBACK_MS = 2000;
 
 const useCopy = (text: () => string): { copied: boolean; copy: () => void } => {
   const [copied, setCopied] = useState(false);
 
-  /**
-   * 戻すまでの時間は効果に持たせる。ハンドラの中で `setTimeout` を張ると、その 2 秒の
-   * あいだに計画を取り直してこのボタンごと消えた場合に、後片付けをする場所が無い。
-   */
+  // ハンドラの中で `setTimeout` を張らない。その 2 秒のあいだに計画を取り直してこのボタンごと
+  // 消えた場合に、後片付けをする場所が無い。
   useEffect(() => {
     if (!copied) {
       return undefined;

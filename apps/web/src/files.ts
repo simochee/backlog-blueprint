@@ -1,4 +1,3 @@
-import { downloadText } from "./download";
 import { openedFile, type ManifestDocument, type OpenedDocument } from "./manifest-document";
 
 const YAML_TYPE = "application/yaml";
@@ -7,7 +6,28 @@ const MANIFEST_FILES = [{ description: "Manifest", accept: { [YAML_TYPE]: [".yam
 
 export const UNTITLED_FILENAME = "manifest.yaml";
 
-/** WU-44 */
+/**
+ * ダウンロードが URL を読み終える前に解放されうるので、`click()` の直後には解放しない。
+ * FileSaver.js が同じ理由で解放を遅らせている。
+ */
+const REVOKE_DELAY_MS = 40_000;
+
+/**
+ * `<a href>` に object URL を持たせ続ける形にしない。結果が差し替わるたびに古い URL を
+ * 解放する後片付けが要り、漏れても画面からは分からない。押したときに作って捨てる。
+ */
+const downloadText = (filename: string, text: string, type: string): void => {
+  const url = URL.createObjectURL(new Blob([text], { type }));
+  const anchor = document.createElement("a");
+
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  setTimeout(() => {
+    URL.revokeObjectURL(url);
+  }, REVOKE_DELAY_MS);
+};
+
 const cancelled = (error: unknown): boolean =>
   error instanceof DOMException && error.name === "AbortError";
 
@@ -22,7 +42,6 @@ const chooseWithInput = async (): Promise<File | undefined> =>
     input.click();
   });
 
-/** 閉じられたら `undefined`。API が無い環境では書き戻せる保存先を持たずに開く（WU-44） */
 export const openManifestFile = async (): Promise<OpenedDocument | undefined> => {
   if (globalThis.showOpenFilePicker === undefined) {
     const file = await chooseWithInput();
@@ -52,10 +71,8 @@ export const openManifestFile = async (): Promise<OpenedDocument | undefined> =>
 const writeText = async (handle: FileSystemFileHandle, text: string): Promise<void> => {
   const writable = await handle.createWritable();
 
-  /**
-   * 失敗したら閉じずに捨てる。Chromium は書き込みを一時ファイルに溜めて close で置き換えるので、
-   * close すると途中までの内容で元のファイルを上書きする。
-   */
+  // 失敗したら閉じずに捨てる。Chromium は書き込みを一時ファイルに溜めて close で置き換えるので、
+  // close すると途中までの内容で元のファイルを上書きする。
   try {
     await writable.write(text);
   } catch (error) {
@@ -66,10 +83,6 @@ const writeText = async (handle: FileSystemFileHandle, text: string): Promise<vo
   await writable.close();
 };
 
-/**
- * 保存できたら、保存した内容を持つ文書を返す。閉じられたら `undefined`。
- * API が無い環境ではダウンロードに落とし、その時点で保存済みとする（WU-44）。
- */
 export const saveManifestFile = async (
   document: ManifestDocument,
   text: string,

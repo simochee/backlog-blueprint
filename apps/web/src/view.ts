@@ -11,10 +11,9 @@ import {
   type Style,
 } from "@backlog-blueprint/core";
 
-/** ブラウザに TTY は無い。色は CSS で付けるので、描画には色を付けさせない */
 export const PLAIN = painter(false);
 
-export type BadgedAction = { symbol: string; style: Style; text: string; changes: string[] };
+type BadgedAction = { symbol: string; style: Style; text: string; changes: string[] };
 
 const SYMBOL_LENGTH = 1;
 
@@ -35,17 +34,15 @@ export const badgedAction = (action: Action, variant: LineVariant = "plan"): Bad
   };
 };
 
-export type DiagnosticBlock = { diagnostic: Diagnostic; text: string };
+type DiagnosticBlock = { diagnostic: Diagnostic; text: string };
 
-export type DiagnosticView = { summary?: string; blocks: DiagnosticBlock[] };
+type DiagnosticView = { summary?: string; blocks: DiagnosticBlock[] };
 
 const BLOCK_SEPARATOR = "\n\n";
 
 /**
- * 1件ずつに行番号（DG-5）を添えたいが、`renderDiagnostics` は全件を1つの文字列にして返す。
- * 文面を Web 側で組み直すと CLI と別の文言になる（NFR-6）ので、返った文字列を並び順で
- * 対応付けて切り分ける。並びを決めるのは `orderDiagnostics`（DG-3）で、同じ関数を
- * 通した配列と突き合わせれば対応が取れる。先頭の件数の要約は診断1件に対応しない。
+ * 文面を Web 側で組み直さない。CLI と別の文言になる（NFR-6）。`renderDiagnostics` が全件を
+ * 1つにした文字列を、同じ `orderDiagnostics`（DG-3）を通した配列と並び順で突き合わせて切り分ける。
  */
 export const diagnosticView = (
   diagnostics: Diagnostic[],

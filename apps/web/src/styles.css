@@ -1,6 +1,5 @@
 /**
  * Radix Themes が覆う範囲（色・間隔・角丸・フォーム部品・カード）はここに書かない。
- * 残しているのは、計画の等幅表示と、部品として用意されていない画面の枠組みだけである。
  * 二重に持つと、テーマを切り替えたときに片方だけ追従しないところができる。
  */
 
@@ -8,7 +7,7 @@ body {
   margin: 0;
 }
 
-/* plan の出力はこのツールの主役なので、等幅と行間を自前で決める。 */
+/* Radix の `Code` に任せない。plan の出力はこのツールの主役なので、等幅と行間を自前で決める。 */
 .mono {
   margin: 0;
   font-family: var(--code-font-family);
@@ -58,10 +57,7 @@ body {
   gap: var(--space-2);
 }
 
-/**
- * 行番号の桁を揃える。揃っていないと、診断が複数出たときに本文の開始位置が
- * 行ごとにずれ、等幅で書いてある意味が消える。
- */
+/* 幅を中身に任せない。診断が複数出たときに本文の開始位置が行ごとにずれる。 */
 .diagnostic-position {
   flex: none;
   width: 4rem;
@@ -71,9 +67,9 @@ body {
   color: var(--gray-10);
 }
 
-/**
- * 高さは器が決める（WU-39）。CodeMirror は中身の行数だけ伸びるので、指定しないと
- * マニフェストの長さで画面が跳ね、下の Output の位置が入力のたびに変わる。
+/*
+ * 高さを CodeMirror に任せない。中身の行数だけ伸びるので、下の Output の位置が入力のたびに
+ * 変わる（WU-39）。
  */
 .manifest-editor {
   flex: 1;
@@ -97,9 +93,9 @@ body {
   overflow: auto;
 }
 
-/**
- * サイドペインは Radix に相当する部品が無い。`Dialog` も `Popover` も背面を覆うか
- * 外側の操作で閉じるので、一覧から写しながらエディタに貼る使い方ができない（WU-20）。
+/*
+ * Radix の `Dialog` や `Popover` を使わない。背面を覆うか外側の操作で閉じるので、一覧から
+ * 写しながらエディタに貼る使い方ができない（WU-20）。
  */
 .side-pane {
   position: fixed;
@@ -118,9 +114,9 @@ body {
   display: none;
 }
 
-/**
- * 表のセルは中身の幅まで広がるので、`truncate` だけでは省略されずにペインからはみ出す。
- * 幅を 0 に固定して残りを全部渡すと、セルが列の幅に収まり、長いメールアドレスが省略される。
+/*
+ * `truncate` だけに任せない。表のセルは中身の幅まで広がるので、省略されずにペインからはみ出す。
+ * 幅を 0 に固定して残りを全部渡すと、セルが列の幅に収まる。
  */
 .side-pane-entry {
   width: 100%;
@@ -132,31 +128,21 @@ body {
   min-height: 0;
 }
 
-/**
- * 広い画面では本文をペインの幅だけ寄せ、ペインの下に Plan や Apply が隠れないようにする。
- * 狭い画面では寄せる余地が無いので上に重ねる。
- */
+/* 広い画面でペインを本文に重ねない。ペインの下に Plan や Apply が隠れる。 */
 @media (min-width: 1024px) {
   .page[data-pane-open="true"] {
     padding-right: min(26rem, 100vw);
   }
 }
 
-/**
- * 留める位置は Radix の `position` / `top` で指定し、ここは下を流れる本文が透けないための
- * 地の色と境界だけを持つ。`z-index` はサイドペインより下にする — 狭い画面ではペインが
- * ヘッダーの上に重なり、閉じるボタンがヘッダーに隠れてはいけない。
- */
+/* `z-index` をサイドペインより上にしない。狭い画面でペインの閉じるボタンがヘッダーに隠れる。 */
 .app-header {
   z-index: 1;
   background: var(--color-background);
   border-bottom: 1px solid var(--gray-a4);
 }
 
-/**
- * WU-39。ページを画面の高さに収め、エディタが残りを使う。低い画面で潰れないよう下限を持ち、
- * それを下回ればページごとスクロールさせる（WU-25）。57px はヘッダーの高さ（`.navbar` と境界）。
- */
+/* 57px はヘッダーの高さ（`.navbar` と境界）。下限を下回ればページごとスクロールさせる（WU-25）。 */
 .workspace {
   display: flex;
   flex-direction: column;
@@ -200,16 +186,15 @@ body {
   border-bottom: 1px solid var(--gray-a4);
 }
 
-/* 履歴の見出しは長くなりうるので、ヘッダーの幅に収まらない分を省略する。 */
 .output-current {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/**
- * `position: relative` は外さない。Apply の区切りの `offsetTop` をこの器から測るため
- * （WU-42）。外すと、ページの先頭からの距離になり、飛ぶ先も現在地もずれる。
+/*
+ * `position: relative` は外さない。Apply の区切りの `offsetTop` をこの器から測るため（WU-42）で、
+ * 外すとページの先頭からの距離になり、飛ぶ先も現在地もずれる。
  */
 .output-body {
   position: relative;
@@ -265,15 +250,14 @@ body {
   color: var(--accent-9);
 }
 
-/* WU-34。ヘッダーの下の残りの高さの中央にフォームを置く。 */
 .connect-screen {
   min-height: calc(100dvh - 57px);
   padding-block: var(--space-6);
 }
 
-/**
- * 寸法と色は隣の Users / Teams（Radix の soft な Button、size 2）のトークンに揃える。
- * 自前の値を持つと、テーマの半径や間隔を変えたときにこれだけが揃わなくなる。
+/*
+ * 自前の寸法や色を持たない。隣の Users / Teams（Radix の soft な Button、size 2）のトークンに
+ * 揃えないと、テーマの半径や間隔を変えたときにこれだけが揃わなくなる。
  */
 .account-trigger {
   display: inline-flex;
@@ -299,9 +283,9 @@ body {
   outline-offset: -1px;
 }
 
-/**
- * 利用者のアバターは角からはみ出させ、寸法に数えない。余白で場所を空けると
- * スペースのアバターが左上に寄り、ボタンの中で中央に来なくなる。
+/*
+ * 利用者のアバターの場所を余白で空けない。スペースのアバターが左上に寄り、ボタンの中で
+ * 中央に来なくなるので、角からはみ出させて寸法に数えない。
  */
 .account-avatars {
   position: relative;
@@ -333,7 +317,7 @@ body {
   color: var(--gray-10);
 }
 
-/* 狭い画面では右上に文字を並べる幅が無いので、アイコンだけにする。名前は aria-label が持つ。 */
+/* 文字を隠しても名前は失わない。aria-label が持つ。 */
 @media (max-width: 640px) {
   .navbar-tool-label {
     display: none;

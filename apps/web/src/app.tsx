@@ -15,8 +15,7 @@ import { runApply } from "./apply";
 import { useAppearance } from "./appearance";
 import { AccountMenu } from "./components/account-menu";
 import { SectionBoundary } from "./components/boundary";
-import { ConnectDialog } from "./components/connect-dialog";
-import { ConnectScreen } from "./components/connect-screen";
+import { ConnectDialog, ConnectScreen } from "./components/connect";
 import { DIRECTORY_PANES, DirectoryPane } from "./components/directory-pane";
 import { DiscardDialog } from "./components/discard-dialog";
 import { ManifestPane } from "./components/manifest-pane";
@@ -60,7 +59,6 @@ import { validatedFor } from "./validation";
 
 const DIRECTORY_KINDS: DirectoryKind[] = ["users", "teams"];
 
-/** WU-15。Action の dispatch は transition の中から呼ぶ。 */
 const start = (action: () => void) => () => startTransition(action);
 
 export const App = () => {
@@ -78,7 +76,6 @@ export const App = () => {
   const [fileFailure, setFileFailure] = useState<string>();
   const [showUnchanged, setShowUnchanged] = useState(false);
   const [runs, setRuns] = useState<ApplyRuns>({});
-  /** 未指定のあいだは最新の項目を追う。新しい項目を足したら、その項目を開く（WU-39） */
   const [selectedId, setSelectedId] = useState<number>();
   const [outputExpanded, setOutputExpanded] = useState(false);
   const [paneRecord, setPaneRecord] = useState<Derived<DirectoryKind>>();
@@ -89,22 +86,16 @@ export const App = () => {
     user: useIcon(connectionKey, connection?.icons.user),
   };
 
-  /** 失敗は、それを出したフォームにだけ見せる。開き直したフォームに前の失敗を残さない */
+  // `connectionControl.attempt` をそのまま出さない。開き直したフォームに前の失敗が残る。
   const attempt =
     connectionControl.attempt?.formId === formId ? connectionControl.attempt : undefined;
 
-  /**
-   * モーダルは開いた時点の接続に紐づける。新しい接続が通れば番号が変わって閉じるので、
-   * 「成功したら閉じる」を成功の経路に書き足さずに済む（WU-36）。
-   */
+  // 開閉を真偽値で持たない。開いた時点の接続に紐づければ、新しい接続が通った時点で閉じ、
+  // 「成功したら閉じる」を成功の経路ごとに書き足さずに済む（WU-36）。
   const switching = switchingFrom !== undefined && switchingFrom === session?.id;
 
-  /**
-   * 束ね直さない。`useDeferredValue` は同一性で新旧を見分けるので、描画のたびに別の
-   * object を渡すと後回しの描画がいつまでも追いつかない。React Compiler も同じものを
-   * 畳むが（WU-19）、それに任せて消さない。畳まれなかったときに出るのが「遅い」ではなく
-   * 「描画が止まらない」なので、落ちても遅いだけで済む形にしておく。
-   */
+  // `useMemo` を消して React Compiler に任せない（WU-19）。`useDeferredValue` は同一性で
+  // 新旧を見分けるので、畳まれなかったときに出るのは「遅い」ではなく「描画が止まらない」になる。
   const manifestInputs: ManifestInputs = useMemo(
     () => ({ manifestText, environment: revisions.environment }),
     [manifestText, revisions.environment],
@@ -112,7 +103,6 @@ export const App = () => {
   const manifestKey = manifestStamp(manifestInputs);
   const planKey = planStamp(connectionKey, manifestKey);
 
-  /** WU-16。追いついていない結果は印が合わないので `fresh` が弾き、Plan も Apply も押せないままになる。 */
   const settled = useDeferredValue(manifestInputs);
   const validated = validatedFor(settled);
 
@@ -122,7 +112,6 @@ export const App = () => {
     users: useDirectory("users", connectionKey),
     teams: useDirectory("teams", connectionKey),
   };
-  /** WU-21。開いているペインも接続の印に紐づけ、接続を差し替えれば閉じる。 */
   const pane = connection === undefined ? undefined : fresh(paneRecord, connectionKey);
 
   const togglePane = (kind: DirectoryKind): void => {
@@ -141,7 +130,6 @@ export const App = () => {
     }
   };
 
-  /** Plan は計画を作って履歴に1件足すだけで、何も書かない。適用は Apply が別に受け持つ（WU-3） */
   const [history, runPlan, planning] = useActionState<OutputEntry[]>(async (previous) => {
     if (validation?.manifest === undefined || connection === undefined) {
       return previous;
@@ -186,10 +174,8 @@ export const App = () => {
     startTransition(runPlan);
   };
 
-  /**
-   * 離脱の警告は Output に失われる記録があるあいだ出す（WU-41）。マニフェストを書いた
-   * だけでは出さない。何も実行していない画面を閉じるたびに聞くと、警告そのものが読まれなくなる。
-   */
+  // マニフェストを書いただけでは警告しない。何も実行していない画面を閉じるたびに聞くと、
+  // 警告そのものが読まれなくなる（WU-41）。
   const keepsRecords = history.length > 0 || planning;
 
   useEffect(() => {
@@ -200,11 +186,8 @@ export const App = () => {
     const warn = (event: BeforeUnloadEvent): void => {
       event.preventDefault();
 
-      /**
-       * `returnValue` は非推奨だが消さない。`preventDefault()` だけを見るのは
-       * Chrome 119 以降で、Safari と Firefox は今もこちらを見る。片方だけだと
-       * 適用の最中に閉じても何も聞かれないブラウザが出る。
-       */
+      // `returnValue` は非推奨だが消さない。`preventDefault()` だけを見るのは Chrome 119 以降で、
+      // Safari と Firefox は今もこちらを見る。
       event.returnValue = "";
     };
 
@@ -215,13 +198,8 @@ export const App = () => {
     };
   }, [keepsRecords]);
 
-  /**
-   * 適用するのは描画した時点の判定ではなく、押された時点で導き直した計画にする。描画の後に
-   * 入力が変わった描画より先にクリックが届く経路が残る。
-   *
-   * ここだけ Action にしないのは WU-15 による。進捗を1件ずつ出すのが仕事なので、
-   * 包むと全部終わってからまとめて出る。保留中を自前で持たないことは WU-17 が満たす。
-   */
+  // 描画した時点の判定を適用しない。入力が変わった描画より先にクリックが届く経路が残る。
+  // Action にしないのは、包むと進捗が全部終わってからまとめて出るため（WU-15）。
   const applyPlan = (): void => {
     const prepared = applicable?.attempt.prepared;
 
@@ -246,7 +224,6 @@ export const App = () => {
     setFileFailure(undefined);
   };
 
-  /** WU-45 */
   const openDocument = (opened: OpenedDocument): void => {
     if (unsaved) {
       setReplacement(opened);
@@ -267,7 +244,6 @@ export const App = () => {
     }
   };
 
-  /** WU-43 / WU-44 */
   const saveFile = async (): Promise<void> => {
     const failure = `Could not save ${manifestDocument.name ?? UNTITLED_FILENAME}`;
 
@@ -275,10 +251,8 @@ export const App = () => {
       const saved = await saveManifestFile(manifestDocument, manifestText);
 
       if (saved !== undefined) {
-        /**
-         * 書き込みの許可を待つあいだに別の文書へ差し替えられていたら戻さない。戻すと、
-         * 表示は新しい文書のまま保存先だけが前のファイルになり、次の Save がそこを上書きする。
-         */
+        // 書き込みの許可を待つあいだに別の文書へ差し替えられていたら戻さない。戻すと、
+        // 表示は新しい文書のまま保存先だけが前のファイルになり、次の Save がそこを上書きする。
         setManifestDocument((current) => (current === manifestDocument ? saved : current));
         setFileFailure(undefined);
       }
@@ -287,12 +261,12 @@ export const App = () => {
     }
   };
 
-  /** WU-47。押し続けた繰り返しでも、ページの保存は止めたまま保存だけしない。 */
   const saveOnShortcut = useEffectEvent((event: KeyboardEvent): void => {
     if (!isSaveShortcut(event)) {
       return;
     }
 
+    // 繰り返しで先に抜けない。押し続けたときにブラウザのページ保存が開く（WU-47）。
     event.preventDefault();
 
     if (!event.repeat) {

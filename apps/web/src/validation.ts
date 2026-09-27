@@ -19,8 +19,9 @@ export type ManifestValidation = {
   manifest?: Manifest;
 };
 
-export type ValidateInput = { text: string; valueOf: (name: string) => string };
+type ValidateInput = { text: string; valueOf: (name: string) => string };
 
+/** 空欄の名前を環境に入れない。core の展開（S2）が値として受け取り、「値が未入力」を判定できなくなる */
 const environmentOf = (names: string[], valueOf: (name: string) => string): Environment =>
   Object.fromEntries(
     names.flatMap((name) => {
@@ -31,10 +32,8 @@ const environmentOf = (names: string[], valueOf: (name: string) => string): Envi
   );
 
 /**
- * S1〜S4 をブラウザで走らせる（検証パイプライン §4 の Web エディタ）。テキストを2度読むのは、
- * 入力欄を生成するのに `${NAME}` の一覧が要るのに、core の展開が名前を返すのは
- * 診断の文面の中だけだからである。文面から名前を取り出す形にすると、core の文言が
- * 変わった瞬間に入力欄が消える。
+ * `${NAME}` の一覧を診断の文面から取り出さない。core の文言が変わった瞬間に入力欄が消えるので、
+ * テキストを2度読む。
  */
 export const validateInBrowser = ({ text, valueOf }: ValidateInput): ManifestValidation => {
   const syntax = parseManifestSyntax(text);
@@ -71,10 +70,8 @@ const EMPTY: ManifestValidation = { diagnostics: [], names: [] };
 let memo: Derived<ManifestValidation> | undefined;
 
 /**
- * 環境変数の入力値はモジュールに置くので、描画からは見えない依存になる。印が
- * その値の代わりに変わるので、印を引数に取れば「同じ印なら同じ結果」が関数の外から言える。
- * `useMemo` に任せない — React Compiler は書いた依存配列を採らず、式が触っている
- * ものから依存を引き直すので、本文が読んでいない版の違いを落としてしまう。
+ * `useMemo` に任せない。React Compiler は書いた依存配列を採らず、式が触っているものから
+ * 依存を引き直すので、本文が読んでいない環境の版の違いを落とす。
  */
 export const validatedFor = (inputs: ManifestInputs): Derived<ManifestValidation> => {
   const stamp = manifestStamp(inputs);

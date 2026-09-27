@@ -6,20 +6,14 @@ import { defineConfig } from "vitest/config";
 import cliPackage from "../cli/package.json";
 
 /**
- * 書き出しをここに置くのは、Node が使えて、かつ `packages/core` と
- * `packages/schema` にプラットフォーム依存を入れずに済む場所だから（NFR-5）。
- * 要件定義 §7.1 の配布構成でも、JSON Schema は Web UI と同じ Pages のルートに並ぶ。
+ * スキーマの書き出しを `packages/schema` に置かない。ファイルを書くには Node が要り、
+ * プラットフォーム依存が入る（NFR-5）。版をルートの package.json から読まないのは、
+ * private で版を持たず npm に出る版と一致しないため（D-2）。
  *
- * バージョンを npm パッケージの package.json から読むのは D-2 による。
- * ルートの package.json は private で版を持たないので、npm に出る
- * `@simochee/backlog-blueprint` の版と一致しない。
- *
- * この設定を読むコマンドはすべて `--configLoader runner` を付ける（`dev` / `build` /
- * `test`）。既定のローダはこのファイルを esbuild で束ねたうえで、ワークスペースの
- * パッケージを external にして Node に読ませる。core は相対 import に拡張子を
- * 書かない決まり（AGENTS.md）なので、Node の ESM 解決では読めない。
- * 相対 path で `packages/schema/src` を直に読む案は、既定のローダで動く代わりに
- * パッケージの公開面（B-1）を迂回するので採らない。
+ * この設定を読むコマンドには `--configLoader runner` を付ける。既定のローダはワークスペースの
+ * パッケージを external にして Node に読ませるが、core の相対 import には拡張子が無く、
+ * Node の ESM 解決では読めない。`packages/schema/src` を相対 path で読めば既定のローダで
+ * 動くが、パッケージの公開面（B-1）を迂回するので採らない。
  */
 const schemaArtifact = (): Plugin => ({
   name: "backlog-blueprint:schema",
@@ -31,16 +25,14 @@ const schemaArtifact = (): Plugin => ({
 });
 
 /**
- * 畳めなかったことを黙って見逃さない（WU-19）。既定では畳めない部品をそのまま素通しに
- * するので、`for await` を1つ書き足しただけで、それを抱えている部品ごと最適化から外れる。
- * 外れたことは動かしても分からない — 遅くなるだけで壊れないからである。落とせば分かる。
+ * 既定の閾値に戻さない（WU-19）。既定では畳めない部品を素通しにするので、`for await` を
+ * 1つ書き足しただけで部品ごと最適化から外れ、遅くなるだけで壊れないので誰も気付かない。
  */
 const reactCompiler: [string, { panicThreshold: string }] = [
   "babel-plugin-react-compiler",
   { panicThreshold: "all_errors" },
 ];
 
-/** GitHub Pages のサブパス配信（要件定義 §7.1 / WU-2） */
 const BASE = "/backlog-blueprint/";
 
 export default defineConfig({
@@ -50,11 +42,8 @@ export default defineConfig({
   test: {
     environment: "happy-dom",
     setupFiles: ["./src/test-setup.ts"],
-    /**
-     * codemirror-json-schema の ESM は拡張子の無い相対 import で書かれていて、
-     * 外部モジュールのまま Node に読ませると解決できない。ブラウザ向けのビルドは
-     * Vite が束ねるので困らず、テストだけがこれを要る。
-     */
+    // codemirror-json-schema を外部モジュールのまま Node に読ませない。ESM が拡張子の無い
+    // 相対 import で書かれていて解決できない。ブラウザ向けのビルドは Vite が束ねるので困らない。
     server: { deps: { inline: ["codemirror-json-schema"] } },
   },
 });

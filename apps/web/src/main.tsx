@@ -1,7 +1,4 @@
-/**
- * 読む順がそのまま優先順。Radix の既定色を Catppuccin が上書きし、最後に自前の
- * 等幅表示と画面の枠組みが乗る。逆にすると計画の桁が Radix 側の指定で崩れる。
- */
+/** 並べ替えない。読む順がそのまま優先順で、逆にすると計画の桁が Radix 側の指定で崩れる */
 import "@radix-ui/themes/styles.css";
 import "./catppuccin.css";
 import "./styles.css";

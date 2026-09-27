@@ -7,7 +7,7 @@ import {
   type SourceMap,
 } from "@backlog-blueprint/core";
 
-export type EnvironmentReference = { name: string; path: string };
+type EnvironmentReference = { name: string; path: string };
 
 /**
  * `$${NAME}` を参照として数えない。core の展開（S2）が literal として扱う書き方なので、
@@ -52,11 +52,7 @@ export const referencedNames = (references: EnvironmentReference[]): string[] =>
   ...new Set(references.map(({ name }) => name)),
 ];
 
-/**
- * ブラウザには環境変数が無いので、生成した入力欄が空かどうかで V-A4 を判定する
- * （検証パイプライン §4「Web UI での V-A4」）。core が同じ状況に出す
- * 「環境変数が未定義」はここでは正しくない説明なので、捨ててこちらに置き換える。
- */
+/** core の「環境変数が未定義」を出さない。ブラウザに環境変数は無く、正しくない説明になる（V-A4） */
 export const missingValueDiagnostics = (
   references: EnvironmentReference[],
   source: SourceMap,

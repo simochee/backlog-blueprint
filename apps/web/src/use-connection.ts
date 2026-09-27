@@ -6,11 +6,9 @@ import { revealApiKey, setApiKey } from "./secrets";
 import { forgetCredentials, readStoredCredentials, storeCredentials } from "./session";
 import { adoptTransport, candidateTransport, closeTransport } from "./transport";
 
-/** 確立した接続。`id` が接続の印（WU-36）の元になる */
-export type Session = { id: number; domain: string; connection: Connection };
+type Session = { id: number; domain: string; connection: Connection };
 
-/** 失敗した試み。どのフォームから出したかを持ち、開き直したフォームに前の失敗を出さない */
-export type ConnectAttempt = { formId: number; diagnostics: Diagnostic[]; failure?: unknown };
+type ConnectAttempt = { formId: number; diagnostics: Diagnostic[]; failure?: unknown };
 
 type ConnectionState = { settled: boolean; session?: Session; attempt?: ConnectAttempt };
 
@@ -27,7 +25,6 @@ const failed = (
   request: { formId: number; restoring?: boolean },
   attempt: Omit<ConnectAttempt, "formId">,
 ): ConnectionState => {
-  /** WU-38。保存から繋ぎ直せなかったものは、次の読み込みでまた試さない */
   if (request.restoring === true) {
     forgetCredentials();
   }
@@ -39,13 +36,11 @@ const failed = (
   };
 };
 
-export type ConnectionControl = {
+type ConnectionControl = {
   session?: Session;
   attempt?: ConnectAttempt;
   connecting: boolean;
-  /** 保存した資格情報で繋ぎ直している最中なら、その先のドメイン */
   reconnectingTo?: string;
-  /** 初めに開く接続画面のドメイン欄に入れる値 */
   storedSpace: string;
   connectTo: (space: string, formId: number) => void;
   disconnect: () => void;
@@ -84,10 +79,8 @@ export const useConnection = (): ConnectionControl => {
     { settled: false },
   );
 
-  /**
-   * StrictMode は効果を2回走らせるので、印を付けて1回に絞る。2回目も走らせると
-   * 読み込みのたびに S5 の GET が倍になり、どちらの結果が残るかも決まらない。
-   */
+  // StrictMode は効果を2回走らせるので、印を付けて1回に絞る。2回目も走らせると
+  // 読み込みのたびに S5 の GET が倍になり、どちらの結果が残るかも決まらない。
   const restoreStarted = useRef(false);
 
   useEffect(() => {

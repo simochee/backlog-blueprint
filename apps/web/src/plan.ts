@@ -10,21 +10,16 @@ import {
 
 import toolPackage from "../../cli/package.json";
 
-/**
- * Web UI と CLI は同じツールの別の配り方で、版も揃えて出す（要件定義 §7.1 / D-2）。
- * `@backlog-blueprint/web` は private で版を持たないので、出力が名乗るのは npm に出る側の
- * 名前と版にする。
- */
+/** web 自身の package.json を名乗らない。private で版を持たず、npm に出る版と揃わない（D-2） */
 export const TOOL = { name: toolPackage.name, version: toolPackage.version };
 
-/** 貼り付けられたテキストにはファイル名が無い。ドラッグ&ドロップで読んだときだけ名前がある */
 export const PASTED = "(pasted)";
 
 export type PreparedPlan = { plan: Plan; report: PlanReport };
 
 export type PlanAttempt = { diagnostics: Diagnostic[]; failure?: unknown; prepared?: PreparedPlan };
 
-export type PreparePlanInput = {
+type PreparePlanInput = {
   manifest: Manifest;
   get: ReadContext["get"];
   space: string;
@@ -32,10 +27,7 @@ export type PreparePlanInput = {
   staticDiagnostics: Diagnostic[];
 };
 
-/**
- * S5〜S7 を走らせる（検証パイプライン §4 の Web Plan / Apply）。エディタで出た診断を持ち込むのは、
- * 警告がそこで消えると計画の `Warnings:` から落ちるため。
- */
+/** エディタで出た診断を捨てない。警告がそこで消えると計画の `Warnings:` から落ちる */
 export const preparePlan = async ({
   manifest,
   get,
