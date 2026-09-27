@@ -1,4 +1,4 @@
-# backlog-blueprint
+# ![backlog-blueprint](packages/brand/out/eyecatch.svg)
 
 [日本語](https://github.com/simochee/backlog-blueprint/blob/main/README.ja.md)
 
