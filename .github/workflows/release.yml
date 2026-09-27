@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       released: ${{ steps.release.outputs.releases_created }}
-      tag: ${{ steps.release.outputs['apps/cli--tag_name'] }}
+      tag: ${{ steps.release.outputs.tag_name }}
     steps:
       # GITHUB_TOKEN にしない。github-actions[bot] が開いたリリース PR の CI は、誰かが承認するまで
       # 走らない。

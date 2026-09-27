@@ -165,14 +165,15 @@ contents change (D-3). jsDelivr serves any file of any published npm version; th
 deploy for it.
 
 The Web UI is not part of a release. **Pages is deployed on every push to `main`**, so a correction
-to the Web UI is live without the CLI having to find a reason to be published.
+to the Web UI is live without the CLI having to find a reason to be published, and a change to the
+Web UI alone never produces a release (see [Which commits count](#which-commits-count)).
 
 ### Where the version comes from
 
 Nobody edits it by hand. release-please derives the next version from the Conventional Commit types
-that landed on `main` since the last release, and writes it into `apps/cli/package.json` and
-`.release-please-manifest.json` in the very commit it then tags — so the tag, the published package
-and the schema URL cannot disagree with each other.
+that landed on `main` since the last release, and writes it into `apps/cli/package.json`, the root
+`package.json` and `.release-please-manifest.json` in the very commit it then tags — so the tag,
+the published package and the schema URL cannot disagree with each other.
 
 | Commits since the last release          | `0.4.2` becomes |
 | --------------------------------------- | --------------- |
@@ -182,12 +183,28 @@ and the schema URL cannot disagree with each other.
 
 A version those rules do not produce — a round number that a rewrite of the manifest format deserves
 — is forced by putting `Release-As: 1.0.0` in the body of a commit on `main`. That commit has to
-change a file under `apps/cli/`: release-please attributes a commit to a package by the paths it
-touches, so a footer on a commit that only edits the repository root is never read.
+count (next section), or the footer is never read.
 
-`release-please-config.json` points all of this at `apps/cli`, the only package that is published,
-and `.release-please-manifest.json` records the last version that was released — not the version in
+`.release-please-manifest.json` records the last version that was released — not the version in
 `apps/cli/package.json`, which is where release-please writes the next one.
+
+### Which commits count
+
+The CLI is built from far more than `apps/cli`: core, the schema and the Backlog client are bundled
+into it, and so are the dependencies pinned in `pnpm-lock.yaml`. So `release-please-config.json`
+has release-please read the whole repository (`.`) and lists in `exclude-paths` the directories
+that never reach the tarball: `apps/web`, `packages/brand`, `packages/test-utils`, `docs`,
+`.claude` and `.github`. A commit counts unless every file it touches is under one of those.
+
+`exclude-paths` matches directories only; a file at the repository root cannot be excluded. A
+commit to the Web UI that also touches `pnpm-lock.yaml` or `pnpm-workspace.yaml` — adding a
+dependency, typically — therefore counts, and its subject lands in `CHANGELOG.md` and moves the
+version. Keep such a change out of the Web UI commit: land the dependency first as a
+`chore(deps):` commit, which is hidden from the changelog and opens no release on its own.
+
+release-please has no way to exclude by scope. `changelog-sections` could hide `feat(web)` from the
+notes, but the version is decided from the type alone, so a hidden `feat` would still bump the
+minor version.
 
 ### Cutting one
 
