@@ -205,9 +205,14 @@ and `.release-please-manifest.json` records the last version that was released �
    waiting for it: the site has been redeployed on every one of those pushes already.
 3. Its merge runs the workflow again. This time release-please tags the merge commit `v<version>`
    and creates the GitHub Release, the Pages job deploys the site built from that tag, and the
-   publish job — which runs only for a release, and only after the deployment succeeded — publishes
-   the CLI to npm.
-4. Read the GitHub Release that release-please created. Its body is the generated CHANGELOG entry,
+   publish job — which runs only for a release, and only after the deployment succeeded — stages
+   the CLI on npm.
+4. Approve the staged version: on the package's page on npmjs.com, **Staged Packages**, or with
+   `pnpm stage approve` from a terminal. Either asks for 2FA. Until then nobody can install it,
+   even though the tag, the GitHub Release and the schema URL already exist. Approve it before
+   anything else lands on `main`; see
+   [What the workflow has to guarantee](#what-the-workflow-has-to-guarantee).
+5. Read the GitHub Release that release-please created. Its body is the generated CHANGELOG entry,
    which needs no rewriting so long as the commit subjects were written for the people who read it.
    Add prose above it only when a version asks something of its users — a manifest that has to be
    rewritten, an option that no longer exists.
@@ -219,7 +224,7 @@ would leave the one pull request that decides a release as the only one merged w
 
 If the publish job fails once the tag exists, use **Re-run failed jobs** on that workflow run: the
 tag comes from the first job's outputs, which a re-run keeps, so the same commit is built and
-published again. Re-running the workflow from the start does not work — release-please has already
+staged again. Re-running the workflow from the start does not work — release-please has already
 released that version and the second job would be skipped.
 
 ### CHANGELOG.md
@@ -259,7 +264,11 @@ one of those says nothing about what a version does differently from the one bef
   deployment. A site built from `main` carries a schema for the version that is already on npm,
   built from source that has moved on since it was published; the published one has to win. During
   a release the version being released is not on the registry yet, because Pages is deployed first,
-  so nothing overwrites it. `0.0.0` is skipped: it is the placeholder described in
+  so nothing overwrites it. It stays off the registry until the staged version is approved, and a
+  push to `main` in that window deploys the schema built from `main` under the released version's
+  URL. That window is accepted rather than closed: approving before merging anything else keeps it
+  empty, and closing it would mean treating a tag, not the registry, as the list of released
+  versions. `0.0.0` is skipped: it is the placeholder described in
   [What the repository has to provide](#what-the-repository-has-to-provide), was never released,
   and has no schema to restore. A package npm does not know at all has nothing to restore either;
   any other failure to reach npm or Pages aborts the deployment rather than quietly dropping a
@@ -277,7 +286,7 @@ The workflow cannot create any of these itself.
 | What                       | Value                                                                       |
 | -------------------------- | --------------------------------------------------------------------------- |
 | Pages source               | Settings, Pages, Build and deployment, Source: **GitHub Actions**           |
-| npm trusted publisher      | On the package's npm settings: this repository, workflow `release.yml`, **no environment** |
+| npm trusted publisher      | On the package's npm settings: this repository, workflow `release.yml`, **no environment**, allowed actions: **stage publish only** |
 | npm publishing access      | On the package's npm settings: **Require two-factor authentication and disallow tokens** |
 | `github-pages` environment | Created by GitHub with the Pages source; must allow `main`                  |
 | Release bot                | The organization's GitHub App, installed on this repository with Contents, Issues and Pull requests: **Read and write** |
@@ -295,5 +304,6 @@ bring that page into existence, and is deprecated; it contains nothing that was 
 the release workflow skips it when it restores schemas. Every real release, `0.1.0` included, is
 the workflow's.
 
-With the trusted publisher working, publishing access disallows tokens, so a leaked or forgotten
-token cannot publish either.
+Nothing the workflow holds can put a version in front of users on its own. The trusted publisher
+may only stage, so a release goes live only when a maintainer approves it with 2FA; and publishing
+access disallows tokens, so a leaked or forgotten token cannot publish around that either.

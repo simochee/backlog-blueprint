@@ -121,7 +121,7 @@ jobs:
   # 黙って効かなくなる（要件定義 §7.1）。`push: tags` の別ワークフローにもしない。ワークフローを
   # またぐと、`needs` で Pages のデプロイを待てない。
   publish:
-    name: Publish the CLI to npm
+    name: Stage the CLI on npm
     needs: [release-please, pages]
     if: needs.release-please.outputs.released == 'true'
     runs-on: ubuntu-latest
@@ -150,5 +150,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Publish
-        run: pnpm --filter "${PACKAGE_NAME}" publish --access public --no-git-checks
+      # `publish` にしない。trusted publisher には stage publish しか許しておらず、公開には
+      # maintainer の 2FA による承認が要る。GitHub 側の権限を奪われても、それだけでは公開できない。
+      - name: Stage
+        run: pnpm --filter "${PACKAGE_NAME}" stage publish --access public --no-git-checks
