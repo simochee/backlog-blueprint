@@ -80,6 +80,14 @@ describe("解決できない環境変数", () => {
     expect(diagnostics.map(({ path }) => path)).toEqual(["name", "webhooks/0/hookUrl"]);
   });
 
+  it("ヒントが示すエスケープを書くと、参照がリテラルの ${NAME} として残る", () => {
+    const [diagnostic] = expand("name: ${PROJECT_NAME}\n").diagnostics;
+    const suggested = diagnostic?.hint?.match(/write (\S+)$/)?.[1];
+
+    expect(suggested).toBeDefined();
+    expect(expand(`name: ${suggested}\n`).parsed.value).toEqual({ name: "${PROJECT_NAME}" });
+  });
+
   it("警告に下げても報告される内容は変わらない", () => {
     const { diagnostics } = expand(MANIFEST, {}, "warning");
 
