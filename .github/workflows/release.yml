@@ -18,9 +18,6 @@ env:
   PAGES_URL: "https://simochee.github.io/backlog-blueprint"
 
 jobs:
-  # release-please keeps a pull request open that carries the next version number, derived from the
-  # Conventional Commit types on main. Merging that pull request is what decides a release: on the
-  # merge the same action tags the commit and creates the GitHub Release.
   release-please:
     name: Maintain the release pull request
     runs-on: ubuntu-latest
@@ -77,18 +74,9 @@ jobs:
       - name: Build
         run: pnpm run build
 
-      # D-3: a manifest written years ago must keep resolving its $schema URL. The build emits one
-      # schema, for the version in apps/cli/package.json, and actions/deploy-pages replaces the
-      # whole site, so every schema already published is fetched back into the artifact first. The
-      # npm registry is the list of released versions, because the schema version and the CLI
-      # version are the same number (D-2).
-      #
-      # A published version always wins over what was just built. Outside a release the version in
-      # package.json is the one already on npm, and the source it is built from has moved on since
-      # that version was published; keeping the build would replace a released schema with an
-      # unreleased one. During a release the opposite is true and falls out of the same rule: Pages
-      # is deployed before npm, so the version being released is not on the registry yet and the
-      # freshly built schema survives.
+      # Do not skip this: actions/deploy-pages replaces the whole site, and every published $schema
+      # URL has to keep resolving (D-3). Do not let the fresh build win either; why a published
+      # version always does is in DEVELOPMENT.md, "What the workflow has to guarantee".
       - name: Restore the schema of every published version
         run: |
           set -euo pipefail
@@ -123,13 +111,9 @@ jobs:
         id: deploy
         uses: actions/deploy-pages@v5
 
-  # Publishing the CLI without the matching schema URL on Pages makes editor completion fail
-  # silently for everyone on that version, so this job waits for the deployment and is skipped
-  # with it if it failed (requirements-definition 7.1). The reverse order is harmless: a schema
-  # URL that no published CLI mentions yet bothers nobody.
-  #
-  # This cannot be a separate workflow waiting on the tag. A tag created with GITHUB_TOKEN starts
-  # no workflow, so `on: push: tags` would never fire for a release-please tag.
+  # Keep `needs: pages`: a CLI whose schema URL is not deployed breaks editor completion silently
+  # (requirements-definition 7.1). Not a separate workflow on `push: tags`: a tag created with
+  # GITHUB_TOKEN starts no workflow.
   publish:
     name: Publish the CLI to npm
     needs: [release-please, pages]

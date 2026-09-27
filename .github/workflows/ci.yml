@@ -41,8 +41,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # lint and typecheck are separate checks and both have to pass: one is fast static
-      # analysis, the other is the type checker.
       - name: Lint
         run: pnpm run lint
 
