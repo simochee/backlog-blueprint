@@ -1,10 +1,16 @@
 import { renderExportNotes, type ProjectExport } from "@backlog-blueprint/core";
 
+/**
+ * 文字列だけで持たない。帯を閉じたかどうかをこの値の同一性で覚えるので（WU-60）、同じプロジェクトを
+ * 読み込み直したときに、前の文書で閉じた帯まで閉じたままになる。
+ */
+export type ExportNotes = { text: string; projectKey: string };
+
 export type ManifestDocument = {
   name?: string;
   handle?: FileSystemFileHandle;
   savedText: string;
-  notes?: string;
+  notes?: ExportNotes;
 };
 
 export type OpenedDocument = { document: ManifestDocument; text: string };
@@ -33,7 +39,7 @@ export const importedDocument = (exported: ProjectExport): OpenedDocument => {
     document: {
       name: `${exported.projectKey}.yaml`,
       savedText: "",
-      notes: notes === "" ? undefined : notes,
+      notes: notes === "" ? undefined : { text: notes, projectKey: exported.projectKey },
     },
     text: exported.yaml,
   };

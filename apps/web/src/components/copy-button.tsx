@@ -1,15 +1,20 @@
-import { CheckIcon, CopyIcon } from "@radix-ui/react-icons";
-import { Button, IconButton, Tooltip } from "@radix-ui/themes";
 import { useEffect, useState } from "react";
 
-type CopyButtonProps = { label: string; text: () => string; disabled?: boolean };
+type CopyButtonProps = {
+  label: string;
+  text: () => string;
+  disabled?: boolean;
+  variant?: "primary";
+  size?: "small";
+  accessibleLabel?: string;
+};
 
-const FEEDBACK_MS = 2000;
+const FEEDBACK_MS = 1400;
 
 const useCopy = (text: () => string): { copied: boolean; copy: () => void } => {
   const [copied, setCopied] = useState(false);
 
-  // ハンドラの中で `setTimeout` を張らない。その 2 秒のあいだに計画を取り直してこのボタンごと
+  // ハンドラの中で `setTimeout` を張らない。その間に計画を取り直してこのボタンごと
   // 消えた場合に、後片付けをする場所が無い。
   useEffect(() => {
     if (!copied) {
@@ -32,31 +37,28 @@ const useCopy = (text: () => string): { copied: boolean; copy: () => void } => {
   return { copied, copy };
 };
 
-export const CopyButton = ({ label, text, disabled = false }: CopyButtonProps) => {
+export const CopyButton = ({
+  label,
+  text,
+  disabled = false,
+  variant,
+  size,
+  accessibleLabel,
+}: CopyButtonProps) => {
   const { copied, copy } = useCopy(text);
 
   return (
-    <Button color="gray" disabled={disabled} onClick={copy} size="3" type="button" variant="soft">
+    <button
+      aria-label={accessibleLabel}
+      className="button"
+      data-copied={copied}
+      data-size={size}
+      data-variant={variant}
+      disabled={disabled}
+      onClick={copy}
+      type="button"
+    >
       {copied ? "Copied" : label}
-    </Button>
-  );
-};
-
-export const CopyIconButton = ({ label, text }: Omit<CopyButtonProps, "disabled">) => {
-  const { copied, copy } = useCopy(text);
-
-  return (
-    <Tooltip content={copied ? "Copied" : label}>
-      <IconButton
-        aria-label={label}
-        color={copied ? "green" : "gray"}
-        onClick={copy}
-        size="1"
-        type="button"
-        variant="ghost"
-      >
-        {copied ? <CheckIcon /> : <CopyIcon />}
-      </IconButton>
-    </Tooltip>
+    </button>
   );
 };

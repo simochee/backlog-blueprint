@@ -10,11 +10,11 @@ import {
 
 export type DirectoryKind = "users" | "teams";
 
-/** `details` はマニフェストに写さない。表示と絞り込みのための手掛かりにすぎない（WU-26） */
+/** `details` はマニフェストに写さない。表示と絞り込みのための手掛かりにすぎない（WU-56） */
 export type DirectoryEntry = {
   value: number;
   label: string;
-  badge?: string;
+  administrator?: boolean;
   details: string[];
 };
 
@@ -31,7 +31,7 @@ const toUser = (item: unknown): DirectoryEntry => {
     value: id,
     label: optionalString(user, "name") || String(id),
     ...(requiredNumber(user, "roleType") === SPACE_ADMINISTRATOR_ROLE_TYPE
-      ? { badge: "Space admin" }
+      ? { administrator: true }
       : {}),
     details: details.filter((detail): detail is string => detail !== undefined && detail !== ""),
   };

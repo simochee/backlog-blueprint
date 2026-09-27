@@ -9,13 +9,19 @@ import {
   type Manifest,
 } from "@backlog-blueprint/core";
 
-import { environmentReferences, missingValueDiagnostics, referencedNames } from "./environment";
+import {
+  environmentReferences,
+  environmentVariables,
+  missingValueDiagnostics,
+  referencedNames,
+  type EnvironmentVariable,
+} from "./environment";
 import { manifestStamp, type Derived, type ManifestInputs } from "./freshness";
 import { environmentValue } from "./secrets";
 
 export type ManifestValidation = {
   diagnostics: Diagnostic[];
-  names: string[];
+  variables: EnvironmentVariable[];
   manifest?: Manifest;
 };
 
@@ -41,7 +47,7 @@ export const validateInBrowser = ({ text, valueOf }: ValidateInput): ManifestVal
   if (syntax.parsed === undefined) {
     return {
       diagnostics: orderDiagnostics(syntax.diagnostics),
-      names: [],
+      variables: [],
     };
   }
 
@@ -60,12 +66,12 @@ export const validateInBrowser = ({ text, valueOf }: ValidateInput): ManifestVal
 
   return {
     diagnostics: orderDiagnostics(diagnostics),
-    names,
+    variables: environmentVariables(references, syntax.parsed.source, isEntered),
     ...(validation.manifest === undefined ? {} : { manifest: validation.manifest }),
   };
 };
 
-const EMPTY: ManifestValidation = { diagnostics: [], names: [] };
+const EMPTY: ManifestValidation = { diagnostics: [], variables: [] };
 
 let memo: Derived<ManifestValidation> | undefined;
 

@@ -1,11 +1,9 @@
 import { serializeAccessEntries } from "@backlog-blueprint/core";
-import { ChevronDownIcon, ExitIcon, LoopIcon } from "@radix-ui/react-icons";
-import { Avatar, Box, Button, Flex, Popover, Separator, Text } from "@radix-ui/themes";
-import { type ReactNode } from "react";
+import { Popover } from "radix-ui";
 
 import { initialOf } from "../avatar";
 import { type Connection } from "../connection";
-import { CopyIconButton } from "./copy-button";
+import { CopyButton } from "./copy-button";
 
 type AccountMenuProps = {
   domain: string;
@@ -16,8 +14,6 @@ type AccountMenuProps = {
   onDisconnect: () => void;
 };
 
-type AvatarsSize = "header" | "menu";
-
 const Avatars = ({
   space,
   user,
@@ -27,40 +23,17 @@ const Avatars = ({
   space: string;
   user: string;
   icons: AccountMenuProps["icons"];
-  size: AvatarsSize;
+  size: "header" | "menu";
 }) => (
-  <span className="account-avatars" data-size={size}>
-    <Avatar
-      aria-hidden
-      fallback={initialOf(space)}
-      radius="medium"
-      size={size === "header" ? "1" : "3"}
-      src={icons.space}
-      variant="solid"
-    />
-    <Avatar
-      aria-hidden
-      className="account-avatar-user"
-      color="gray"
-      fallback={initialOf(user)}
-      radius="full"
-      size="1"
-      src={icons.user}
-      variant="solid"
-    />
+  <span aria-hidden className="avatars" data-size={size}>
+    {icons.space === undefined ? initialOf(space) : <img alt="" src={icons.space} />}
+    <span className="avatar-user">
+      {icons.user === undefined ? initialOf(user) : <img alt="" src={icons.user} />}
+    </span>
   </span>
 );
 
-const Detail = ({ label, children }: { label: string; children: ReactNode }) => (
-  <Flex align="center" gap="3" justify="between" minHeight="24px">
-    <Text color="gray" size="1">
-      {label}
-    </Text>
-    <Flex align="center" gap="2">
-      {children}
-    </Flex>
-  </Flex>
-);
+const LOCKED = "Wait for Apply to finish";
 
 export const AccountMenu = ({
   domain,
@@ -71,79 +44,87 @@ export const AccountMenu = ({
   onDisconnect,
 }: AccountMenuProps) => {
   const { user, userId, userName, spaceAdministrator, space, updateRateLimit } = connection;
+  const remaining =
+    updateRateLimit.limit === 0 ? 0 : (updateRateLimit.remaining / updateRateLimit.limit) * 100;
 
   return (
     <Popover.Root>
-      <Popover.Trigger>
+      <Popover.Trigger asChild>
         <button aria-label={`${user} at ${space}`} className="account-trigger" type="button">
           <Avatars icons={icons} size="header" space={space} user={user} />
-          <ChevronDownIcon aria-hidden className="account-chevron" />
         </button>
       </Popover.Trigger>
-      <Popover.Content align="end" maxWidth="20rem" minWidth="18rem" size="2">
-        <Flex direction="column" gap="3">
-          <Flex align="center" gap="3">
+      <Popover.Portal>
+        <Popover.Content
+          align="end"
+          aria-label="Account"
+          className="account-popover"
+          collisionPadding={8}
+          sideOffset={4}
+        >
+          <div className="account-head">
             <Avatars icons={icons} size="menu" space={space} user={user} />
-            <Box minWidth="0">
-              <Text as="div" size="2" truncate weight="bold">
-                {space}
-              </Text>
-              <Text as="div" color="gray" size="1" truncate>
-                {domain}
-              </Text>
-            </Box>
-          </Flex>
-          <Flex direction="column" gap="1">
-            <Detail label="Signed in as">
-              <Text className="mono" size="1" weight="medium">
-                {user}
-              </Text>
+            <div className="account-names">
+              <span className="account-space">{space}</span>
+              <span className="account-domain">{domain}</span>
+            </div>
+          </div>
+          <dl className="account-table">
+            <dt>User</dt>
+            <dd>
+              <span>Signed in as {user}</span>
               {/*
                * 表示しているログイン ID を写さない。`access` に書くのは数値の ID で（A-7）、
-               * 名前のコメントも付けるので、Users のペインと同じ書き出しを通す（WU-23）。
+               * 名前のコメントも付けるので、Users のサイドバーと同じ書き出しを通す（WU-23）。
                */}
-              <CopyIconButton
-                label="Copy user ID as YAML"
+              <CopyButton
+                accessibleLabel="Copy user ID as YAML"
+                label="Copy"
+                size="small"
                 text={() =>
                   serializeAccessEntries([
                     { value: userId, ...(userName === undefined ? {} : { label: userName }) },
                   ])
                 }
               />
-            </Detail>
-            <Detail label="Role">
-              <Text size="1" weight="medium">
-                {spaceAdministrator ? "Space Administrator" : "Not a space administrator"}
-              </Text>
-            </Detail>
-            <Detail label="Update rate limit">
-              <Text size="1" weight="medium">
+            </dd>
+            <dt>Role</dt>
+            <dd>{spaceAdministrator ? "Space Administrator" : "Not a space administrator"}</dd>
+            <dt>Update rate limit</dt>
+            <dd data-layout="stack">
+              <span>
                 {updateRateLimit.remaining} / {updateRateLimit.limit} remaining
-              </Text>
-            </Detail>
-          </Flex>
-          <Separator size="4" />
-          <Flex direction="column" gap="2">
-            <Popover.Close>
-              <Button color="gray" disabled={locked} onClick={onSwitch} variant="soft">
-                <LoopIcon />
+              </span>
+              <span aria-hidden className="meter">
+                <span style={{ width: `${remaining}%` }} />
+              </span>
+            </dd>
+          </dl>
+          <div className="account-actions">
+            <Popover.Close asChild>
+              <button
+                disabled={locked}
+                onClick={onSwitch}
+                title={locked ? LOCKED : undefined}
+                type="button"
+              >
                 Switch connection
-              </Button>
+              </button>
             </Popover.Close>
-            <Popover.Close>
-              <Button color="red" disabled={locked} onClick={onDisconnect} variant="soft">
-                <ExitIcon />
+            <Popover.Close asChild>
+              <button
+                data-tone="destroy"
+                disabled={locked}
+                onClick={onDisconnect}
+                title={locked ? LOCKED : undefined}
+                type="button"
+              >
                 Disconnect
-              </Button>
+              </button>
             </Popover.Close>
-            {locked ? (
-              <Text color="gray" size="1">
-                Unavailable while apply is running.
-              </Text>
-            ) : null}
-          </Flex>
-        </Flex>
-      </Popover.Content>
+          </div>
+        </Popover.Content>
+      </Popover.Portal>
     </Popover.Root>
   );
 };

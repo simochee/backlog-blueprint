@@ -1,4 +1,4 @@
-import { AlertDialog, Button, Code, Flex } from "@radix-ui/themes";
+import { AlertDialog } from "radix-ui";
 
 type DiscardDialogProps = {
   current: string;
@@ -21,24 +21,41 @@ export const DiscardDialog = ({
     }}
     open={replacement !== undefined}
   >
-    <AlertDialog.Content maxWidth="28rem">
-      <AlertDialog.Title size="4">Discard unsaved changes?</AlertDialog.Title>
-      <AlertDialog.Description size="2">
-        <Code>{current}</Code> has changes that are not saved. Opening <Code>{replacement}</Code>{" "}
-        replaces them.
-      </AlertDialog.Description>
-      <Flex gap="3" justify="end" mt="4">
-        <AlertDialog.Cancel>
-          <Button color="gray" type="button" variant="soft">
-            Cancel
-          </Button>
-        </AlertDialog.Cancel>
-        <AlertDialog.Action>
-          <Button color="red" onClick={onDiscard} type="button">
-            Discard and open
-          </Button>
-        </AlertDialog.Action>
-      </Flex>
-    </AlertDialog.Content>
+    <AlertDialog.Portal>
+      <AlertDialog.Overlay className="scrim" />
+      <AlertDialog.Content className="modal">
+        <div className="modal-header">
+          <AlertDialog.Title className="modal-title">Discard unsaved changes?</AlertDialog.Title>
+          <AlertDialog.Cancel asChild>
+            <button aria-label="Close" className="close-button" type="button">
+              ×
+            </button>
+          </AlertDialog.Cancel>
+        </div>
+        <div className="modal-body">
+          <AlertDialog.Description className="modal-message">
+            {current} has unsaved changes. Opening <strong>{replacement}</strong> replaces them.
+          </AlertDialog.Description>
+        </div>
+        <div className="modal-footer">
+          <AlertDialog.Cancel asChild>
+            <button className="button" data-size="modal" type="button">
+              Cancel
+            </button>
+          </AlertDialog.Cancel>
+          <AlertDialog.Action asChild>
+            <button
+              className="button"
+              data-size="modal"
+              data-variant="destroy"
+              onClick={onDiscard}
+              type="button"
+            >
+              Discard and open
+            </button>
+          </AlertDialog.Action>
+        </div>
+      </AlertDialog.Content>
+    </AlertDialog.Portal>
   </AlertDialog.Root>
 );

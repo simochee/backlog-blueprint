@@ -29,26 +29,15 @@ vi.mock("./components/manifest-editor", () => ({
     id,
     value,
     onChange,
-    onFileDropped,
   }: {
     id: string;
     value: string;
     onChange: (text: string) => void;
-    onFileDropped: (name: string, text: string) => void;
   }) => (
     <textarea
       aria-label="Manifest"
       id={id}
       onChange={(event) => onChange(event.target.value)}
-      onDrop={(event) => {
-        event.preventDefault();
-
-        const [file] = event.dataTransfer.files;
-
-        if (file !== undefined) {
-          void file.text().then((text) => onFileDropped(file.name, text));
-        }
-      }}
       value={value}
     />
   ),
@@ -116,6 +105,21 @@ const manifestField = async (): Promise<HTMLElement> => screen.findByLabelText(/
 
 const button = (name: string): HTMLElement => screen.getByRole("button", { name });
 
+/** 空のエディタの表題欄にも同じ名前のボタンがあるので、タイトルバーの方を引く */
+const titleButton = (name: string): HTMLElement =>
+  within(screen.getByRole("banner")).getByRole("button", { name });
+
+/** Plan と Apply は押せなくても `disabled` にしない。クリックを拾って理由の場所へ誘導する（WU-52） */
+const expectAvailable = (name: string): void => {
+  expect(titleButton(name)).toHaveAttribute("aria-disabled", "false");
+};
+
+const expectBlocked = (name: string): void => {
+  expect(titleButton(name)).toHaveAttribute("aria-disabled", "true");
+};
+
+const outputTab = (): HTMLElement => screen.getByRole("tab", { name: /Output/ });
+
 const pane = (name: string): HTMLElement => screen.getByRole("complementary", { name });
 
 /**
@@ -145,9 +149,9 @@ const openEnvironment = async (user: UserEvent): Promise<void> => {
 
 const plan = async (user: UserEvent): Promise<void> => {
   await waitFor(() => {
-    expect(button("Plan")).toBeEnabled();
+    expectAvailable("Plan");
   });
-  await user.click(button("Plan"));
+  await user.click(titleButton("Plan"));
   await within(region("Output")).findByRole("button", { name: "Copy JSON" });
 };
 
@@ -190,9 +194,9 @@ const beforeUnloadCalls = (spy: MockInstance<typeof globalThis.addEventListener>
 
 const apply = async (user: UserEvent): Promise<void> => {
   await waitFor(() => {
-    expect(button("Apply")).toBeEnabled();
+    expectAvailable("Apply");
   });
-  await user.click(button("Apply"));
+  await user.click(titleButton("Apply"));
 };
 
 // sessionStorage を残さない。前のテストで繋いだ接続を次のテストが読み込み時に自動で繋ぎ直し
@@ -218,7 +222,7 @@ const switchTo = async (user: UserEvent, domain: string): Promise<HTMLElement> =
   await user.clear(field);
   await user.type(field, domain);
   await user.type(within(dialog).getByLabelText("API key"), "another-api-key");
-  await user.click(within(dialog).getByRole("button", { name: "Switch" }));
+  await user.click(within(dialog).getByRole("button", { name: "Connect" }));
 
   return dialog;
 };
@@ -240,8 +244,9 @@ describe("接続", () => {
   it("接続する前は接続のフォームだけを出し、エディタも読み込みも一覧のボタンも出さない", async () => {
     await startApp();
 
-    expect(screen.getByRole("heading", { name: "Connect to Backlog" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Connect a space" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Import from Backlog" })).toBeNull();
+    expect(screen.queryByRole("banner")).toBeNull();
     expect(screen.queryByRole("button", { name: "Users" })).toBeNull();
     expect(screen.queryByLabelText(/^Manifest/)).toBeNull();
   });
@@ -252,9 +257,11 @@ describe("接続", () => {
     await connect(user);
     await openAccount(user);
 
-    expect(screen.getByText(SPACE)).toBeInTheDocument();
-    expect(screen.getByText("Space Administrator")).toBeInTheDocument();
-    expect(screen.getByText("150 / 150 remaining")).toBeInTheDocument();
+    const account = await screen.findByRole("dialog", { name: "Account" });
+
+    expect(within(account).getByText(SPACE)).toBeInTheDocument();
+    expect(within(account).getByText("Space Administrator")).toBeInTheDocument();
+    expect(within(account).getByText("150 / 150 remaining")).toBeInTheDocument();
   });
 
   it("ヘッダーのアカウント表示はアイコンだけで、名前は出さない", async () => {
@@ -325,7 +332,7 @@ describe("接続", () => {
     await connect(user);
 
     expect(await screen.findByText("V-B1", { exact: false })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Connect to Backlog" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Connect a space" })).toBeInTheDocument();
     expect(screen.queryByLabelText(/^Manifest/)).toBeNull();
   });
 
@@ -371,7 +378,7 @@ describe("接続の切り替え", () => {
     expect(await within(dialog).findByText("V-B1", { exact: false })).toBeInTheDocument();
     await user.keyboard("{Escape}");
     expect(button(ACCOUNT)).toBeInTheDocument();
-    expect(button("Apply")).toBeEnabled();
+    expectAvailable("Apply");
     expect(screen.queryByText("Outdated")).toBeNull();
   });
 
@@ -386,7 +393,7 @@ describe("接続の切り替え", () => {
     });
     expect(within(region("Output")).getByText("Outdated")).toBeInTheDocument();
     expect(within(region("Output")).getByText(SPACE)).toBeInTheDocument();
-    expect(button("Apply")).toBeDisabled();
+    expectBlocked("Apply");
     expect(await manifestField()).toHaveValue(MANIFEST);
   });
 
@@ -409,7 +416,7 @@ describe("接続の切り替え", () => {
     await openAccount(user);
     await user.click(await screen.findByRole("button", { name: /Disconnect/ }));
 
-    expect(await screen.findByRole("heading", { name: "Connect to Backlog" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Connect a space" })).toBeInTheDocument();
     expect(screen.getByLabelText("API key")).toHaveValue("");
     expect(button("Connect")).toBeDisabled();
   });
@@ -470,24 +477,28 @@ describe("接続の保存", () => {
     await connect(user);
     await openAccount(user);
     await user.click(await screen.findByRole("button", { name: /Disconnect/ }));
-    await screen.findByRole("heading", { name: "Connect to Backlog" });
+    await screen.findByRole("heading", { name: "Connect a space" });
 
     expect(stored()).toBeNull();
   });
 });
 
 describe("環境変数の入力欄", () => {
-  it("${NAME} を書くと、未入力の件数を示すボタンが現れる", async () => {
+  it("${NAME} を書くと、未入力の件数を示す ENV が現れ、サイドバーは開かない", async () => {
     const user = await startApp();
 
     await connect(user);
     await signedIn();
     await writeManifest(user, withCategory("${CATEGORY_NAME}"));
 
-    expect(await screen.findByRole("button", { name: /Environment values 1/ })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: "Environment values (1 missing)" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("complementary")).toBeNull();
+    expect(await screen.findByRole("button", { name: /1 value missing/ })).toBeInTheDocument();
   });
 
-  it("そのボタンを開くと ${NAME} の名前で入力欄が並ぶ", async () => {
+  it("ENV を開くと ${NAME} の名前で入力欄が並び、最初に書かれた行を添える", async () => {
     const user = await startApp();
 
     await connect(user);
@@ -495,10 +506,14 @@ describe("環境変数の入力欄", () => {
     await writeManifest(user, withCategory("${CATEGORY_NAME}"));
     await openEnvironment(user);
 
-    expect(await screen.findByLabelText("CATEGORY_NAME")).toBeInTheDocument();
+    const sidebar = screen.getByRole("complementary", { name: "Environment values" });
+
+    expect(await within(sidebar).findByLabelText("CATEGORY_NAME")).toBeInTheDocument();
+    expect(within(sidebar).getByText("line 12")).toBeInTheDocument();
+    expect(within(sidebar).getByText("1 of 1 missing")).toBeInTheDocument();
   });
 
-  it("${NAME} を書いていなければボタンごと出さない", async () => {
+  it("${NAME} を書いていなければ ENV ごと出さない", async () => {
     const user = await startApp();
 
     await connect(user);
@@ -508,15 +523,23 @@ describe("環境変数の入力欄", () => {
     expect(screen.queryByRole("button", { name: /Environment values/ })).toBeNull();
   });
 
-  it("値を打っていない ${NAME} は計画に進めない", async () => {
+  it("値を打っていない ${NAME} は計画に進めず、Plan を押すと ENV を開いて空欄にフォーカスする", async () => {
     const user = await startApp();
 
     await connect(user);
     await signedIn();
     await writeManifest(user, withCategory("${CATEGORY_NAME}"));
+    await screen.findByRole("button", { name: /Environment values/ });
 
-    expect(await screen.findByText(/value is not entered: CATEGORY_NAME/)).toBeInTheDocument();
-    expect(button("Plan")).toBeDisabled();
+    await waitFor(() => {
+      expect(titleButton("Plan")).toHaveAttribute("title", "Enter the environment values first");
+    });
+    expectBlocked("Plan");
+
+    await user.click(titleButton("Plan"));
+
+    expect(await screen.findByLabelText("CATEGORY_NAME")).toHaveFocus();
+    expect(screen.queryByRole("region", { name: "Output" })).toBeNull();
   });
 });
 
@@ -550,7 +573,6 @@ describe("入力値の表示", () => {
 
     expect(carrying(hookUrl)).toStrictEqual(["INPUT:"]);
 
-    await user.click(screen.getByRole("button", { name: "Done" }));
     await plan(user);
 
     expect(screen.getByText(new RegExp(hookUrl))).toBeInTheDocument();
@@ -575,10 +597,11 @@ describe("Apply できるとき", () => {
     await signedIn();
     await writeManifest(user, MANIFEST);
     await waitFor(() => {
-      expect(button("Plan")).toBeEnabled();
+      expectAvailable("Plan");
     });
 
-    expect(button("Apply")).toBeDisabled();
+    expectBlocked("Apply");
+    expect(titleButton("Apply")).toHaveAttribute("title", "Run Plan first");
   });
 
   it("Apply は確認を挟まずに、今出ている計画をそのまま適用する", async () => {
@@ -609,17 +632,35 @@ describe("Apply できるとき", () => {
 
     expect(await within(region("Output")).findByText("Outdated")).toBeInTheDocument();
     expect(within(region("Output")).getByText(/Run\s+Plan again to apply/)).toBeInTheDocument();
-    expect(button("Apply")).toBeDisabled();
+    expectBlocked("Apply");
+    expect(titleButton("Apply")).toHaveAttribute("title", "The plan is outdated. Run Plan again.");
   });
 
-  it("Outdated は Output を畳んでいても見える", async () => {
+  it("Outdated は下パネルを畳んでいても、Output のタブ・タイトルバー・ステータスバーに出る", async () => {
     const user = await startApp();
 
     await reach(user);
-    await user.click(button("Minimize output"));
+    await user.click(button("Collapse panel"));
     await user.type(await manifestField(), "#");
 
-    expect(await within(region("Output")).findByText("Outdated")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(outputTab()).toHaveTextContent("Outdated");
+    });
+    expect(titleButton("Plan outdated")).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("contentinfo")).getByText("● Plan outdated"),
+    ).toBeInTheDocument();
+  });
+
+  it("タイトルバーの Plan outdated を押すと Output を開く", async () => {
+    const user = await startApp();
+
+    await reach(user);
+    await user.click(button("Collapse panel"));
+    await user.type(await manifestField(), "#");
+    await user.click(await screen.findByRole("button", { name: "Plan outdated" }));
+
+    expect(within(region("Output")).getByText(/Run\s+Plan again to apply/)).toBeInTheDocument();
   });
 
   it("Plan を押し直せば、変えた入力の計画で Apply できる", async () => {
@@ -629,7 +670,7 @@ describe("Apply できるとき", () => {
     await user.type(await manifestField(), "#");
     await plan(user);
 
-    expect(button("Apply")).toBeEnabled();
+    expectAvailable("Apply");
   });
 });
 
@@ -641,7 +682,8 @@ describe("適用した後", () => {
     await apply(user);
 
     expect(await within(region("Output")).findByText(/Apply complete/)).toBeInTheDocument();
-    expect(button("Apply")).toBeDisabled();
+    expectBlocked("Apply");
+    expect(titleButton("Apply")).toHaveAttribute("title", "This plan is already applied");
   });
 
   it("apply が中断すると、中断レポートを写せる形で残り、同じ計画にはもう Apply できない", async () => {
@@ -652,9 +694,12 @@ describe("適用した後", () => {
     await reach(user);
     await apply(user);
 
-    expect(await within(region("Output")).findByText(/Apply aborted/)).toBeInTheDocument();
+    expect(
+      await within(region("Output")).findByText(/Nothing has been rolled back/),
+    ).toBeInTheDocument();
+    expect(within(region("Output")).getByText(/APPLY ABORTED AT 1 \/ /)).toBeInTheDocument();
     expect(button("Copy report")).toBeInTheDocument();
-    expect(button("Apply")).toBeDisabled();
+    expectBlocked("Apply");
   });
 
   it("前の項目に移っても、適用の記録は残っている", async () => {
@@ -683,7 +728,7 @@ describe("Output パネル", () => {
     await within(region("Output")).findByText(/Apply complete/);
 
     const divider = within(region("Output")).getByRole("separator", { name: "Apply" });
-    const planned = within(region("Output")).getByRole("button", { name: "Copy JSON" });
+    const planned = within(region("Output")).getByRole("group", { name: "Actions" });
     const result = within(region("Output")).getByText(/Apply complete/);
 
     expect(
@@ -704,7 +749,7 @@ describe("Output パネル", () => {
     const user = await startApp();
 
     await reach(user);
-    await user.click(button("Minimize output"));
+    await user.click(button("Collapse panel"));
     await apply(user);
 
     const sections = await within(region("Output")).findByRole("navigation", {
@@ -717,7 +762,7 @@ describe("Output パネル", () => {
         "location",
       );
     });
-    expect(button("Minimize output")).toHaveAttribute("aria-expanded", "true");
+    expect(button("Collapse panel")).toHaveAttribute("aria-expanded", "true");
   });
 
   it("前の項目を開いたまま Apply を押しても、適用する最新の項目の Apply の部分に移る", async () => {
@@ -821,13 +866,13 @@ describe("Output パネル", () => {
     const user = await startApp();
 
     await reach(user);
-    await user.click(button("Minimize output"));
+    await user.click(button("Collapse panel"));
 
-    expect(within(region("Output")).queryByRole("button", { name: "Copy JSON" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Output" })).toBeNull();
 
     await plan(user);
 
-    expect(button("Minimize output")).toHaveAttribute("aria-expanded", "true");
+    expect(button("Collapse panel")).toHaveAttribute("aria-expanded", "true");
   });
 });
 
@@ -892,7 +937,7 @@ describe("通信しているあいだの押せなさ", () => {
     await connect(user);
 
     await waitFor(() => {
-      expect(button("Connect")).toBeDisabled();
+      expect(button("Connecting...")).toBeDisabled();
     });
 
     release();
@@ -907,23 +952,25 @@ describe("通信しているあいだの押せなさ", () => {
     await signedIn();
     await writeManifest(user, MANIFEST);
     await waitFor(() => {
-      expect(button("Plan")).toBeEnabled();
+      expectAvailable("Plan");
     });
 
     const release = holding();
 
-    await user.click(button("Plan"));
+    await user.click(titleButton("Plan"));
 
     await waitFor(() => {
-      expect(button("Plan")).toBeDisabled();
+      expectBlocked("Plan");
     });
-    expect(button("Apply")).toBeDisabled();
+    expectBlocked("Apply");
+    expect(within(region("Output")).getByText("Reading the space...")).toBeInTheDocument();
+    expect(outputTab()).toHaveTextContent("Planning");
 
     release();
 
     expect(await screen.findByRole("button", { name: "Copy JSON" })).toBeInTheDocument();
-    expect(button("Plan")).toBeEnabled();
-    expect(button("Apply")).toBeEnabled();
+    expectAvailable("Plan");
+    expectAvailable("Apply");
   });
 });
 
@@ -999,7 +1046,7 @@ describe("スペースのユーザーとチームの一覧", () => {
     expect(await users.findByText("山田 太郎")).toBeInTheDocument();
     expect(users.getByText("2")).toBeInTheDocument();
     expect(users.getByText("yamada")).toBeInTheDocument();
-    expect(users.getByText("Space admin")).toBeInTheDocument();
+    expect(users.getByTitle("Space admin")).toBeInTheDocument();
     expect(users.getByText("hanako@example.com")).toBeInTheDocument();
     expect(users.getByText("3 of 3 users")).toBeInTheDocument();
   });
@@ -1065,7 +1112,7 @@ describe("スペースのユーザーとチームの一覧", () => {
     const users = within(pane("Users"));
 
     expect(await users.findByText("山田 太郎")).toBeInTheDocument();
-    expect(users.getByText("Space admin")).toBeInTheDocument();
+    expect(users.getByTitle("Space admin")).toBeInTheDocument();
 
     await user.click(users.getByRole("button", { name: "Copy 山田 太郎" }));
 
@@ -1345,20 +1392,20 @@ describe("ファイルの開閉", () => {
 
     const user = await connected();
 
-    await user.click(button("Open"));
+    await user.click(titleButton("Open"));
 
     await waitFor(async () => {
       expect(await manifestField()).toHaveValue(MANIFEST);
     });
     expect(within(documentStatus()).getByText("project.yaml")).toBeInTheDocument();
-    expect(within(documentStatus()).queryByText("Unsaved")).toBeNull();
+    expect(within(documentStatus()).queryByRole("img", { name: "Unsaved" })).toBeNull();
   });
 
   it("何も開いていない空のエディタは Untitled で、保存していない変更は無い", async () => {
     await connected();
 
     expect(within(documentStatus()).getByText("Untitled")).toBeInTheDocument();
-    expect(within(documentStatus()).queryByText("Unsaved")).toBeNull();
+    expect(within(documentStatus()).queryByRole("img", { name: "Unsaved" })).toBeNull();
   });
 
   it("中身を変えると Unsaved の印が出て、開いたときの中身に戻すと消える", async () => {
@@ -1366,17 +1413,17 @@ describe("ファイルの開閉", () => {
 
     const user = await connected();
 
-    await user.click(button("Open"));
+    await user.click(titleButton("Open"));
     await waitFor(async () => {
       expect(await manifestField()).toHaveValue(MANIFEST);
     });
     await replaceManifest(user, withCategory("開発"));
 
-    expect(within(documentStatus()).getByText("Unsaved")).toBeInTheDocument();
+    expect(within(documentStatus()).getByRole("img", { name: "Unsaved" })).toBeInTheDocument();
 
     await replaceManifest(user, MANIFEST);
 
-    expect(within(documentStatus()).queryByText("Unsaved")).toBeNull();
+    expect(within(documentStatus()).queryByRole("img", { name: "Unsaved" })).toBeNull();
   });
 
   it("開いたファイルを直して Save すると、保存先を選び直させずにそのファイルへ上書きし、印が消える", async () => {
@@ -1385,15 +1432,15 @@ describe("ファイルの開閉", () => {
 
     const user = await connected();
 
-    await user.click(button("Open"));
+    await user.click(titleButton("Open"));
     await waitFor(async () => {
       expect(await manifestField()).toHaveValue(MANIFEST);
     });
     await replaceManifest(user, withCategory("開発"));
-    await user.click(button("Save"));
+    await user.click(titleButton("Save"));
 
     await waitFor(() => {
-      expect(within(documentStatus()).queryByText("Unsaved")).toBeNull();
+      expect(within(documentStatus()).queryByRole("img", { name: "Unsaved" })).toBeNull();
     });
     expect(file.contents()).toBe(withCategory("開発"));
     expect(showSaveFilePicker).not.toHaveBeenCalled();
@@ -1406,7 +1453,7 @@ describe("ファイルの開閉", () => {
     const user = await connected();
 
     await writeManifest(user, MANIFEST);
-    await user.click(button("Save"));
+    await user.click(titleButton("Save"));
 
     await waitFor(() => {
       expect(within(documentStatus()).getByText("proj-a.yaml")).toBeInTheDocument();
@@ -1416,7 +1463,7 @@ describe("ファイルの開閉", () => {
     );
 
     await replaceManifest(user, withCategory("開発"));
-    await user.click(button("Save"));
+    await user.click(titleButton("Save"));
 
     await waitFor(() => {
       expect(target.contents()).toBe(withCategory("開発"));
@@ -1430,12 +1477,12 @@ describe("ファイルの開閉", () => {
     const user = await connected();
 
     await writeManifest(user, MANIFEST);
-    await user.click(button("Save"));
+    await user.click(titleButton("Save"));
 
     await waitFor(() => {
       expect(showSaveFilePicker).toHaveBeenCalled();
     });
-    expect(within(documentStatus()).getByText("Unsaved")).toBeInTheDocument();
+    expect(within(documentStatus()).getByRole("img", { name: "Unsaved" })).toBeInTheDocument();
     expect(screen.queryByText(/Could not save/)).toBeNull();
   });
 
@@ -1446,16 +1493,16 @@ describe("ファイルの開閉", () => {
 
     const user = await connected();
 
-    await user.click(button("Open"));
+    await user.click(titleButton("Open"));
     await waitFor(async () => {
       expect(await manifestField()).toHaveValue(MANIFEST);
     });
     await replaceManifest(user, withCategory("開発"));
-    await user.click(button("Save"));
+    await user.click(titleButton("Save"));
 
     expect(await screen.findByText(/Could not save project\.yaml/)).toBeInTheDocument();
     expect(file.contents()).toBe(MANIFEST);
-    expect(within(documentStatus()).getByText("Unsaved")).toBeInTheDocument();
+    expect(within(documentStatus()).getByRole("img", { name: "Unsaved" })).toBeInTheDocument();
   });
 
   it("ファイルを選ぶ API が無いブラウザでは、Open はファイルの選択で開き、Save はその名前でダウンロードして保存済みになる", async () => {
@@ -1464,19 +1511,19 @@ describe("ファイルの開閉", () => {
     const saved = capturingDownloads();
     const user = await connected();
 
-    await user.click(button("Open"));
+    await user.click(titleButton("Open"));
     await waitFor(async () => {
       expect(await manifestField()).toHaveValue(MANIFEST);
     });
     await replaceManifest(user, withCategory("開発"));
-    await user.click(button("Save"));
+    await user.click(titleButton("Save"));
 
     await waitFor(() => {
       expect(saved).toHaveLength(1);
     });
     expect(saved[0]?.filename).toBe("project.yml");
     expect(await saved[0]?.blob?.text()).toBe(withCategory("開発"));
-    expect(within(documentStatus()).queryByText("Unsaved")).toBeNull();
+    expect(within(documentStatus()).queryByRole("img", { name: "Unsaved" })).toBeNull();
   });
 
   it("ファイルを選ぶ API が無いブラウザで何も開かずに保存すると、manifest.yaml という名前でダウンロードする", async () => {
@@ -1484,7 +1531,7 @@ describe("ファイルの開閉", () => {
     const user = await connected();
 
     await writeManifest(user, MANIFEST);
-    await user.click(button("Save"));
+    await user.click(titleButton("Save"));
 
     await waitFor(() => {
       expect(saved[0]?.filename).toBe("manifest.yaml");
@@ -1496,7 +1543,7 @@ describe("ファイルの開閉", () => {
 
     const user = await connected();
 
-    await user.click(button("Open"));
+    await user.click(titleButton("Open"));
     await waitFor(async () => {
       expect(await manifestField()).toHaveValue(MANIFEST);
     });
@@ -1533,7 +1580,7 @@ describe("ファイルの開閉の端", () => {
     await waitFor(async () => {
       expect(await manifestField()).toHaveValue(MANIFEST);
     });
-    await user.click(button("Save"));
+    await user.click(titleButton("Save"));
 
     await waitFor(() => {
       expect(showSaveFilePicker).toHaveBeenCalledWith(
@@ -1552,7 +1599,7 @@ describe("ファイルの開閉の端", () => {
     const user = await connected();
 
     await writeManifest(user, MANIFEST);
-    await user.click(button("Open"));
+    await user.click(titleButton("Open"));
 
     expect(await manifestField()).toHaveValue(MANIFEST);
     expect(screen.queryByRole("alertdialog")).toBeNull();
@@ -1570,7 +1617,7 @@ describe("ファイルの開閉の端", () => {
     const user = await connected();
 
     await writeManifest(user, MANIFEST);
-    await user.click(button("Open"));
+    await user.click(titleButton("Open"));
 
     expect(await screen.findByText(/Could not open the file/)).toBeInTheDocument();
     expect(await manifestField()).toHaveValue(MANIFEST);
@@ -1589,13 +1636,13 @@ describe("ファイルの開閉の端", () => {
 
     const user = await connected();
 
-    await user.click(button("Open"));
+    await user.click(titleButton("Open"));
     await waitFor(async () => {
       expect(await manifestField()).toHaveValue(MANIFEST);
     });
     await replaceManifest(user, withCategory("設計"));
-    await user.click(button("Save"));
-    await user.click(button("Open"));
+    await user.click(titleButton("Save"));
+    await user.click(titleButton("Open"));
     await user.click(
       within(await discardDialog()).getByRole("button", { name: "Discard and open" }),
     );
@@ -1605,7 +1652,7 @@ describe("ファイルの開閉の端", () => {
       expect(first.contents()).toBe(withCategory("設計"));
     });
     expect(within(documentStatus()).getByText("other.yaml")).toBeInTheDocument();
-    expect(within(documentStatus()).queryByText("Unsaved")).toBeNull();
+    expect(within(documentStatus()).queryByRole("img", { name: "Unsaved" })).toBeNull();
   });
 });
 
@@ -1615,18 +1662,19 @@ const settleSave = async (): Promise<void> =>
     setTimeout(resolve, 0);
   });
 
+// macOS の Cmd は hotkeys.test.ts で確かめる。割り当ての管理は OS を一度だけ読み、テストの途中で差し替えられない。
 describe("保存のショートカット", () => {
-  it("Cmd+S でも Ctrl+S でも、フォーカスがエディタの外にあっても Save と同じく保存し、ブラウザのページ保存は出さない", async () => {
+  it("Ctrl+S は、フォーカスがエディタの外にあっても Save と同じく保存し、ブラウザのページ保存は出さない", async () => {
     const saved = capturingDownloads();
     const user = await connected();
 
     await writeManifest(user, MANIFEST);
 
-    expect(fireEvent.keyDown(document.body, { key: "s", metaKey: true })).toBe(false);
+    expect(fireEvent.keyDown(document.body, { key: "s", ctrlKey: true })).toBe(false);
     await waitFor(() => {
       expect(saved).toHaveLength(1);
     });
-    expect(within(documentStatus()).queryByText("Unsaved")).toBeNull();
+    expect(within(documentStatus()).queryByRole("img", { name: "Unsaved" })).toBeNull();
 
     expect(fireEvent.keyDown(await manifestField(), { key: "s", ctrlKey: true })).toBe(false);
     await waitFor(() => {
@@ -1635,13 +1683,13 @@ describe("保存のショートカット", () => {
     expect(saved[1]?.filename).toBe("manifest.yaml");
   });
 
-  it("Shift を足した Cmd+Shift+S は奪わない", async () => {
+  it("Shift を足した Ctrl+Shift+S は奪わない", async () => {
     const saved = capturingDownloads();
     const user = await connected();
 
     await writeManifest(user, MANIFEST);
 
-    expect(fireEvent.keyDown(document.body, { key: "S", metaKey: true, shiftKey: true })).toBe(
+    expect(fireEvent.keyDown(document.body, { key: "S", ctrlKey: true, shiftKey: true })).toBe(
       true,
     );
     await settleSave();
@@ -1654,7 +1702,7 @@ describe("保存のショートカット", () => {
 
     await writeManifest(user, MANIFEST);
 
-    expect(fireEvent.keyDown(document.body, { key: "s", metaKey: true, repeat: true })).toBe(false);
+    expect(fireEvent.keyDown(document.body, { key: "s", ctrlKey: true, repeat: true })).toBe(false);
     await settleSave();
     expect(saved).toHaveLength(0);
   });
@@ -1664,7 +1712,7 @@ describe("保存のショートカット", () => {
 
     await writeManifest(user, MANIFEST);
 
-    expect(fireEvent.keyDown(document.body, { key: "ß", metaKey: true, altKey: true })).toBe(true);
+    expect(fireEvent.keyDown(document.body, { key: "ß", ctrlKey: true, altKey: true })).toBe(true);
   });
 
   it("モーダルを開いているあいだも保存する", async () => {
@@ -1672,9 +1720,9 @@ describe("保存のショートカット", () => {
     const user = await connected();
 
     await writeManifest(user, MANIFEST);
-    await user.click(button("Import from Backlog"));
+    await user.click(titleButton("Import from Backlog"));
 
-    expect(fireEvent.keyDown(importDialog(), { key: "s", metaKey: true })).toBe(false);
+    expect(fireEvent.keyDown(importDialog(), { key: "s", ctrlKey: true })).toBe(false);
     await waitFor(() => {
       expect(saved).toHaveLength(1);
     });
@@ -1683,7 +1731,140 @@ describe("保存のショートカット", () => {
   it("接続する前は奪わない", async () => {
     await startApp();
 
-    expect(fireEvent.keyDown(document.body, { key: "s", metaKey: true })).toBe(true);
+    expect(fireEvent.keyDown(document.body, { key: "s", ctrlKey: true })).toBe(true);
+  });
+});
+
+describe("そのほかのショートカット", () => {
+  it("Ctrl+Enter は Plan と同じく計画を出す", async () => {
+    const user = await connected();
+
+    await writeManifest(user, MANIFEST);
+    await waitFor(() => {
+      expectAvailable("Plan");
+    });
+
+    expect(fireEvent.keyDown(await manifestField(), { key: "Enter", ctrlKey: true })).toBe(false);
+    expect(
+      await within(region("Output")).findByRole("button", { name: "Copy JSON" }),
+    ).toBeInTheDocument();
+  });
+
+  it("Ctrl+J は下パネルを開け閉めする", async () => {
+    await connected();
+
+    fireEvent.keyDown(document.body, { key: "j", ctrlKey: true });
+
+    expect(await screen.findByRole("button", { name: "Collapse panel" })).toBeInTheDocument();
+
+    fireEvent.keyDown(document.body, { key: "j", ctrlKey: true });
+
+    expect(await screen.findByRole("button", { name: "Expand panel" })).toBeInTheDocument();
+  });
+
+  it("Ctrl+B は最後に開いたサイドバーを開け閉めし、まだ開いていなければ Users を開く", async () => {
+    const user = await connected();
+
+    fireEvent.keyDown(document.body, { key: "b", ctrlKey: true });
+
+    expect(await screen.findByRole("complementary", { name: "Users" })).toBeInTheDocument();
+
+    await user.click(button("Teams"));
+    fireEvent.keyDown(document.body, { key: "b", ctrlKey: true });
+
+    expect(screen.queryByRole("complementary")).toBeNull();
+
+    fireEvent.keyDown(document.body, { key: "b", ctrlKey: true });
+
+    expect(await screen.findByRole("complementary", { name: "Teams" })).toBeInTheDocument();
+  });
+
+  it("Ctrl+O は Open と同じくファイルを開く", async () => {
+    withPickers({ open: [fakeFile("project.yaml", MANIFEST).handle] });
+
+    await connected();
+
+    expect(fireEvent.keyDown(document.body, { key: "o", ctrlKey: true })).toBe(false);
+    await waitFor(async () => {
+      expect(await manifestField()).toHaveValue(MANIFEST);
+    });
+  });
+
+  it("モーダルを開いているあいだは、背面を動かすショートカットを奪わない", async () => {
+    const user = await connected();
+
+    await user.click(titleButton("Import from Backlog"));
+
+    expect(fireEvent.keyDown(importDialog(), { key: "j", ctrlKey: true })).toBe(true);
+    expect(fireEvent.keyDown(importDialog(), { key: "b", ctrlKey: true })).toBe(true);
+  });
+});
+
+describe("下パネルとサイドバーが開くとき", () => {
+  const BROKEN = `${MANIFEST}categories:\n  - name: 開発\n  - name: 開発\n`;
+
+  it("接続した直後は下パネルを畳み、Output には何も走っていないと出す", async () => {
+    const user = await connected();
+
+    expect(button("Expand panel")).toBeInTheDocument();
+
+    await user.click(outputTab());
+
+    expect(within(region("Output")).getByText("Nothing has run yet.")).toBeInTheDocument();
+  });
+
+  it("打っているあいだにエラーが出ても Problems は開かない", async () => {
+    const user = await connected();
+
+    await writeManifest(user, BROKEN);
+
+    await waitFor(() => {
+      expect(screen.getByRole("tab", { name: /Problems/ })).toHaveTextContent(/[1-9]/);
+    });
+    expect(button("Expand panel")).toBeInTheDocument();
+  });
+
+  it("エラーのあるファイルを開くと、Problems を開いて診断を位置付きで並べる", async () => {
+    withPickers({ open: [fakeFile("broken.yaml", BROKEN).handle] });
+
+    const user = await connected();
+
+    await user.click(titleButton("Open"));
+
+    const problems = await screen.findByRole("list", { name: "Problems" });
+
+    expect(within(problems).getAllByRole("button")[0]).toHaveTextContent(/^\d+:\d+/);
+  });
+
+  it("エラーがあるときに Plan を押すと、計画は作らず Problems を開く", async () => {
+    const user = await connected();
+
+    await writeManifest(user, BROKEN);
+    await waitFor(() => {
+      expect(titleButton("Plan")).toHaveAttribute("title", "Fix the errors in Problems first");
+    });
+    await user.click(titleButton("Plan"));
+
+    expect(await screen.findByRole("list", { name: "Problems" })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Output" })).toBeNull();
+  });
+
+  it("エラーが無ければ Problems は何も無いと言う", async () => {
+    const user = await connected();
+
+    await writeManifest(user, MANIFEST);
+    await user.click(screen.getByRole("tab", { name: /Problems/ }));
+
+    expect(await screen.findByText("No problems in Untitled.")).toBeInTheDocument();
+  });
+
+  it("開いているタブをもう一度押すと下パネルを畳む", async () => {
+    const user = await connected();
+
+    await user.click(outputTab());
+    await user.click(outputTab());
+
+    expect(button("Expand panel")).toBeInTheDocument();
   });
 });
 
@@ -1694,11 +1875,11 @@ describe("保存していない変更の差し替え", () => {
     const user = await connected();
 
     await writeManifest(user, MANIFEST);
-    await user.click(button("Open"));
+    await user.click(titleButton("Open"));
 
     const dialog = await discardDialog();
 
-    expect(dialog).toHaveTextContent("Untitled has changes that are not saved.");
+    expect(dialog).toHaveTextContent("Untitled has unsaved changes.");
     expect(dialog).toHaveTextContent("Opening other.yaml replaces them.");
 
     await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
@@ -1713,7 +1894,7 @@ describe("保存していない変更の差し替え", () => {
     const user = await connected();
 
     await writeManifest(user, MANIFEST);
-    await user.click(button("Open"));
+    await user.click(titleButton("Open"));
     await user.click(
       within(await discardDialog()).getByRole("button", { name: "Discard and open" }),
     );
@@ -1732,11 +1913,11 @@ describe("保存していない変更の差し替え", () => {
 
     const user = await connected();
 
-    await user.click(button("Open"));
+    await user.click(titleButton("Open"));
     await waitFor(async () => {
       expect(await manifestField()).toHaveValue(MANIFEST);
     });
-    await user.click(button("Open"));
+    await user.click(titleButton("Open"));
 
     await waitFor(async () => {
       expect(await manifestField()).toHaveValue(withCategory("開発"));
@@ -1766,7 +1947,7 @@ describe("Backlog からの読み込み", () => {
   const ISSUES_COUNT = "/api/v2/issues/count?projectId[]=100";
 
   const importProject = async (user: UserEvent, key: string): Promise<void> => {
-    await user.click(button("Import from Backlog"));
+    await user.click(titleButton("Import from Backlog"));
     await user.type(within(importDialog()).getByLabelText("Project key"), key);
     await user.click(within(importDialog()).getByRole("button", { name: "Import" }));
   };
@@ -1789,7 +1970,7 @@ describe("Backlog からの読み込み", () => {
     expect(await imported()).toContain("key: PROJ_A\nname: プロジェクトA\n");
     expect(screen.queryByRole("dialog", { name: "Import from Backlog" })).toBeNull();
     expect(within(documentStatus()).getByText("PROJ_A.yaml")).toBeInTheDocument();
-    expect(within(documentStatus()).getByText("Unsaved")).toBeInTheDocument();
+    expect(within(documentStatus()).getByRole("img", { name: "Unsaved" })).toBeInTheDocument();
   });
 
   it("課題を持つプロジェクトを読み込むと、そのままでは plan と apply が拒むことをエディタの上で案内する", async () => {
@@ -1817,7 +1998,7 @@ describe("Backlog からの読み込み", () => {
 
     await importProject(user, "PROJ_A");
     await imported();
-    await user.click(button("Open"));
+    await user.click(titleButton("Open"));
     await user.click(
       within(await discardDialog()).getByRole("button", { name: "Discard and open" }),
     );
@@ -1877,7 +2058,7 @@ describe("Backlog からの読み込み", () => {
 
     const user = await connected(EXPORTABLE);
 
-    await user.click(button("Open"));
+    await user.click(titleButton("Open"));
     await waitFor(async () => {
       expect(await manifestField()).toHaveValue(MANIFEST);
     });
@@ -1895,10 +2076,10 @@ describe("Backlog からの読み込み", () => {
 
     await importProject(user, "PROJ_A");
     await imported();
-    await user.click(button("Save"));
+    await user.click(titleButton("Save"));
 
     await waitFor(() => {
-      expect(within(documentStatus()).queryByText("Unsaved")).toBeNull();
+      expect(within(documentStatus()).queryByRole("img", { name: "Unsaved" })).toBeNull();
     });
     expect(showSaveFilePicker).toHaveBeenCalledWith(
       expect.objectContaining({ suggestedName: "PROJ_A.yaml" }),
@@ -1935,7 +2116,7 @@ describe("Backlog からの読み込み", () => {
     await imported();
 
     expect(within(region("Output")).getAllByText("Outdated")).not.toHaveLength(0);
-    expect(button("Apply")).toBeDisabled();
+    expectBlocked("Apply");
   });
 
   it("別の接続に差し替えると、モーダルに打ったキーと診断は消える", async () => {
@@ -1948,7 +2129,7 @@ describe("Backlog からの読み込み", () => {
     await waitFor(() => {
       expect(screen.queryByRole("dialog", { name: "Switch connection" })).toBeNull();
     });
-    await user.click(button("Import from Backlog"));
+    await user.click(titleButton("Import from Backlog"));
 
     expect(within(importDialog()).getByLabelText("Project key")).toHaveValue("");
     expect(within(importDialog()).queryByText(/export error/)).toBeNull();

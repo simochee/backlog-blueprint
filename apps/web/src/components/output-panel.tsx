@@ -1,14 +1,23 @@
-import { ChevronDownIcon, ChevronUpIcon, ExclamationTriangleIcon } from "@radix-ui/react-icons";
-import { Badge, Button, Callout, DropdownMenu, Flex, IconButton, Text } from "@radix-ui/themes";
+import { summarize } from "@backlog-blueprint/core";
+import { Checkbox, DropdownMenu } from "radix-ui";
 import { type Ref, useEffect, useRef, useState } from "react";
 
-import { type ApplyRuns, entryLabel, type OutputEntry, type Section, sectionAt } from "../output";
-import { type ApplyRun } from "../progress";
+import {
+  type ApplyRuns,
+  entryLabel,
+  entryState,
+  formatTime,
+  isOutdated,
+  type OutputEntry,
+  type Section,
+  sectionAt,
+} from "../output";
+import { isRunning, type ApplyRun } from "../progress";
 import { ApplyResult } from "./apply-result";
 import { SectionBoundary } from "./boundary";
-import { PlanResult } from "./plan-result";
+import { PlanResult, PlanSummary } from "./plan-result";
 
-type OutputView = {
+export type OutputView = {
   entry: OutputEntry;
   outdated: boolean;
   run?: ApplyRun;
@@ -17,18 +26,19 @@ type OutputView = {
 type OutputPanelProps = {
   entries: OutputEntry[];
   runs: ApplyRuns;
+  planKey: string;
   view?: OutputView;
   applyRequested?: number;
+  onApplyFollowed: () => void;
   preparing: boolean;
-  expanded: boolean;
-  onExpandedChange: (expanded: boolean) => void;
   onSelect: (id: number) => void;
   showUnchanged: boolean;
   onShowUnchangedChange: (showUnchanged: boolean) => void;
+  onPlanAgain: () => void;
 };
 
 /**
- * 表示のまま Plan / Apply と読ませない。エディタの上の Plan / Apply と同じ名前のボタンが
+ * 表示のまま Plan / Apply と読ませない。タイトルバーの Plan / Apply と同じ名前のボタンが
  * 2つずつ並び、押して何が起きるかが名前から区別できない。
  */
 const SECTIONS: { section: Section; title: string; label: string }[] = [
@@ -39,74 +49,124 @@ const SECTIONS: { section: Section; title: string; label: string }[] = [
 /** `.output-body` の padding と揃える */
 const SECTION_MARGIN = 12;
 
-/** `<hr>` や Radix の `Separator` を使わない。線だけで名前を持てず、「ここから先が適用」を言えない */
-const ApplyDivider = ({ ref }: { ref: Ref<HTMLDivElement> }) => (
-  <div aria-label="Apply" className="output-divider" ref={ref} role="separator">
-    <Text color="gray" size="1" weight="medium">
-      Apply
-    </Text>
+/** `<hr>` を使わない。線だけで名前を持てず、「ここから先が適用」を言えない */
+const ApplyDivider = ({ ref, startedAt }: { ref: Ref<HTMLDivElement>; startedAt: number }) => (
+  <div aria-label="Apply" className="apply-divider" ref={ref} role="separator">
+    <span className="apply-divider-tick" />
+    <span className="apply-divider-line" />
+    <strong>APPLY · {formatTime(startedAt)}</strong>
+    <span className="apply-divider-line" />
+    <span className="apply-divider-tick" />
   </div>
+);
+
+const HistoryMenu = ({
+  entries,
+  runs,
+  planKey,
+  view,
+  onSelect,
+}: Pick<OutputPanelProps, "entries" | "runs" | "planKey" | "onSelect"> & { view: OutputView }) => (
+  <DropdownMenu.Root>
+    <DropdownMenu.Trigger asChild>
+      <button className="history-trigger" type="button">
+        {entryLabel(view.entry, view.run)}
+        <span aria-hidden className="caret">
+          ▾
+        </span>
+      </button>
+    </DropdownMenu.Trigger>
+    <DropdownMenu.Portal>
+      <DropdownMenu.Content align="start" className="menu" sideOffset={4}>
+        {[...entries].reverse().map((entry) => {
+          const run = runs[entry.id];
+          const state = entryState(entry, run, isOutdated(entry, planKey));
+
+          return (
+            <DropdownMenu.Item
+              className="menu-item"
+              key={entry.id}
+              onSelect={() => onSelect(entry.id)}
+            >
+              <span aria-hidden className="menu-item-current">
+                {entry.id === view.entry.id ? "●" : ""}
+              </span>
+              <span className="menu-item-label">{entryLabel(entry, run)}</span>
+              <span className="menu-item-state" data-tone={state.tone}>
+                {state.chip}
+              </span>
+            </DropdownMenu.Item>
+          );
+        })}
+      </DropdownMenu.Content>
+    </DropdownMenu.Portal>
+  </DropdownMenu.Root>
 );
 
 const EntryBody = ({
   view,
   applyRef,
   showUnchanged,
-  onShowUnchangedChange,
-}: Pick<OutputPanelProps, "showUnchanged" | "onShowUnchangedChange"> & {
+  onPlanAgain,
+}: Pick<OutputPanelProps, "showUnchanged" | "onPlanAgain"> & {
   view: OutputView;
   applyRef: Ref<HTMLDivElement>;
 }) => {
   const { entry, outdated, run } = view;
+  const stale = outdated && run === undefined;
 
   return (
-    <Flex direction="column" gap="4">
-      <Flex align="center" gap="2" wrap="wrap">
-        <Text size="2" weight="bold">
-          {entryLabel(entry, run)}
-        </Text>
-        <Text color="gray" size="1">
-          {entry.space}
-        </Text>
-      </Flex>
-      {outdated && run === undefined ? (
-        <Callout.Root color="amber" size="1" variant="surface">
-          <Callout.Icon>
-            <ExclamationTriangleIcon />
-          </Callout.Icon>
-          <Callout.Text>
+    <>
+      {stale ? (
+        <div className="outdated-banner">
+          <span className="chip" data-filled="true" data-tone="change">
+            Outdated
+          </span>
+          <p>
             The manifest, its environment values or the connection changed after this plan. Run Plan
             again to apply.
-          </Callout.Text>
-        </Callout.Root>
+          </p>
+          <button className="button" data-variant="secondary" onClick={onPlanAgain} type="button">
+            Plan again
+          </button>
+        </div>
       ) : null}
-      <PlanResult
-        diagnostics={entry.attempt.diagnostics}
-        failure={entry.attempt.failure}
-        onShowUnchangedChange={onShowUnchangedChange}
-        prepared={entry.attempt.prepared}
-        showUnchanged={showUnchanged}
-      />
+      <div className="plan" data-outdated={stale}>
+        <div className="section-heading">
+          <strong>PLAN</strong>
+          <span>
+            {formatTime(entry.startedAt)} · {entry.projectKey} · <span>{entry.space}</span>
+          </span>
+        </div>
+        <PlanResult
+          diagnostics={entry.attempt.diagnostics}
+          failure={entry.attempt.failure}
+          prepared={entry.attempt.prepared}
+          showUnchanged={showUnchanged}
+        />
+      </div>
       {run === undefined ? null : (
-        <>
-          <ApplyDivider ref={applyRef} />
+        <div className="apply-section">
+          <ApplyDivider ref={applyRef} startedAt={run.startedAt} />
           <ApplyResult run={run} />
-        </>
+        </div>
       )}
-    </Flex>
+    </>
   );
 };
 
 export const OutputPanel = ({
   entries,
   runs,
+  planKey,
   view,
   applyRequested,
+  onApplyFollowed,
   preparing,
-  expanded,
-  onExpandedChange,
   onSelect,
-  ...body
+  showUnchanged,
+  onShowUnchangedChange,
+  onPlanAgain,
 }: OutputPanelProps) => {
   const bodyRef = useRef<HTMLDivElement>(null);
   const applyRef = useRef<HTMLDivElement>(null);
@@ -122,7 +182,8 @@ export const OutputPanel = ({
   }
 
   const section = reading !== undefined && reading.entryId === entryId ? reading.section : "plan";
-  const showSections = expanded && entryId !== undefined && view?.run !== undefined && !preparing;
+  const shown = preparing ? undefined : view;
+  const prepared = shown?.entry.attempt.prepared;
 
   const applyStart = (): number | undefined => {
     const divider = applyRef.current;
@@ -130,8 +191,18 @@ export const OutputPanel = ({
     return divider === null ? undefined : Math.max(divider.offsetTop - SECTION_MARGIN, 0);
   };
 
+  // 飛んだ先で起きるスクロールを読んでいる位置として拾わない。適用のログが短いと区切りまで
+  // 上がりきらず、そのイベントが届く前にログが伸びると、飛んだ直後に Plan へ戻る（WU-49）。
+  const jumping = useRef(false);
+
   const track = (): void => {
     const scroller = bodyRef.current;
+
+    if (jumping.current) {
+      jumping.current = false;
+
+      return;
+    }
 
     if (scroller === null || entryId === undefined) {
       return;
@@ -141,109 +212,116 @@ export const OutputPanel = ({
   };
 
   const jumpTo = (target: Section): void => {
+    const scroller = bodyRef.current;
+
     if (entryId === undefined) {
       return;
     }
 
     setReading({ entryId, section: target });
-    bodyRef.current?.scrollTo({ top: target === "plan" ? 0 : (applyStart() ?? 0) });
+
+    if (scroller === null) {
+      return;
+    }
+
+    const top = Math.min(
+      target === "plan" ? 0 : (applyStart() ?? 0),
+      scroller.scrollHeight - scroller.clientHeight,
+    );
+
+    // 位置が変わらなければスクロールのイベントは来ないので、次の利用者のスクロールを飲み込まない。
+    jumping.current = Math.round(scroller.scrollTop) !== Math.round(Math.max(top, 0));
+    scroller.scrollTo({ top });
   };
 
-  const followed = useRef<number>(undefined);
-  const applyShown = expanded && entryId === applyRequested && view?.run !== undefined;
+  const applyShown = entryId === applyRequested && shown?.run !== undefined;
 
-  // 進捗が届くたびに Apply へ飛ばさない。適用の途中で計画を読み返しに戻れなくなる（WU-49）。
+  // 追ったことをこの部品の中に覚えない。パネルを畳むとこの部品ごと消えるので、開き直すたびに
+  // Apply へ飛び直す。進捗が届くたびに飛ばさないのと同じく、適用の途中で計画を読み返せなくなる（WU-49）。
   useEffect(() => {
-    if (applyShown && followed.current !== applyRequested) {
-      followed.current = applyRequested;
+    if (applyShown) {
       jumpTo("apply");
+      onApplyFollowed();
     }
-  }, [applyShown, applyRequested]);
+  }, [applyShown]);
 
   return (
-    <section aria-label="Output" className="output-panel" data-expanded={expanded}>
-      <Flex align="center" className="output-header" gap="3" justify="between">
-        <Flex align="center" gap="3" minWidth="0">
-          <Text size="2" weight="medium">
-            Output
-          </Text>
-          {view === undefined ? null : (
-            <DropdownMenu.Root>
-              <DropdownMenu.Trigger>
-                <Button color="gray" size="1" variant="soft">
-                  <span className="output-current">{entryLabel(view.entry, view.run)}</span>
-                  <DropdownMenu.TriggerIcon />
-                </Button>
-              </DropdownMenu.Trigger>
-              <DropdownMenu.Content align="start" size="1">
-                {[...entries].reverse().map((entry) => (
-                  <DropdownMenu.Item key={entry.id} onSelect={() => onSelect(entry.id)}>
-                    {entryLabel(entry, runs[entry.id])}
-                  </DropdownMenu.Item>
-                ))}
-              </DropdownMenu.Content>
-            </DropdownMenu.Root>
+    <section aria-label="Output" className="output">
+      {shown === undefined ? null : (
+        <div className="output-header">
+          <HistoryMenu
+            entries={entries}
+            onSelect={onSelect}
+            planKey={planKey}
+            runs={runs}
+            view={shown}
+          />
+          {shown.run === undefined ? null : (
+            <nav aria-label="Sections" className="anchors">
+              {SECTIONS.map(({ section: target, title, label }) => (
+                <button
+                  aria-current={section === target ? "location" : undefined}
+                  aria-label={label}
+                  key={target}
+                  onClick={() => jumpTo(target)}
+                  type="button"
+                >
+                  {title}
+                </button>
+              ))}
+            </nav>
           )}
-          {/* 本文の中にだけ出さない。畳んでいても Apply が押せない理由が読めるように（WU-3）。 */}
-          {view?.outdated && view.run === undefined ? (
-            <Badge color="amber" variant="solid">
-              Outdated
-            </Badge>
+          <span className="output-header-spacer" />
+          {shown.run !== undefined && isRunning(shown.run) ? (
+            <span className="applying-note">
+              <span aria-hidden className="spinner" />
+              Applying. Do not close this tab.
+            </span>
           ) : null}
-        </Flex>
-        <Flex align="center" gap="3">
-          {showSections ? (
-            <Flex align="center" aria-label="Sections" asChild gap="1">
-              <nav>
-                {SECTIONS.map(({ section: target, title, label }) => (
-                  <Button
-                    aria-current={section === target ? "location" : undefined}
-                    aria-label={label}
-                    color="gray"
-                    key={target}
-                    onClick={() => jumpTo(target)}
-                    size="1"
-                    type="button"
-                    variant={section === target ? "solid" : "ghost"}
-                  >
-                    {title}
-                  </Button>
-                ))}
-              </nav>
-            </Flex>
-          ) : null}
-          <IconButton
-            aria-expanded={expanded}
-            aria-label={expanded ? "Minimize output" : "Expand output"}
-            color="gray"
-            onClick={() => onExpandedChange(!expanded)}
-            size="1"
-            variant="ghost"
-          >
-            {expanded ? <ChevronDownIcon /> : <ChevronUpIcon />}
-          </IconButton>
-        </Flex>
-      </Flex>
-      {expanded ? (
-        /* `key` を外さない。別の項目へ移ってもスクロール位置が残る（WU-42）。 */
-        <div className="output-body" key={entryId} onScroll={track} ref={bodyRef}>
-          <SectionBoundary>
-            {preparing ? (
-              <Text color="gray" size="2">
-                Reading the space...
-              </Text>
-            ) : null}
-            {!preparing && view === undefined ? (
-              <Text color="gray" size="2">
-                Nothing has run yet.
-              </Text>
-            ) : null}
-            {!preparing && view !== undefined ? (
-              <EntryBody applyRef={applyRef} view={view} {...body} />
-            ) : null}
-          </SectionBoundary>
+          {prepared === undefined ? null : (
+            <label className="toggle">
+              <Checkbox.Root
+                checked={showUnchanged}
+                className="checkbox"
+                onCheckedChange={(checked) => onShowUnchangedChange(checked === true)}
+              />
+              Show unchanged ({summarize(prepared.plan.actions).noop})
+            </label>
+          )}
         </div>
-      ) : null}
+      )}
+      <SectionBoundary>
+        {preparing ? (
+          <div className="output-empty">
+            <p className="output-empty-title" data-busy="true">
+              <span aria-hidden className="spinner" />
+              Reading the space...
+            </p>
+          </div>
+        ) : null}
+        {!preparing && view === undefined ? (
+          <div className="output-empty">
+            <p className="output-empty-title">Nothing has run yet.</p>
+            <p className="output-empty-note">
+              Plan reads the space and lists what would change. Nothing is written.
+            </p>
+          </div>
+        ) : null}
+        {shown === undefined ? null : (
+          <div className="output-content" data-summary={prepared !== undefined}>
+            {/* `key` を外さない。別の項目へ移ってもスクロール位置が残る（WU-42）。 */}
+            <div className="output-body" key={entryId} onScroll={track} ref={bodyRef}>
+              <EntryBody
+                applyRef={applyRef}
+                onPlanAgain={onPlanAgain}
+                showUnchanged={showUnchanged}
+                view={shown}
+              />
+            </div>
+            {prepared === undefined ? null : <PlanSummary prepared={prepared} />}
+          </div>
+        )}
+      </SectionBoundary>
     </section>
   );
 };

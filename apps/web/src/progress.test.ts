@@ -46,7 +46,9 @@ describe("実行イベントを進捗に畳み込む", () => {
       resolved: [],
     });
 
-    expect(done.lines).toStrictEqual(['[1/2] + issueType      "バグ" ... done']);
+    expect(done.lines).toStrictEqual([
+      { text: '[1/2] + issueType      "バグ" ... done', mark: "done" },
+    ]);
   });
 
   it("待機は捨てずに行として残す", () => {
@@ -57,7 +59,7 @@ describe("実行イベントを進捗に畳み込む", () => {
     );
 
     expect(waiting.lines).toStrictEqual([
-      '[1/2] + issueType      "バグ" ... rate limited, waiting 42s',
+      { text: '[1/2] + issueType      "バグ" ... rate limited, waiting 42s', mark: "waiting" },
     ]);
   });
 
@@ -117,6 +119,7 @@ describe("実行イベントを進捗に畳み込む", () => {
 });
 
 const run = (progress: ApplyProgress, failure?: unknown): ApplyRun => ({
+  startedAt: 0,
   progress,
   projectKey: "PROJ_A",
   space: "example.backlog.com",

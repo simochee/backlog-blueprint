@@ -11,7 +11,7 @@ export const runApply = async (
   show: (run: ApplyRun) => void,
 ): Promise<void> => {
   const { actions, resolutions, manifest } = plan;
-  const base = { resolutions, projectKey: manifest.key, space };
+  const base = { resolutions, projectKey: manifest.key, space, startedAt: Date.now() };
 
   let progress = idleProgress;
 

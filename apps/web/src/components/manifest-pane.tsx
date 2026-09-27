@@ -1,18 +1,8 @@
-import { type ProjectExport } from "@backlog-blueprint/core";
-import {
-  CrossCircledIcon,
-  DownloadIcon,
-  FileTextIcon,
-  InfoCircledIcon,
-} from "@radix-ui/react-icons";
-import { Badge, Button, Callout, Flex, Text } from "@radix-ui/themes";
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useState, type DragEvent } from "react";
 
-import { type ExportAttempt } from "../export";
-import { type ManifestValidation } from "../validation";
-import { DiagnosticList } from "./diagnostics";
-import { EnvironmentDialog } from "./environment-dialog";
-import { ImportDialog } from "./import-dialog";
+import { type ExportNotes } from "../manifest-document";
+import { projectUrl } from "../plan";
+import { type EditorJump, type EditorPosition } from "../editor-position";
 
 /** 最初の読み込みに載せない。エディタは接続まで現れず、接続前の画面が待つ理由が無い */
 const ManifestEditor = lazy(async () => {
@@ -21,127 +11,185 @@ const ManifestEditor = lazy(async () => {
   return { default: loaded.ManifestEditor };
 });
 
+export type FileFailure = { action: "open" | "save"; message: string };
+
 type ManifestPaneProps = {
   text: string;
   onTextChange: (text: string) => void;
   onFileDropped: (name: string, text: string) => void;
   documentName: string;
+  untitled: boolean;
   unsaved: boolean;
-  notes?: string;
-  fileFailure?: string;
+  notes?: ExportNotes;
+  onDismissNotes: () => void;
+  fileFailure?: FileFailure;
+  onDismissFailure: () => void;
+  space: string;
+  author: string;
   onOpen: () => void;
-  onSave: () => void;
-  importKey: string;
-  onImport: (projectKey: string) => Promise<ExportAttempt>;
-  onImported: (exported: ProjectExport) => void;
-  /**
-   * 入力欄の一覧を最新の検証結果から取らない。検証は入力が止まってから走る（§2.2）ので、
-   * 途中の状態で欄が消えると、環境変数を打っている最中に focus が外れる。
-   */
-  names: string[];
-  validation?: ManifestValidation;
-  canPlan: boolean;
-  planning: boolean;
-  onPlan: () => void;
-  canApply: boolean;
-  applying: boolean;
-  onApply: () => void;
+  onImport: () => void;
+  onCursorChange: (position: EditorPosition) => void;
+  jump?: EditorJump;
 };
+
+const carriesFiles = (event: DragEvent): boolean => event.dataTransfer.types.includes("Files");
+
+const readDroppedFile = async (
+  event: DragEvent,
+  onFileDropped: (name: string, text: string) => void,
+): Promise<void> => {
+  const [file] = event.dataTransfer.files;
+
+  if (file !== undefined) {
+    onFileDropped(file.name, await file.text());
+  }
+};
+
+const Welcome = ({
+  space,
+  author,
+  onOpen,
+  onImport,
+}: Pick<ManifestPaneProps, "space" | "author" | "onOpen" | "onImport">) => (
+  <div className="welcome">
+    <div className="welcome-inner">
+      <div className="title-block">
+        <dl>
+          {[
+            ["PROJECT", "UNTITLED"],
+            ["SPACE", space],
+            ["AUTHOR", `@${author}`],
+            ["SCALE", "1 : 1"],
+          ].map(([term, detail]) => (
+            <div className="title-block-row" key={term}>
+              <dt>{term}</dt>
+              <dd>{detail}</dd>
+            </div>
+          ))}
+        </dl>
+        <div className="title-block-actions">
+          <button onClick={onOpen} type="button">
+            Open file
+          </button>
+          <button onClick={onImport} type="button">
+            Import from Backlog
+          </button>
+        </div>
+      </div>
+      <p className="note">or paste YAML anywhere, or drop a .yaml file on this sheet</p>
+    </div>
+  </div>
+);
 
 export const ManifestPane = ({
   text,
   onTextChange,
   onFileDropped,
   documentName,
+  untitled,
   unsaved,
   notes,
+  onDismissNotes,
   fileFailure,
+  onDismissFailure,
+  space,
+  author,
   onOpen,
-  onSave,
-  importKey,
   onImport,
-  onImported,
-  names,
-  validation,
-  canPlan,
-  planning,
-  onPlan,
-  canApply,
-  applying,
-  onApply,
-}: ManifestPaneProps) => (
-  <>
-    <Flex align="center" className="workspace-toolbar" gap="3" justify="between" wrap="wrap">
-      <Flex align="center" gap="2" wrap="wrap">
-        <Button color="gray" onClick={onOpen} type="button" variant="soft">
-          <FileTextIcon />
-          Open
-        </Button>
-        <Button
-          aria-keyshortcuts="Meta+S Control+S"
-          color="gray"
-          onClick={onSave}
-          title="Save (Cmd+S / Ctrl+S)"
-          type="button"
-          variant="soft"
-        >
-          <DownloadIcon />
-          Save
-        </Button>
-        <ImportDialog key={importKey} onImport={onImport} onImported={onImported} />
-        {names.length === 0 ? null : <EnvironmentDialog names={names} />}
-      </Flex>
-      <Flex align="center" gap="3">
-        <Flex align="center" aria-label="Document" gap="2" role="group">
-          <Text className="mono" color="gray" size="2">
+  onCursorChange,
+  jump,
+}: ManifestPaneProps) => {
+  const [dragging, setDragging] = useState(false);
+  const empty = text === "";
+  const lines = empty ? 0 : text.split("\n").length;
+
+  return (
+    <>
+      <div className="editor-tabs">
+        <div aria-label="Document" className="editor-tab" role="group">
+          <span className="editor-tab-name" data-untitled={untitled}>
             {documentName}
-          </Text>
+          </span>
           {unsaved ? (
-            <Badge color="amber" variant="soft">
-              Unsaved
-            </Badge>
-          ) : null}
-        </Flex>
-        <Button color="gray" disabled={!canPlan} loading={planning} onClick={onPlan} variant="soft">
-          Plan
-        </Button>
-        <Button disabled={!canApply} loading={applying} onClick={onApply}>
-          Apply
-        </Button>
-      </Flex>
-    </Flex>
-    {fileFailure === undefined ? null : (
-      <Callout.Root color="red" size="1" variant="surface">
-        <Callout.Icon>
-          <CrossCircledIcon />
-        </Callout.Icon>
-        <Callout.Text>{fileFailure}</Callout.Text>
-      </Callout.Root>
-    )}
-    {notes === undefined ? null : (
-      <Callout.Root color="blue" size="1" variant="surface">
-        <Callout.Icon>
-          <InfoCircledIcon />
-        </Callout.Icon>
-        <pre className="mono">{notes}</pre>
-      </Callout.Root>
-    )}
-    <Suspense fallback={<div className="manifest-editor" />}>
-      <ManifestEditor
-        id="manifest"
-        onChange={onTextChange}
-        onFileDropped={onFileDropped}
-        value={text}
-      />
-    </Suspense>
-    <div className="workspace-diagnostics">
-      {validation === undefined ? (
-        <Text color="gray" size="2">
-          Validating...
-        </Text>
-      ) : (
-        <DiagnosticList diagnostics={validation.diagnostics} />
+            <span aria-label="Unsaved" className="unsaved-dot" role="img" title="Unsaved changes" />
+          ) : (
+            <span aria-hidden className="saved-mark">
+              ×
+            </span>
+          )}
+        </div>
+        <span className="sheet-label">
+          {lines === 0 ? "MANIFEST" : `MANIFEST · ${lines} ${lines === 1 ? "LINE" : "LINES"}`}
+        </span>
+      </div>
+      {fileFailure === undefined ? null : (
+        <div className="banner" data-tone="destroy" role="alert">
+          <span className="chip">
+            {fileFailure.action === "open" ? "Cannot open" : "Cannot save"}
+          </span>
+          <p className="banner-text">{fileFailure.message}</p>
+          <button
+            aria-label="Dismiss"
+            className="close-button"
+            onClick={onDismissFailure}
+            type="button"
+          >
+            ×
+          </button>
+        </div>
       )}
-    </div>
-  </>
-);
+      {notes === undefined ? null : (
+        <div className="banner" data-tone="change">
+          <span className="chip">Has issues</span>
+          <p className="banner-text mono">{notes.text}</p>
+          <a href={projectUrl(space, notes.projectKey)} rel="noreferrer" target="_blank">
+            Open {notes.projectKey} in Backlog ↗
+          </a>
+          <button
+            aria-label="Dismiss"
+            className="close-button"
+            onClick={onDismissNotes}
+            type="button"
+          >
+            ×
+          </button>
+        </div>
+      )}
+      <div
+        className="editor-area"
+        data-empty={empty}
+        onDragEnter={(event) => {
+          if (carriesFiles(event)) {
+            setDragging(true);
+          }
+        }}
+        onDragOver={(event) => event.preventDefault()}
+        onDrop={(event) => {
+          event.preventDefault();
+          setDragging(false);
+          void readDroppedFile(event, onFileDropped);
+        }}
+      >
+        <Suspense fallback={<div className="manifest-editor" />}>
+          <ManifestEditor
+            id="manifest"
+            jump={jump}
+            onChange={onTextChange}
+            onCursorChange={onCursorChange}
+            value={text}
+          />
+        </Suspense>
+        {empty && !dragging ? (
+          <Welcome author={author} onImport={onImport} onOpen={onOpen} space={space} />
+        ) : null}
+        {/* 引きずっているあいだはファイル名を出さない。ブラウザが落とすまで名前を渡さない（WU-59）。 */}
+        {dragging ? (
+          <div className="drop-zone" onDragLeave={() => setDragging(false)}>
+            <span className="drop-zone-title">Drop to open</span>
+            <span className="drop-zone-note">Replaces {documentName}</span>
+          </div>
+        ) : null}
+      </div>
+    </>
+  );
+};
