@@ -7,8 +7,8 @@ on:
 
 permissions: {}
 
-# One deployment at a time. Two overlapping runs would race for the same Pages deployment, and the
-# later one could publish a site assembled from a stale list of schema versions.
+# 並行させない。重なった実行が同じ Pages のデプロイを取り合い、後の側が古いスキーマ版の一覧で
+# 組んだサイトを公開しうる。
 concurrency:
   group: release
   cancel-in-progress: false
@@ -23,9 +23,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      # The release pull request is labelled, and that is how the next run recognizes it as its own
-      # and knows the release still has to be tagged. Labelling a pull request goes through the
-      # issues API, so `pull-requests: write` alone is not enough.
+      # `pull-requests: write` だけにしない。release-please はリリース PR のラベルで次の実行が
+      # タグ付けを判断し、PR へのラベル付けは issues API を通る。
       issues: write
       pull-requests: write
     outputs:
@@ -38,8 +37,7 @@ jobs:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
-  # The site is deployed on every push to main, not only on a release, so a change to the Web UI
-  # reaches people without waiting for the CLI to have a reason to be published.
+  # リリースのときだけに絞らない。Web UI の修正が、CLI を公開する理由ができるまで届かなくなる。
   pages:
     name: Deploy the Web UI and the JSON Schema
     needs: release-please
@@ -52,10 +50,9 @@ jobs:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
-      # A pinned commit, never the branch: a push landing on main while this job runs must not
-      # become part of what was already announced. When release-please has just tagged this push,
-      # the tag is used instead — a queued run can find main ahead of the commit that triggered it,
-      # and the site has to match the release, not whatever arrived afterwards.
+      # ブランチを checkout しない。実行中に main へ届いた push が、公開済みの内容に混ざる。
+      # タグがあればタグを使う。待たされた実行では main がきっかけのコミットより進んでおり、
+      # サイトはリリースと一致しなければならない。
       - uses: actions/checkout@v7
         with:
           ref: ${{ needs.release-please.outputs.tag || github.sha }}
@@ -74,18 +71,17 @@ jobs:
       - name: Build
         run: pnpm run build
 
-      # Do not skip this: actions/deploy-pages replaces the whole site, and every published $schema
-      # URL has to keep resolving (D-3). Do not let the fresh build win either; why a published
-      # version always does is in DEVELOPMENT.md, "What the workflow has to guarantee".
+      # 省かない。actions/deploy-pages はサイトを丸ごと置き換え、公開済みの $schema の URL が
+      # 解決できなくなる（D-3）。新しいビルドを優先させもしない。理由は DEVELOPMENT.md の
+      # "What the workflow has to guarantee"。
       - name: Restore the schema of every published version
         run: |
           set -euo pipefail
 
           error_log="$(mktemp)"
           if ! published="$(npm view "${PACKAGE_NAME}" versions --json 2>"${error_log}")"; then
-            # Only "the package does not exist yet" is tolerated, which is the first release.
-            # Any other failure is fatal: carrying on with an empty list would silently drop
-            # every schema version already on Pages.
+            # 初回リリース（パッケージが未公開）以外の失敗を許さない。空の一覧で続けると、
+            # Pages にある公開済みのスキーマが黙って全部消える。
             if grep -q "E404" "${error_log}"; then
               echo "${PACKAGE_NAME} has no published version yet; nothing to restore"
               exit 0
@@ -111,9 +107,9 @@ jobs:
         id: deploy
         uses: actions/deploy-pages@v5
 
-  # Keep `needs: pages`: a CLI whose schema URL is not deployed breaks editor completion silently
-  # (requirements-definition 7.1). Not a separate workflow on `push: tags`: a tag created with
-  # GITHUB_TOKEN starts no workflow.
+  # `needs: pages` を外さない。スキーマの URL が未デプロイの CLI を公開すると、エディタの補完が
+  # 黙って効かなくなる（要件定義 §7.1）。`push: tags` の別ワークフローにもしない。GITHUB_TOKEN で
+  # 作ったタグはワークフローを起動しない。
   publish:
     name: Publish the CLI to npm
     needs: [release-please, pages]
@@ -121,8 +117,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      # npm accepts this job's OIDC token in place of a long-lived publish token, so the
-      # repository holds no npm secret at all. This permission is what mints that token.
+      # 長期の publish トークンを secret に置かない。npm はこのジョブの OIDC トークンを受け付け、
+      # この権限がそれを発行する。
       id-token: write
     steps:
       - uses: actions/checkout@v7
@@ -132,11 +128,10 @@ jobs:
       - name: Enable Corepack
         run: corepack enable
 
-      # `registry-url` is deliberately absent. It writes an .npmrc holding
-      # `_authToken=${NODE_AUTH_TOKEN}`, and with no such secret here the literal placeholder used
-      # to be sent as the bearer token, which the registry answered with 404 before trusted
-      # publishing was ever attempted (pnpm/pnpm#11526, fixed in pnpm 11.1.3). registry.npmjs.org
-      # is the default anyway, so the option can only take authentication away.
+      # `registry-url` を足さない。`_authToken=${NODE_AUTH_TOKEN}` を書いた .npmrc が作られ、
+      # その secret が無いここではプレースホルダがそのまま bearer トークンとして送られて、
+      # trusted publishing を試す前に 404 で落ちていた（pnpm/pnpm#11526、pnpm 11.1.3 で修正）。
+      # registry.npmjs.org は既定値なので、このオプションは認証を奪う方向にしか働かない。
       - uses: actions/setup-node@v7
         with:
           node-version-file: .tool-versions

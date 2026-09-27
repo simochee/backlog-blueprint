@@ -129,6 +129,11 @@ Beyond that:
 
 ## Language
 
+The line runs between what faces outward and what records the reasoning inside. Anything a user,
+a CHANGELOG reader or a first-time visitor to the repository sees is English. The reasoning that
+cites the Japanese documents by ID — the documents themselves, code comments, test names — is
+Japanese.
+
 - **Everything a user can see is English, and only English** (NFR-9): CLI output, the Web UI, and
   the descriptions inside the JSON Schema. No i18n machinery. Names that users gave their own
   Backlog resources are printed as they are and never translated.
@@ -141,7 +146,8 @@ Beyond that:
   decision was taken, and translating them afterwards would replace the author's reasoning with
   someone else's paraphrase.
 - **Code comments and test names are Japanese**, like the documents they cite, because they are
-  written for the same readers: whoever works on this repository.
+  written for the same readers: whoever works on this repository. That includes comments in
+  workflows and configuration files.
 - **`.claude/docs/` stays Japanese.** It is written for whoever works on this repository, and the
   decision identifiers a commit body cites — `V-A19`, `D-2`, `K-1` — read the same in either
   language, so they are what joins an English commit to a Japanese document.
