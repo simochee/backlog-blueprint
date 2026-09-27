@@ -132,6 +132,9 @@ Each override in `.oxlintrc.json` is there for a specific problem. Check before 
 - `typescript/consistent-type-definitions` (`**/*.d.ts` only) — `packages/core/src/fetch.d.ts`
   declares the runtime surface core may use as ambient `interface`s, which merge with a platform
   declaration of the same name. The `type` form the rest of the code uses does not merge.
+- `no-var` (`**/*.d.ts` only) — `apps/web/src/globals.d.ts` declares the file pickers that Firefox
+  and Safari lack, so they must be readable as possibly `undefined` on `globalThis`. Only an ambient
+  `declare var` becomes a property of `globalThis`; `let` and `const` do not.
 - `import/no-default-export` and `import/no-anonymous-default-export` (`vite.config.*` and
   `vitest.config.*` only) — Vite reads a configuration file's default export, and there is no other
   way to hand it one.

@@ -1,5 +1,6 @@
 import { Compartment, EditorState } from "@codemirror/state";
 import { catppuccinLatte, catppuccinMocha } from "@catppuccin/codemirror";
+import { placeholder } from "@codemirror/view";
 import { basicSetup, EditorView } from "codemirror";
 import { useEffect, useRef, type DragEvent } from "react";
 
@@ -56,6 +57,7 @@ export const ManifestEditor = ({ id, value, onChange, onFileDropped }: ManifestE
         extensions: [
           basicSetup,
           manifestSchemaExtensions(),
+          placeholder("Paste a manifest, drop a file here, or use Open or Import from Backlog"),
           theme.current.of(startedDark.current ? catppuccinMocha : catppuccinLatte),
           /** ラベルは器の div に結び付かないので、編集領域そのものに持たせる。 */
           EditorView.contentAttributes.of({ "aria-label": "Manifest" }),
@@ -88,7 +90,7 @@ export const ManifestEditor = ({ id, value, onChange, onFileDropped }: ManifestE
 
     /**
      * 打っている最中に書き戻さない。同じ内容を差し替えると選択と undo の履歴が飛ぶので、
-     * 外から差し替わったとき（ファイルを落としたとき）だけ反映する。
+     * 外から差し替わったとき（ファイルを開いたとき・読み込んだとき）だけ反映する。
      */
     if (current !== null && current.state.doc.toString() !== value) {
       current.dispatch({ changes: { from: 0, to: current.state.doc.length, insert: value } });

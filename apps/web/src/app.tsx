@@ -5,6 +5,7 @@ import {
   useActionState,
   useDeferredValue,
   useEffect,
+  useEffectEvent,
   useMemo,
   useState,
   useSyncExternalStore,
@@ -17,11 +18,12 @@ import { SectionBoundary } from "./components/boundary";
 import { ConnectDialog } from "./components/connect-dialog";
 import { ConnectScreen } from "./components/connect-screen";
 import { DIRECTORY_PANES, DirectoryPane } from "./components/directory-pane";
-import { ExportPage } from "./components/export-page";
+import { DiscardDialog } from "./components/discard-dialog";
 import { ManifestPane } from "./components/manifest-pane";
 import { OutputPanel } from "./components/output-panel";
 import { type DirectoryKind } from "./directory";
-import { prepareExport, type ExportAttempt } from "./export";
+import { prepareExport } from "./export";
+import { openManifestFile, saveManifestFile, UNTITLED_FILENAME } from "./files";
 import {
   connectionStamp,
   fresh,
@@ -31,13 +33,21 @@ import {
   type ManifestInputs,
 } from "./freshness";
 import {
+  documentName,
+  hasUnsavedChanges,
+  importedDocument,
+  openedFile,
+  type ManifestDocument,
+  type OpenedDocument,
+  UNTITLED,
+} from "./manifest-document";
+import {
   appendEntry,
   applicableEntry,
   type ApplyRuns,
   isOutdated,
   type OutputEntry,
 } from "./output";
-import { PAGES, usePage } from "./page";
 import { PASTED, preparePlan } from "./plan";
 import { isRunning } from "./progress";
 import { secretRevisions, subscribeSecrets } from "./secrets";
@@ -54,7 +64,6 @@ const start = (action: () => void) => () => startTransition(action);
 
 export const App = () => {
   const appearance = useAppearance();
-  const page = usePage();
   const revisions = useSyncExternalStore(subscribeSecrets, secretRevisions);
   const connectionControl = useConnection();
   const { session } = connectionControl;
@@ -63,14 +72,15 @@ export const App = () => {
   const [formId, setFormId] = useState(RESTORED_FORM_ID);
   const [switchingFrom, setSwitchingFrom] = useState<number>();
   const [manifestText, setManifestText] = useState("");
-  const [manifestSource, setManifestSource] = useState(PASTED);
+  const [manifestDocument, setManifestDocument] = useState<ManifestDocument>(UNTITLED);
+  const [replacement, setReplacement] = useState<OpenedDocument>();
+  const [fileFailure, setFileFailure] = useState<string>();
   const [showUnchanged, setShowUnchanged] = useState(false);
   const [runs, setRuns] = useState<ApplyRuns>({});
   /** 未指定のあいだは最新の項目を追う。新しい項目を足したら、その項目を開く（WU-39） */
   const [selectedId, setSelectedId] = useState<number>();
   const [outputExpanded, setOutputExpanded] = useState(false);
   const [paneRecord, setPaneRecord] = useState<Derived<DirectoryKind>>();
-  const [exportKey, setExportKey] = useState("");
 
   const connectionKey = connectionStamp(session?.id);
   const icons = {
@@ -130,26 +140,6 @@ export const App = () => {
     }
   };
 
-  const [exportRecord, runExport, exporting] = useActionState<Derived<ExportAttempt> | undefined>(
-    async (previous) => {
-      if (connection === undefined) {
-        return previous;
-      }
-
-      const stamp = connectionKey;
-
-      try {
-        return { stamp, value: await prepareExport(exportKey, transport.get) };
-      } catch (error) {
-        return { stamp, value: { diagnostics: [], failure: error } };
-      }
-    },
-    undefined,
-  );
-
-  /** WU-32。キーの欄には紐づけない。どのキーを書き出したかは結果が持っている。 */
-  const exportAttempt = fresh(exportRecord, connectionKey);
-
   /** Plan は計画を作って履歴に1件足すだけで、何も書かない。適用は Apply が別に受け持つ（WU-3） */
   const [history, runPlan, planning] = useActionState<OutputEntry[]>(async (previous) => {
     if (validation?.manifest === undefined || connection === undefined) {
@@ -157,6 +147,7 @@ export const App = () => {
     }
 
     const { manifest, diagnostics } = validation;
+    const source = manifestDocument.name ?? PASTED;
     const entry = { startedAt: Date.now(), space, projectKey: manifest.key, stamp: planKey };
 
     try {
@@ -166,7 +157,7 @@ export const App = () => {
           manifest,
           get: transport.get,
           space,
-          source: manifestSource,
+          source,
           staticDiagnostics: diagnostics,
         }),
       });
@@ -245,6 +236,84 @@ export const App = () => {
     );
   };
 
+  const unsaved = hasUnsavedChanges(manifestDocument, manifestText);
+
+  const replaceDocument = ({ document, text }: OpenedDocument): void => {
+    setManifestDocument(document);
+    setManifestText(text);
+    setReplacement(undefined);
+    setFileFailure(undefined);
+  };
+
+  /** WU-45。保存していない変更があるときだけ、差し替える前に確かめる。 */
+  const openDocument = (opened: OpenedDocument): void => {
+    if (unsaved) {
+      setReplacement(opened);
+    } else {
+      replaceDocument(opened);
+    }
+  };
+
+  const openFile = async (): Promise<void> => {
+    try {
+      const opened = await openManifestFile();
+
+      if (opened !== undefined) {
+        openDocument(opened);
+      }
+    } catch (error) {
+      setFileFailure(`Could not open the file: ${String(error)}`);
+    }
+  };
+
+  /** 書いているあいだに打った分は保存した内容に含まれないので、Unsaved のまま残る（WU-43）。 */
+  const saveFile = async (): Promise<void> => {
+    const failure = `Could not save ${manifestDocument.name ?? UNTITLED_FILENAME}`;
+
+    try {
+      const saved = await saveManifestFile(manifestDocument, manifestText);
+
+      if (saved !== undefined) {
+        setManifestDocument(saved);
+        setFileFailure(undefined);
+      }
+    } catch (error) {
+      setFileFailure(`${failure}: ${String(error)}`);
+    }
+  };
+
+  /**
+   * WU-47。エディタの中だけで効かせない。Output や一覧を触った後に押すと、ブラウザが
+   * このページの HTML を保存する画面を開く。Shift+Cmd+S は「名前を付けて保存」に残す。
+   */
+  const saveOnShortcut = useEffectEvent((event: KeyboardEvent): void => {
+    if (
+      (event.metaKey || event.ctrlKey) &&
+      !event.shiftKey &&
+      !event.altKey &&
+      event.key.toLowerCase() === "s"
+    ) {
+      event.preventDefault();
+      void saveFile();
+    }
+  });
+
+  const connected = session !== undefined;
+
+  useEffect(() => {
+    if (!connected) {
+      return undefined;
+    }
+
+    const listen = (event: KeyboardEvent): void => saveOnShortcut(event);
+
+    globalThis.addEventListener("keydown", listen);
+
+    return () => {
+      globalThis.removeEventListener("keydown", listen);
+    };
+  }, [connected]);
+
   const openSwitch = (): void => {
     setFormId(formId + 1);
     setSwitchingFrom(session?.id);
@@ -260,53 +329,35 @@ export const App = () => {
       <header>
         <Container maxWidth="1200px" px={{ initial: "4", sm: "6" }}>
           <div className="navbar" data-connected={connection !== undefined}>
-            <a className="navbar-brand" href={PAGES[0]?.hash}>
+            <span className="navbar-brand">
               <LayersIcon aria-hidden height="18" width="18" />
               backlog-blueprint
-            </a>
+            </span>
             {session === undefined ? null : (
-              <>
-                {/**
-                 * Radix の `TabNav` を使わない。下線のタブはページの中の切り替えに見え、
-                 * サイト全体の行き先を選ぶ部品に見えない。
-                 */}
-                <nav aria-label="Pages" className="navbar-pages">
-                  {PAGES.map((entry) => (
-                    <a
-                      aria-current={page === entry.page ? "page" : undefined}
-                      className="navbar-page"
-                      href={entry.hash}
-                      key={entry.page}
-                    >
-                      {entry.title}
-                    </a>
-                  ))}
-                </nav>
-                <Flex align="center" className="navbar-tools" gap="2">
-                  {DIRECTORY_KINDS.map((kind) => (
-                    <Button
-                      aria-label={DIRECTORY_PANES[kind].title}
-                      aria-pressed={pane === kind}
-                      color="gray"
-                      key={kind}
-                      onClick={() => togglePane(kind)}
-                      type="button"
-                      variant={pane === kind ? "solid" : "soft"}
-                    >
-                      {DIRECTORY_PANES[kind].icon}
-                      <span className="navbar-tool-label">{DIRECTORY_PANES[kind].title}</span>
-                    </Button>
-                  ))}
-                  <AccountMenu
-                    connection={session.connection}
-                    domain={session.domain}
-                    icons={icons}
-                    locked={running}
-                    onDisconnect={disconnect}
-                    onSwitch={openSwitch}
-                  />
-                </Flex>
-              </>
+              <Flex align="center" gap="2">
+                {DIRECTORY_KINDS.map((kind) => (
+                  <Button
+                    aria-label={DIRECTORY_PANES[kind].title}
+                    aria-pressed={pane === kind}
+                    color="gray"
+                    key={kind}
+                    onClick={() => togglePane(kind)}
+                    type="button"
+                    variant={pane === kind ? "solid" : "soft"}
+                  >
+                    {DIRECTORY_PANES[kind].icon}
+                    <span className="navbar-tool-label">{DIRECTORY_PANES[kind].title}</span>
+                  </Button>
+                ))}
+                <AccountMenu
+                  connection={session.connection}
+                  domain={session.domain}
+                  icons={icons}
+                  locked={running}
+                  onDisconnect={disconnect}
+                  onSwitch={openSwitch}
+                />
+              </Flex>
             )}
           </div>
         </Container>
@@ -338,30 +389,29 @@ export const App = () => {
     <Theme accentColor="blue" appearance={appearance} grayColor="slate" radius="medium">
       <Box className="page" data-pane-open={pane !== undefined}>
         {header}
-        {/**
-         * 見えないページもアンマウントしない（WU-28）。apply の最中に Export を開いた
-         * だけで進捗と離脱の警告が消え、書きかけのマニフェストも失われる。
-         */}
         <Container maxWidth="1200px" px={{ initial: "4", sm: "6" }}>
-          <div className="workspace" hidden={page !== "apply"}>
+          <div className="workspace">
             <SectionBoundary>
               <ManifestPane
                 applying={running}
                 canApply={applicable !== undefined}
                 canPlan={validation?.manifest !== undefined && !planning && !running}
+                documentName={documentName(manifestDocument)}
+                fileFailure={fileFailure}
+                importKey={connectionKey}
                 names={validated.value.names}
-                onFileDropped={(name, text) => {
-                  setManifestSource(name);
-                  setManifestText(text);
-                }}
+                notes={manifestDocument.notes}
                 onApply={applyPlan}
+                onFileDropped={(name, text) => openDocument(openedFile(name, text))}
+                onImport={(projectKey) => prepareExport(projectKey, transport.get)}
+                onImported={(exported) => openDocument(importedDocument(exported))}
+                onOpen={() => void openFile()}
                 onPlan={requestPlan}
-                onTextChange={(text) => {
-                  setManifestSource(PASTED);
-                  setManifestText(text);
-                }}
+                onSave={() => void saveFile()}
+                onTextChange={setManifestText}
                 planning={planning}
                 text={manifestText}
+                unsaved={unsaved}
                 validation={validation}
               />
             </SectionBoundary>
@@ -377,20 +427,6 @@ export const App = () => {
               view={outputView}
             />
           </div>
-          <section aria-label="Export" className="export-view" hidden={page !== "export"}>
-            <SectionBoundary>
-              <ExportPage
-                canExport={exportKey.trim() !== ""}
-                diagnostics={exportAttempt?.diagnostics ?? []}
-                exported={exportAttempt?.exported}
-                exporting={exporting}
-                failure={exportAttempt?.failure}
-                onExport={start(runExport)}
-                onProjectKeyChange={setExportKey}
-                projectKey={exportKey}
-              />
-            </SectionBoundary>
-          </section>
         </Container>
       </Box>
       {DIRECTORY_KINDS.map((kind) => (
@@ -403,6 +439,16 @@ export const App = () => {
           open={pane === kind}
         />
       ))}
+      <DiscardDialog
+        current={documentName(manifestDocument)}
+        onCancel={() => setReplacement(undefined)}
+        onDiscard={() => {
+          if (replacement !== undefined) {
+            replaceDocument(replacement);
+          }
+        }}
+        replacement={replacement?.document.name}
+      />
       <ConnectDialog
         connecting={connectionControl.connecting}
         diagnostics={attempt?.diagnostics ?? []}

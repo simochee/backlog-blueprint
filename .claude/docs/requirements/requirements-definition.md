@@ -307,9 +307,9 @@ GitHub Action・Docker イメージ・PR コメント機能は提供しない。
 Yaml を GUI フォームから生成する機能は初期スコープ外。
 既存プロジェクトからの書き出し（export）は FR-8 として CLI と Web UI の両方に提供する。
 写像とシリアライズは core が持つ（[EX-1](../design/export.md#ex-1-read--tomanifest--serializemanifest-の3段にする)）ので、
-Web UI に載せても NFR-6 は保たれる。Web UI では Apply とは別のページに置き、
-書き出した結果を Apply の入力欄へ送る導線は持たない
-（[EX-20](../design/export.md#ex-20-web-ui-に載せ別のページに置く)）。
+Web UI に載せても NFR-6 は保たれる。Web UI ではエディタから書き出し、
+書き出した結果をそのままエディタに読み込む
+（[EX-20](../design/export.md#ex-20-web-ui-に載せエディタに読み込む)）。
 
 ### FR-8 export
 

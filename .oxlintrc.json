@@ -103,7 +103,8 @@
     {
       "files": ["**/*.d.ts"],
       "rules": {
-        "typescript/consistent-type-definitions": "off"
+        "typescript/consistent-type-definitions": "off",
+        "no-var": "off"
       }
     },
     {
