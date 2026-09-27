@@ -39,7 +39,7 @@ Write a manifest. The comment on the first line gives your editor completion and
 [JSON Schema](#json-schema)).
 
 ```yaml
-# yaml-language-server: $schema=https://simochee.github.io/backlog-blueprint/schema/0.1.0/project.json
+# yaml-language-server: $schema=https://cdn.jsdelivr.net/npm/@simochee/backlog-blueprint@0.2.0/schema.json
 key: PROJ_A
 name: プロジェクトA
 
@@ -239,13 +239,13 @@ an existing project into the editor as the same YAML that `export` prints.
 
 ## JSON Schema
 
-Each release has a published JSON Schema:
+Each release ships a JSON Schema inside the npm package, served by jsDelivr:
 
 ```
-https://simochee.github.io/backlog-blueprint/schema/<version>/project.json
+https://cdn.jsdelivr.net/npm/@simochee/backlog-blueprint@<version>/schema.json
 ```
 
-The version in the URL is the CLI version, and old URLs are never removed. The CLI checks many
+The version in the URL is the CLI version, and a published version's schema never changes. The CLI checks many
 things a schema cannot express, so a manifest your editor accepts can still fail `validate`.
 
 ## Documentation

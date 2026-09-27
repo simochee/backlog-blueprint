@@ -1,4 +1,4 @@
-import { ManifestSchema, projectSchemaPath, projectSchemaUrl } from "@backlog-blueprint/core";
+import { ManifestSchema, PROJECT_SCHEMA_PATH, projectSchemaUrl } from "@backlog-blueprint/core";
 import { Ajv2020 } from "ajv/dist/2020.js";
 import { describe, expect, it } from "vitest";
 
@@ -63,15 +63,15 @@ describe("配布する JSON Schema", () => {
     expect(projectSchema("1.2.3").$schema).toBe("https://json-schema.org/draft/2020-12/schema");
   });
 
-  it("$id は配布先の URL であり、パスにバージョンを含む", () => {
+  it("$id は同じ版の CLI パッケージに同梱されたスキーマを jsDelivr で指す", () => {
     expect(projectSchema("1.2.3").$id).toBe(
-      "https://simochee.github.io/backlog-blueprint/schema/1.2.3/project.json",
+      "https://cdn.jsdelivr.net/npm/@simochee/backlog-blueprint@1.2.3/schema.json",
     );
   });
 
   it("バージョンは呼び出し側が渡した semver がそのまま入る", () => {
     expect(projectSchemaUrl("0.1.0")).toBe(
-      "https://simochee.github.io/backlog-blueprint/schema/0.1.0/project.json",
+      "https://cdn.jsdelivr.net/npm/@simochee/backlog-blueprint@0.1.0/schema.json",
     );
   });
 });
@@ -132,9 +132,9 @@ describe("エディタでの ${NAME}（E-9）", () => {
 });
 
 describe("生成物の置き場所", () => {
-  it("配布構成の schema/<version>/project.json に置かれる", () => {
-    expect(projectSchemaPath("0.1.0")).toBe("schema/0.1.0/project.json");
-    expect(projectSchemaArtifact("0.1.0").path).toBe("schema/0.1.0/project.json");
+  it("CLI パッケージの直下の schema.json に置かれ、版はパスに入らない", () => {
+    expect(projectSchemaArtifact("0.1.0").path).toBe("schema.json");
+    expect(projectSchemaArtifact("1.2.3").path).toBe("schema.json");
   });
 
   it("中身は整形された JSON テキストで、末尾に改行がある", () => {
@@ -147,6 +147,6 @@ describe("生成物の置き場所", () => {
   });
 
   it("$id の URL と生成物の置き場所が一致する", () => {
-    expect(projectSchemaUrl("0.1.0").endsWith(projectSchemaPath("0.1.0"))).toBe(true);
+    expect(projectSchemaUrl("0.1.0").endsWith(`@0.1.0/${PROJECT_SCHEMA_PATH}`)).toBe(true);
   });
 });

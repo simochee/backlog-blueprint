@@ -1,12 +1,20 @@
 {
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
   "packages": {
-    "apps/cli": {
+    ".": {
       "release-type": "node",
       "package-name": "@simochee/backlog-blueprint",
       "initial-version": "0.1.0",
-      "changelog-path": "/CHANGELOG.md",
       "include-component-in-tag": false,
+      "extra-files": [{ "type": "json", "path": "apps/cli/package.json", "jsonpath": "$.version" }],
+      "exclude-paths": [
+        ".claude",
+        ".github",
+        "apps/web",
+        "docs",
+        "packages/brand",
+        "packages/test-utils"
+      ],
       "changelog-sections": [
         { "type": "feat", "section": "Features" },
         { "type": "fix", "section": "Bug Fixes" },

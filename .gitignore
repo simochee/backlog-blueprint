@@ -4,3 +4,4 @@ dist/
 *.tsbuildinfo
 .orca/
 apps/cli/README.md
+apps/cli/schema.json

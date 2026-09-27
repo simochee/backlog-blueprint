@@ -190,6 +190,7 @@ Each override in `.oxlintrc.json` is there for a specific problem. Check before 
   way to hand it one.
 - `import/no-unassigned-import` (`apps/web/src/test-setup.ts` and `apps/web/src/main.tsx` only) —
   jest-dom matchers and stylesheets can only be loaded by a side-effecting import.
-- `import/no-nodejs-modules` (`apps/cli/src/` and `packages/brand/src/render.tsx` only) — the CLI
-  is a Node application and needs `node:*` for file and stdin access, and the brand renderer reads
-  fonts and writes images. It stays enabled everywhere else under `packages/` (NFR-5).
+- `import/no-nodejs-modules` (`apps/cli/src/`, `apps/cli/vite.config.ts` and
+  `packages/brand/src/render.tsx` only) — the CLI is a Node application and needs `node:*` for file
+  and stdin access, its build writes `schema.json` next to `package.json`, where Rollup cannot emit
+  a file, and the brand renderer reads fonts and writes images. It stays enabled everywhere else under `packages/` (NFR-5).

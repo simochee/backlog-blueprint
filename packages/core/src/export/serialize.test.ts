@@ -29,13 +29,13 @@ describe("書き出したマニフェストの体裁", () => {
     const [comment, first] = serialize(manifestOf()).split("\n");
 
     expect(comment).toBe(
-      "# yaml-language-server: $schema=https://simochee.github.io/backlog-blueprint/schema/1.2.3/project.json",
+      "# yaml-language-server: $schema=https://cdn.jsdelivr.net/npm/@simochee/backlog-blueprint@1.2.3/schema.json",
     );
     expect(first).toBe("key: PROJ_A");
   });
 
   it("スキーマの URL には実行中のツールの版が入る", () => {
-    expect(serializeManifest(manifestOf(), { version: "0.1.0" })).toContain("/schema/0.1.0/");
+    expect(serializeManifest(manifestOf(), { version: "0.1.0" })).toContain("@0.1.0/");
   });
 
   it("$schema はコメントだけで、キーとしては書かれない", () => {

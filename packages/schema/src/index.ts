@@ -1,4 +1,4 @@
-import { ManifestSchema, projectSchemaPath, projectSchemaUrl } from "@backlog-blueprint/core";
+import { ManifestSchema, PROJECT_SCHEMA_PATH, projectSchemaUrl } from "@backlog-blueprint/core";
 
 type SchemaNode = Record<string, unknown>;
 
@@ -114,6 +114,6 @@ type SchemaArtifact = { path: string; contents: string };
  * Node 専用 API が混ざる経路ができる（NFR-5）。
  */
 export const projectSchemaArtifact = (version: string): SchemaArtifact => ({
-  path: projectSchemaPath(version),
+  path: PROJECT_SCHEMA_PATH,
   contents: `${JSON.stringify(projectSchema(version), null, 2)}\n`,
 });

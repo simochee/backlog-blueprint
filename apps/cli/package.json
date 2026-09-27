@@ -24,6 +24,7 @@
   },
   "files": [
     "dist",
+    "schema.json",
     "README.md"
   ],
   "type": "module",
@@ -34,12 +35,13 @@
     "build": "vite build --configLoader runner",
     "prepack": "cp ../../README.md ./README.md && pnpm run build",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run --configLoader runner --passWithNoTests",
     "postpack": "rm -f ./README.md"
   },
   "devDependencies": {
     "@backlog-blueprint/backlog-client": "workspace:*",
     "@backlog-blueprint/core": "workspace:*",
+    "@backlog-blueprint/schema": "workspace:*",
     "@backlog-blueprint/test-utils": "workspace:*",
     "@backlog-blueprint/tsconfigs": "workspace:*",
     "@types/node": "catalog:",

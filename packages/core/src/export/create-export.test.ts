@@ -78,7 +78,7 @@ describe("プロジェクトの書き出し", () => {
     const { exported } = await exportProject();
 
     expect(exported?.yaml.split("\n").slice(0, 2)).toEqual([
-      `# yaml-language-server: $schema=https://simochee.github.io/backlog-blueprint/schema/${VERSION}/project.json`,
+      `# yaml-language-server: $schema=https://cdn.jsdelivr.net/npm/@simochee/backlog-blueprint@${VERSION}/schema.json`,
       "key: PROJ_A",
     ]);
   });
