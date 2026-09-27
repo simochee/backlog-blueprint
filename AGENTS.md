@@ -95,6 +95,8 @@ depends on core — and turbo then refuses to build any task at all.
 - **Everything a user can see is English, and only English** (NFR-9): CLI output, the Web UI, and
   the descriptions inside the JSON Schema. No i18n machinery. Names that users gave their own
   Backlog resources are printed as they are and never translated.
+- **`README.md` is the source; `README.ja.md` follows it** (NFR-10). A change to `README.md` updates
+  `README.ja.md` in the same commit. `docs/manifest.md` has no translation.
 - **Commit messages are English**, subject and body alike. `CHANGELOG.md` is generated from the
   subjects and release-please puts it straight into the GitHub Release, so a Japanese subject
   arrives untranslated in front of people who were promised an English tool. Everything up to the

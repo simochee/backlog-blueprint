@@ -1,5 +1,7 @@
 # backlog-blueprint
 
+[日本語](https://github.com/simochee/backlog-blueprint/blob/main/README.ja.md)
+
 Declare the settings of a [Backlog](https://backlog.com/) project in a YAML file, and create the
 project from it. The manifest lives in your repository, so the shape of a project can be reviewed in
 a pull request, copied to the next project, and kept as your organization's template instead of a
