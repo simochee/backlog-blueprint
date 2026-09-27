@@ -34,6 +34,12 @@
     linear-gradient(90deg, rgba(255, 255, 255, 0.16) 1px, transparent 1px),
     linear-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px),
     linear-gradient(90deg, rgba(255, 255, 255, 0.07) 1px, transparent 1px);
+  /* エディタの地を接続画面と同じ濃さにしない。線がコードの文字と重なって読みにくい。 */
+  --grid-faint:
+    linear-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.08) 1px, transparent 1px),
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
   --grid-size: 80px 80px, 80px 80px, 16px 16px, 16px 16px, 100% 100%;
   --sidebar-width: 300px;
 
@@ -1135,13 +1141,14 @@ p {
   overflow: hidden;
   background-color: var(--paper);
   background-image:
-    var(--grid),
+    var(--grid-faint),
     radial-gradient(ellipse at 50% 40%, rgba(27, 79, 138, 0) 0%, rgba(18, 58, 107, 0.9) 100%);
   background-size: var(--grid-size);
 }
 
 .editor-area[data-empty="true"] {
-  background-image: var(--grid), radial-gradient(ellipse at 50% 45%, #1b4f8a 0%, #123a6b 100%);
+  background-image:
+    var(--grid-faint), radial-gradient(ellipse at 50% 45%, #1b4f8a 0%, #123a6b 100%);
 }
 
 /* 高さを CodeMirror に任せない。中身の行数だけ伸びるので、下パネルの位置が入力のたびに変わる。 */
