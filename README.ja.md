@@ -11,7 +11,7 @@ YAML ファイルから [Backlog](https://backlog.com/ja/) のプロジェクト
 
 ![backlog-blueprint](https://raw.githubusercontent.com/simochee/backlog-blueprint/main/packages/brand/out/eyecatch.svg)
 
-**[ブラウザで試す](https://simochee.github.io/backlog-blueprint/)** — インストールもサーバーも不要です。
+**[ブラウザで試す](https://backlog-blueprint.simochee.net/)** — インストールもサーバーも不要です。
 
 マニフェストをリポジトリに置けば、プロジェクトの設定をプルリクエストでレビューし、次のプロジェクトに使い回せます。
 マニフェストで扱えるもの:

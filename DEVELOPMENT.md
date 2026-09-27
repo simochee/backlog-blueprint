@@ -269,11 +269,15 @@ The workflow cannot create any of these itself.
 | What                       | Value                                                                       |
 | -------------------------- | --------------------------------------------------------------------------- |
 | Pages source               | Settings, Pages, Build and deployment, Source: **GitHub Actions**           |
+| Pages custom domain        | Settings, Pages, Custom domain: **backlog-blueprint.simochee.net**, with **Enforce HTTPS**; a DNS `CNAME` record from that name to `simochee.github.io` |
 | npm trusted publisher      | On the package's npm settings: this repository, workflow `release.yml`, **no environment**, allowed actions: **stage publish only** |
 | npm publishing access      | On the package's npm settings: **Require two-factor authentication and disallow tokens** |
 | `github-pages` environment | Created by GitHub with the Pages source; must allow `main`                  |
 | Release bot                | The organization's GitHub App, installed on this repository with Contents, Issues and Pull requests: **Read and write** |
 | Release bot credentials    | Organization secrets `RELEASE_BOT_APP_ID` and `RELEASE_BOT_PRIVATE_KEY`, available to this repository |
+
+The custom domain lives in the settings and not in a `CNAME` file under `apps/web/public/`: Pages
+ignores that file when the site is deployed from a workflow.
 
 The repository holds no npm token. npm accepts the publish job's OIDC token instead, which is why
 `id-token: write` appears in its permissions and why `actions/setup-node` is not given

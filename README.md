@@ -11,7 +11,7 @@ Create a [Backlog](https://backlog.com/) project from a YAML file.
 
 ![backlog-blueprint](https://raw.githubusercontent.com/simochee/backlog-blueprint/main/packages/brand/out/eyecatch.svg)
 
-**[Try it in your browser](https://simochee.github.io/backlog-blueprint/)** — no install, no server.
+**[Try it in your browser](https://backlog-blueprint.simochee.net/)** — no install, no server.
 
 Keep the manifest in your repository to review a project's settings in a pull request and reuse them
 for the next project. A manifest can include:

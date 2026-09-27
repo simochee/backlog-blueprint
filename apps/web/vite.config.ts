@@ -12,7 +12,7 @@ const reactCompiler: [string, { panicThreshold: string }] = [
   { panicThreshold: "all_errors" },
 ];
 
-const BASE = "/backlog-blueprint/";
+const BASE = "/";
 
 export default defineConfig({
   base: BASE,
