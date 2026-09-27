@@ -78,7 +78,7 @@ packages/
   core/            @backlog-blueprint/core — parsing, validation, planning, execution
   backlog-client/  @backlog-blueprint/backlog-client — the transport layer, wrapping backlog-js
   schema/          @backlog-blueprint/schema — the JSON Schema artifact, generated from core (M-1)
-  brand/           @backlog-blueprint/brand — the eyecatch image, drawn in JSX and rendered by Satori
+  brand/           @backlog-blueprint/brand — the eyecatch image and the Web UI icons
   test-utils/      @backlog-blueprint/test-utils — shared test helpers (B-3)
   tsconfigs/       @backlog-blueprint/tsconfigs — shared TypeScript configuration (B-4)
 ```
@@ -102,7 +102,8 @@ package gaining a dependency on Node.
 
 **`packages/brand`** draws the eyecatch in JSX and renders it with
 [Satori](https://github.com/vercel/satori) and resvg. `pnpm --filter @backlog-blueprint/brand run
-render` writes `out/eyecatch.svg` and `out/eyecatch.png`; commit both after changing the design.
+render` writes `out/eyecatch.svg` and `out/eyecatch.png`, plus the Web UI's `favicon.svg` and
+`apple-touch-icon.png` into `apps/web/public/`; commit all of them after changing the design.
 The fonts are committed beside it with their licenses (SIL OFL and Apache 2.0), because Satori has
 no access to system fonts and cannot read WOFF2. It is not part of `build`, so nothing else depends on it.
 

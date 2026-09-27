@@ -3,6 +3,7 @@ import { Resvg } from "@resvg/resvg-js";
 import satori, { type Font } from "satori";
 import { type ReactNode } from "react";
 import { Eyecatch, eyecatchSize } from "./eyecatch";
+import { iconSvg } from "./icon";
 import { font } from "./theme";
 
 const here = (path: string) => new URL(path, import.meta.url);
@@ -35,3 +36,18 @@ for (const { name, width, height, element } of targets) {
   await writeFile(new URL(`${name}.png`, outDir), png);
   console.log(`out/${name}.svg, out/${name}.png (${width * 2}x${height * 2})`);
 }
+
+const webPublic = here("../../../apps/web/public/");
+await mkdir(webPublic, { recursive: true });
+
+const appleTouchIconSize = 180;
+await writeFile(new URL("favicon.svg", webPublic), iconSvg({ cornerRadius: 6 }));
+await writeFile(
+  new URL("apple-touch-icon.png", webPublic),
+  new Resvg(iconSvg({ cornerRadius: 0 }), { fitTo: { mode: "width", value: appleTouchIconSize } })
+    .render()
+    .asPng(),
+);
+console.log(
+  `apps/web/public/favicon.svg, apps/web/public/apple-touch-icon.png (${appleTouchIconSize}x${appleTouchIconSize})`,
+);
