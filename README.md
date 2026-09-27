@@ -38,7 +38,6 @@ These are deliberately out of scope as well:
 - Git repositories, which the Backlog API cannot create
 - issues and wiki content
 - space settings
-- priorities and resolutions
 - deleting or archiving a project
 
 ## Before you start
