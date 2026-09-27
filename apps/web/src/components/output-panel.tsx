@@ -170,8 +170,10 @@ export const OutputPanel = ({
               Outdated
             </Badge>
           ) : null}
+        </Flex>
+        <Flex align="center" gap="3">
           {showSections ? (
-            <Flex aria-label="Sections" asChild gap="1">
+            <Flex align="center" aria-label="Sections" asChild gap="1">
               <nav>
                 {SECTIONS.map(({ section: target, title, label }) => (
                   <Button
@@ -190,17 +192,17 @@ export const OutputPanel = ({
               </nav>
             </Flex>
           ) : null}
+          <IconButton
+            aria-expanded={expanded}
+            aria-label={expanded ? "Minimize output" : "Expand output"}
+            color="gray"
+            onClick={() => onExpandedChange(!expanded)}
+            size="1"
+            variant="ghost"
+          >
+            {expanded ? <ChevronDownIcon /> : <ChevronUpIcon />}
+          </IconButton>
         </Flex>
-        <IconButton
-          aria-expanded={expanded}
-          aria-label={expanded ? "Minimize output" : "Expand output"}
-          color="gray"
-          onClick={() => onExpandedChange(!expanded)}
-          size="1"
-          variant="ghost"
-        >
-          {expanded ? <ChevronDownIcon /> : <ChevronUpIcon />}
-        </IconButton>
       </Flex>
       {expanded ? (
         /* `key` を外さない。別の項目へ移ってもスクロール位置が残る（WU-42）。 */
