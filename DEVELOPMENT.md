@@ -275,7 +275,7 @@ The workflow cannot create any of these itself.
 | npm publishing access      | On the package's npm settings: **Require two-factor authentication and disallow tokens** |
 | `github-pages` environment | Created by GitHub with the Pages source; must allow `main`                  |
 | Release bot                | The organization's GitHub App, installed on this repository with Contents, Issues and Pull requests: **Read and write** |
-| Release bot credentials    | Organization secrets `RELEASE_BOT_APP_ID` and `RELEASE_BOT_PRIVATE_KEY`, available to this repository |
+| Release bot credentials    | Organization secrets `RELEASE_BOT_CLIENT_ID` and `RELEASE_BOT_PRIVATE_KEY`, available to this repository |
 
 The custom domain lives in the settings and not in a `CNAME` file under `apps/web/public/`: Pages
 ignores that file when the site is deployed from a workflow.
