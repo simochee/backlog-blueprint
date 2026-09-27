@@ -15,6 +15,7 @@
     "@backlog-blueprint/core": "workspace:*",
     "@backlog-blueprint/schema": "workspace:*",
     "@catppuccin/codemirror": "catalog:",
+    "@codemirror/commands": "catalog:",
     "@codemirror/lang-yaml": "catalog:",
     "@codemirror/lint": "catalog:",
     "@codemirror/state": "catalog:",

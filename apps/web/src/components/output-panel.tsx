@@ -1,6 +1,6 @@
 import { ChevronDownIcon, ChevronUpIcon, ExclamationTriangleIcon } from "@radix-ui/react-icons";
 import { Badge, Button, Callout, DropdownMenu, Flex, IconButton, Text } from "@radix-ui/themes";
-import { type Ref, useRef, useState } from "react";
+import { type Ref, useEffect, useRef, useState } from "react";
 
 import { type ApplyRuns, entryLabel, type OutputEntry, type Section, sectionAt } from "../output";
 import { type ApplyRun } from "../progress";
@@ -18,6 +18,7 @@ type OutputPanelProps = {
   entries: OutputEntry[];
   runs: ApplyRuns;
   view?: OutputView;
+  applyRequested?: number;
   preparing: boolean;
   expanded: boolean;
   onExpandedChange: (expanded: boolean) => void;
@@ -100,6 +101,7 @@ export const OutputPanel = ({
   entries,
   runs,
   view,
+  applyRequested,
   preparing,
   expanded,
   onExpandedChange,
@@ -112,6 +114,13 @@ export const OutputPanel = ({
   // 書き足すことになるので、どの項目のものかと組にして持つ。
   const [reading, setReading] = useState<{ entryId: number; section: Section }>();
   const entryId = view?.entry.id;
+
+  // 組にするだけで済ませない。A → B → A と戻ると A で読んでいた部分が蘇るが、本文は
+  // `key` で描き直されて先頭（Plan）にいる。
+  if (reading !== undefined && reading.entryId !== entryId) {
+    setReading(undefined);
+  }
+
   const section = reading !== undefined && reading.entryId === entryId ? reading.section : "plan";
   const showSections = expanded && entryId !== undefined && view?.run !== undefined && !preparing;
 
@@ -139,6 +148,17 @@ export const OutputPanel = ({
     setReading({ entryId, section: target });
     bodyRef.current?.scrollTo({ top: target === "plan" ? 0 : (applyStart() ?? 0) });
   };
+
+  const followed = useRef<number>(undefined);
+  const applyShown = expanded && entryId === applyRequested && view?.run !== undefined;
+
+  // 進捗が届くたびに Apply へ飛ばさない。適用の途中で計画を読み返しに戻れなくなる（WU-49）。
+  useEffect(() => {
+    if (applyShown && followed.current !== applyRequested) {
+      followed.current = applyRequested;
+      jumpTo("apply");
+    }
+  }, [applyShown, applyRequested]);
 
   return (
     <section aria-label="Output" className="output-panel" data-expanded={expanded}>
@@ -170,8 +190,10 @@ export const OutputPanel = ({
               Outdated
             </Badge>
           ) : null}
+        </Flex>
+        <Flex align="center" gap="3">
           {showSections ? (
-            <Flex aria-label="Sections" asChild gap="1">
+            <Flex align="center" aria-label="Sections" asChild gap="1">
               <nav>
                 {SECTIONS.map(({ section: target, title, label }) => (
                   <Button
@@ -190,17 +212,17 @@ export const OutputPanel = ({
               </nav>
             </Flex>
           ) : null}
+          <IconButton
+            aria-expanded={expanded}
+            aria-label={expanded ? "Minimize output" : "Expand output"}
+            color="gray"
+            onClick={() => onExpandedChange(!expanded)}
+            size="1"
+            variant="ghost"
+          >
+            {expanded ? <ChevronDownIcon /> : <ChevronUpIcon />}
+          </IconButton>
         </Flex>
-        <IconButton
-          aria-expanded={expanded}
-          aria-label={expanded ? "Minimize output" : "Expand output"}
-          color="gray"
-          onClick={() => onExpandedChange(!expanded)}
-          size="1"
-          variant="ghost"
-        >
-          {expanded ? <ChevronDownIcon /> : <ChevronUpIcon />}
-        </IconButton>
       </Flex>
       {expanded ? (
         /* `key` を外さない。別の項目へ移ってもスクロール位置が残る（WU-42）。 */

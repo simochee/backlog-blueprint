@@ -700,14 +700,89 @@ describe("Output パネル", () => {
     expect(within(region("Output")).queryByRole("navigation", { name: "Sections" })).toBeNull();
   });
 
-  it("適用した項目の見出しには Plan / Apply のアンカーが出て、初めは Plan を読んでいることを示す", async () => {
+  it("Apply を押すと、Output はその項目の Apply の部分を読んでいる状態で開く", async () => {
+    const user = await startApp();
+
+    await reach(user);
+    await user.click(button("Minimize output"));
+    await apply(user);
+
+    const sections = await within(region("Output")).findByRole("navigation", {
+      name: "Sections",
+    });
+
+    await waitFor(() => {
+      expect(within(sections).getByRole("button", { name: "Jump to apply" })).toHaveAttribute(
+        "aria-current",
+        "location",
+      );
+    });
+    expect(button("Minimize output")).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("前の項目を開いたまま Apply を押しても、適用する最新の項目の Apply の部分に移る", async () => {
+    const user = await startApp();
+
+    await reach(user);
+    await plan(user);
+    await user.click(within(region("Output")).getByRole("button", { name: /^\d\d:\d\d:\d\d · / }));
+    const [, older] = await screen.findAllByRole("menuitem");
+
+    await user.click(older!);
+    await apply(user);
+
+    const sections = await within(region("Output")).findByRole("navigation", {
+      name: "Sections",
+    });
+
+    await waitFor(() => {
+      expect(within(sections).getByRole("button", { name: "Jump to apply" })).toHaveAttribute(
+        "aria-current",
+        "location",
+      );
+    });
+    expect(
+      within(region("Output")).getByRole("button", { name: /^\d\d:\d\d:\d\d · .* · Appl/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("2度目の Apply でも、新しく適用する項目の Apply の部分に移る", async () => {
     const user = await startApp();
 
     await reach(user);
     await apply(user);
     await within(region("Output")).findByText(/Apply complete/);
+    await plan(user);
 
-    const sections = within(region("Output")).getByRole("navigation", { name: "Sections" });
+    expect(within(region("Output")).queryByRole("navigation", { name: "Sections" })).toBeNull();
+
+    await apply(user);
+
+    const sections = await within(region("Output")).findByRole("navigation", {
+      name: "Sections",
+    });
+
+    await waitFor(() => {
+      expect(within(sections).getByRole("button", { name: "Jump to apply" })).toHaveAttribute(
+        "aria-current",
+        "location",
+      );
+    });
+  });
+
+  it("適用した項目をメニューから開き直すと、Plan を読んでいることを示す", async () => {
+    const user = await startApp();
+
+    await reach(user);
+    await apply(user);
+    await within(region("Output")).findByText(/Apply complete/);
+    await plan(user);
+    await user.click(within(region("Output")).getByRole("button", { name: /^\d\d:\d\d:\d\d · / }));
+    await user.click(await screen.findByRole("menuitem", { name: /Applied$/ }));
+
+    const sections = await within(region("Output")).findByRole("navigation", {
+      name: "Sections",
+    });
 
     expect(within(sections).getByRole("button", { name: "Jump to plan" })).toHaveAttribute(
       "aria-current",

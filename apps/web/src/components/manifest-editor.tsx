@@ -1,6 +1,7 @@
 import { Compartment, EditorState } from "@codemirror/state";
 import { catppuccinLatte, catppuccinMocha } from "@catppuccin/codemirror";
-import { placeholder } from "@codemirror/view";
+import { indentWithTab } from "@codemirror/commands";
+import { keymap, placeholder } from "@codemirror/view";
 import { basicSetup, EditorView } from "codemirror";
 import { useEffect, useRef, type DragEvent } from "react";
 
@@ -52,6 +53,7 @@ export const ManifestEditor = ({ id, value, onChange, onFileDropped }: ManifestE
         doc: value,
         extensions: [
           basicSetup,
+          keymap.of([indentWithTab]),
           manifestSchemaExtensions(),
           placeholder("Paste a manifest, drop a file here, or use Open or Import from Backlog"),
           theme.current.of(startedDark.current ? catppuccinMocha : catppuccinLatte),
