@@ -95,7 +95,14 @@ const withWebhook = (hookUrl: string): string =>
 /**
  * モジュールスコープに閉じた API キーと送信層（§2.4）は、テストのあいだも1つしかない。
  * 読み込み直さないと、前のテストが打った API キーと開いた接続が次のテストに残る。
+ *
+ * その代わり、各テストが依存の木を評価し直す費用を払う。1件目は変換も伴う。他の
+ * パッケージのテストと並んで CPU が混むと、それだけで既定のタイムアウト（5秒）を越える。
+ * 越えたテストの描画は `cleanup` の後に終わって DOM に残り、次のテストを複数一致で
+ * 道連れにする。タイムアウトはこのファイルの費用に合わせて延ばしておく。
  */
+vi.setConfig({ testTimeout: 30_000 });
+
 const startApp = async (responses: Record<string, unknown> = {}): Promise<UserEvent> => {
   respond = fixedGet(fixedSpaceResponses(responses));
 
