@@ -77,6 +77,7 @@ export const App = () => {
   const [showUnchanged, setShowUnchanged] = useState(false);
   const [runs, setRuns] = useState<ApplyRuns>({});
   const [selectedId, setSelectedId] = useState<number>();
+  const [applyRequested, setApplyRequested] = useState<number>();
   const [outputExpanded, setOutputExpanded] = useState(false);
   const [paneRecord, setPaneRecord] = useState<Derived<DirectoryKind>>();
 
@@ -210,6 +211,7 @@ export const App = () => {
     const { id } = applicable;
 
     followLatest();
+    setApplyRequested(id);
     void runApply({ plan: prepared.plan, space, client: pinTransport() }, (run) =>
       setRuns((previous) => ({ ...previous, [id]: run })),
     );
@@ -392,6 +394,7 @@ export const App = () => {
               />
             </SectionBoundary>
             <OutputPanel
+              applyRequested={applyRequested}
               entries={history}
               expanded={outputExpanded}
               onExpandedChange={setOutputExpanded}
