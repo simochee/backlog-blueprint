@@ -6,12 +6,14 @@ import {
   type Diagnostic,
   type ManifestInput,
   type ProjectExport,
+  projectSchemaUrl,
 } from "@backlog-blueprint/core";
 
 import { type Deps } from "./commands";
 import { type Io } from "./io";
 import { createOutput } from "./output";
 import { runCli } from "./program";
+import { TOOL } from "./version";
 
 const API_KEY = "api-key-must-never-be-printed";
 
@@ -165,5 +167,11 @@ describe("export の書き出し", () => {
     await expect(runCli(["export", "PROJ_A", "PROJ_B"], deps(io))).resolves.toBe(1);
 
     expect(io.stdout).toBe("");
+  });
+});
+
+describe("スキーマの配布先", () => {
+  it("export が書くスキーマの URL は、実行中の CLI と同じ名前・同じ版の npm パッケージを指す", () => {
+    expect(projectSchemaUrl(TOOL.version)).toContain(`/npm/${TOOL.name}@${TOOL.version}/`);
   });
 });

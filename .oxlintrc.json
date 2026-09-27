@@ -97,7 +97,7 @@
   },
   "overrides": [
     {
-      "files": ["apps/cli/src/**", "packages/brand/src/render.tsx"],
+      "files": ["apps/cli/src/**", "apps/cli/vite.config.ts", "packages/brand/src/render.tsx"],
       "rules": {
         "import/no-nodejs-modules": "off"
       }

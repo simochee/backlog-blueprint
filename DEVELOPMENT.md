@@ -96,9 +96,9 @@ itself: it is handed a `get` and a `send` function and calls them.
 separate package rather than living inside core for the reason described in AGENTS.md.
 
 **`packages/schema`** turns core's schema definition into the published JSON Schema document. It
-writes no files of its own: it returns a path and the contents, and the Web UI's Vite build emits
-them into the site. That is how the schema ends up next to `index.html` without any package gaining
-a dependency on Node.
+writes no files of its own: it returns a path and the contents, and the CLI's Vite build writes
+them to `apps/cli/schema.json`. That is how the schema ends up in the npm tarball without any
+package gaining a dependency on Node.
 
 **`packages/brand`** draws the eyecatch in JSX and renders it with
 [Satori](https://github.com/vercel/satori) and resvg. `pnpm --filter @backlog-blueprint/brand run
@@ -150,28 +150,22 @@ not change is not rebuilt.
 The first release is `0.1.0`. `.release-please-manifest.json` starts at `0.0.0`, because nothing had
 been released yet, and `initial-version` in `release-please-config.json` names the version that a
 repository in that state is released at — without it the first release would be `1.0.0`, which is
-release-please's default. The schema URL carries the same version as the npm package (D-2), and the
-documentation already points at `schema/0.1.0/project.json`, so the first published version has to
-be that one.
+release-please's default.
 
-A release consists of three artifacts that are produced from the same version number:
+What a release publishes, and where:
 
-| Artifact    | Destination                                                      |
-| ----------- | ---------------------------------------------------------------- |
-| CLI         | npm, as `@simochee/backlog-blueprint`                            |
-| Web UI      | GitHub Pages, at `https://simochee.github.io/backlog-blueprint/` |
-| JSON Schema | GitHub Pages, at `.../schema/<version>/project.json`             |
+| Artifact    | Destination                                                                                        |
+| ----------- | -------------------------------------------------------------------------------------------------- |
+| CLI         | npm, as `@simochee/backlog-blueprint`                                                              |
+| JSON Schema | Inside the same npm tarball, as `schema.json`, served by jsDelivr at `https://cdn.jsdelivr.net/npm/@simochee/backlog-blueprint@<version>/schema.json` |
 
-`pnpm run build` produces the whole Pages site in `apps/web/dist`: `index.html`, its assets, and
-`schema/<version>/project.json`. The version in that path is read from `apps/cli/package.json`,
-because the schema version and the CLI version are deliberately the same number (D-2) — the root
-`package.json` is private and its version means nothing.
+The schema's URL carries the CLI's version (D-2), and the schema travels in the CLI's own tarball,
+so a version cannot be published without its schema, and npm never lets a published version's
+contents change (D-3). jsDelivr serves any file of any published npm version; there is nothing to
+deploy for it.
 
-Only the CLI waits for a release. **Pages is deployed on every push to `main`**, so a correction to
-the Web UI is live without the CLI having to find a reason to be published. What that costs is
-explained in [What the workflow has to guarantee](#what-the-workflow-has-to-guarantee): a site
-built from `main` carries a schema for a version that is already on npm, and the deployment has to
-put the published one back.
+The Web UI is not part of a release. **Pages is deployed on every push to `main`**, so a correction
+to the Web UI is live without the CLI having to find a reason to be published.
 
 ### Where the version comes from
 
@@ -204,14 +198,11 @@ and `.release-please-manifest.json` records the last version that was released �
    so leaving it open to collect further commits is the normal way to batch a release. Pages is not
    waiting for it: the site has been redeployed on every one of those pushes already.
 3. Its merge runs the workflow again. This time release-please tags the merge commit `v<version>`
-   and creates the GitHub Release, the Pages job deploys the site built from that tag, and the
-   publish job — which runs only for a release, and only after the deployment succeeded — stages
-   the CLI on npm.
+   and creates the GitHub Release, and the publish job — which runs only for a release — stages
+   the CLI, schema included, on npm.
 4. Approve the staged version: on the package's page on npmjs.com, **Staged Packages**, or with
    `pnpm stage approve` from a terminal. Either asks for 2FA. Until then nobody can install it,
-   even though the tag, the GitHub Release and the schema URL already exist. Approve it before
-   anything else lands on `main`; see
-   [What the workflow has to guarantee](#what-the-workflow-has-to-guarantee).
+   and its schema URL does not resolve, even though the tag and the GitHub Release already exist.
 5. Read the GitHub Release that release-please created. Its body is the generated CHANGELOG entry,
    which needs no rewriting so long as the commit subjects were written for the people who read it.
    Add prose above it only when a version asks something of its users — a manifest that has to be
@@ -245,34 +236,9 @@ one of those says nothing about what a version does differently from the one bef
 ### What the workflow has to guarantee
 
 - **Tagging and publishing stay inside one workflow run.** Publishing is another job of the
-  release workflow, gated on release-please's `releases_created` output, because it has to `needs`
-  the Pages job (next item), and a job cannot wait on a job in another workflow. A separate workflow
-  listening for `v*` tags would start as soon as the tag exists, whether or not the site is deployed
-  yet.
-- **A release's schema is on Pages before its CLI is on npm.** Publish a CLI whose schema URL is not
-  deployed yet, and every editor pointed at that version silently stops offering completion. The
-  publish job therefore `needs` the Pages job and is skipped with it when the deployment fails
-  (requirements-definition §7.1). The reverse order costs nothing: a schema URL that no published
-  CLI mentions yet bothers nobody.
-- **A published version's schema is never replaced by a newer build of it.** Old manifests keep
-  pointing at old URLs and must keep working (D-3), and `actions/deploy-pages` replaces the site
-  wholesale, so before uploading, the workflow asks npm which versions exist — the same number as
-  the schema version, by D-2 — and fetches each `schema/<version>/project.json` back from the live
-  site.
-
-  Those fetched files overwrite what was just built, and the single rule covers both kinds of
-  deployment. A site built from `main` carries a schema for the version that is already on npm,
-  built from source that has moved on since it was published; the published one has to win. During
-  a release the version being released is not on the registry yet, because Pages is deployed first,
-  so nothing overwrites it. It stays off the registry until the staged version is approved, and a
-  push to `main` in that window deploys the schema built from `main` under the released version's
-  URL. That window is accepted rather than closed: approving before merging anything else keeps it
-  empty, and closing it would mean treating a tag, not the registry, as the list of released
-  versions. `0.0.0` is skipped: it is the placeholder described in
-  [What the repository has to provide](#what-the-repository-has-to-provide), was never released,
-  and has no schema to restore. A package npm does not know at all has nothing to restore either;
-  any other failure to reach npm or Pages aborts the deployment rather than quietly dropping a
-  version.
+  release workflow, gated on release-please's `releases_created` output, and takes the tag from
+  that job's outputs. The publish job does not wait for Pages: the schema is in the tarball it
+  publishes, and the Web UI is not part of the release.
 - **A breaking change to the manifest format bumps the major version** and ships as a new schema
   URL, leaving the old one in place. The CLI is then expected to recognize the superseded syntax and
   say how to rewrite it, rather than interpreting it in a way the author did not intend. The
@@ -300,8 +266,8 @@ in no environment; `github-pages` belongs to the Pages job, which does not talk 
 Trusted publishing cannot create a package, though. A trusted publisher is configured on a
 package's settings page, and a package nobody has published yet has no settings page
 ([npm/cli#8544](https://github.com/npm/cli/issues/8544)). So `0.0.0` was published by hand, only to
-bring that page into existence, and is deprecated; it contains nothing that was ever released, and
-the release workflow skips it when it restores schemas. Every real release, `0.1.0` included, is
+bring that page into existence, and is deprecated; it contains nothing that was ever released.
+Every real release, `0.1.0` included, is
 the workflow's.
 
 Nothing the workflow holds can put a version in front of users on its own. The trusted publisher

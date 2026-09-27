@@ -403,7 +403,7 @@ K-1 により `[]` と省略は同じ意味だが、**雛形の読み手にと�
 
 | 決定 | 内容 |
 | --- | --- |
-| EX-15 | 先頭行に `# yaml-language-server: $schema=https://simochee.github.io/backlog-blueprint/schema/<version>/project.json` を出す。`<version>` は実行中のツールの版。**`$schema:` キーは書かない** |
+| EX-15 | 先頭行に `# yaml-language-server: $schema=https://cdn.jsdelivr.net/npm/@simochee/backlog-blueprint@<version>/schema.json` を出す。`<version>` は実行中のツールの版。**`$schema:` キーは書かない** |
 
 D-1 / D-2 のとおり、スキーマは版付き URL で配布され、版は CLI の semver と一致する。
 [M-2](manifest-schema.md#m-2-schema-キーを受理して無視する) が `$schema` キーを

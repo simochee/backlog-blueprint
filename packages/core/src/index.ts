@@ -21,7 +21,7 @@ export {
 } from "./output/text";
 export { buildPlan, readUpdateRateLimit } from "./planner";
 export { DEFAULT_STATUSES_JA } from "./resources/statuses";
-export { projectSchemaPath, projectSchemaUrl } from "./schema-url";
+export { PROJECT_SCHEMA_PATH, projectSchemaUrl } from "./schema-url";
 export { authenticateExecutor, SPACE_ADMINISTRATOR_ROLE_TYPE } from "./validation/auth-stage";
 export { UNRESOLVED_ENV_ID } from "./validation/expand-stage";
 export { hasError, orderDiagnostics } from "./validation/gate";

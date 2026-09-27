@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=https://simochee.github.io/backlog-blueprint/schema/0.1.0/project.json
+# yaml-language-server: $schema=https://cdn.jsdelivr.net/npm/@simochee/backlog-blueprint@0.2.0/schema.json
 #
 # マニフェストの構造案。実装の前にこの形で合意を取るための叩き台。
 # ここでの注釈は設計意図の説明なので日本語。実際に配布する雛形と

@@ -22,7 +22,7 @@
 | 項目 | 決定 | 理由 |
 | --- | --- | --- |
 | ファイル単位 | 1ファイル = 1プロジェクト | プロジェクト単位でレビュー・適用したい。ファイル名と対象が1対1で対応する |
-| バージョニング | `$schema` にバージョン入りの URL を書く。実体は `https://simochee.github.io/backlog-blueprint/schema/<version>/project.json` | 詳細と選定理由は [manifest-versioning.md](../design/manifest-versioning.md) |
+| バージョニング | `$schema` にバージョン入りの URL を書く。実体は `https://cdn.jsdelivr.net/npm/@simochee/backlog-blueprint@<version>/schema.json` | 詳細と選定理由は [manifest-versioning.md](../design/manifest-versioning.md) |
 | キー名 | Backlog API のフィールド名をそのまま使う（camelCase） | GitHub の設定 IaC が採る「API の命名をそのまま使う」原則に倣う。API リファレンスと Yaml とエラーメッセージが1対1で対応する |
 | 色の表記 | `"#ea2c00"` のように**必ず引用符で囲む** | `#` から始まる値は引用符が無いと YAML のコメントとして解釈される。先行事例で頻出する罠 |
 | 未知キー | **エラー**（strict parse） | 新しい Yaml を古い CLI に食わせたとき黙って無視されるのが最悪。タイプミスも同時に防げる |
@@ -204,7 +204,7 @@ JSON Schema に名前の enum と各値の説明を持たせ、エディタ補�
 | FR-1.1 | Yaml をパースし、スキーマに従って型検証する |
 | FR-1.2 | 未知のキーが存在したらエラーにする |
 | FR-1.3 | `${NAME}` を環境変数から展開する。未定義ならエラー |
-| FR-1.4 | JSON Schema を GitHub Pages に配布し、エディタ補完が効くようにする |
+| FR-1.4 | JSON Schema を CLI の npm パッケージに同梱して配布し、エディタ補完が効くようにする |
 
 ### FR-2 検証
 
@@ -550,22 +550,20 @@ Go CLI + TypeScript Web という案は、検証ロジックを2回実装する�
 | --- | --- |
 | CLI | npm `@simochee/backlog-blueprint`。実行ファイル名は `backlog-blueprint` |
 | Web UI | GitHub Pages `https://simochee.github.io/backlog-blueprint/` |
-| JSON Schema | GitHub Pages `https://simochee.github.io/backlog-blueprint/schema/<version>/project.json` |
-
-```
-https://simochee.github.io/backlog-blueprint/
-├── index.html                      Web UI
-└── schema/
-    ├── 0.1.0/project.json
-    └── 0.2.0/project.json          過去バージョンは消さない
-```
+| JSON Schema | CLI の npm パッケージに `schema.json` として同梱し、jsDelivr の `https://cdn.jsdelivr.net/npm/@simochee/backlog-blueprint@<version>/schema.json` で配る |
 
 `$schema` の URL に含まれるバージョンは npm パッケージの semver と一致させる
 （[バージョニング方針 D-2](../design/manifest-versioning.md#3-本プロジェクトの決定)）。
 
-**リリース時に npm publish と Pages デプロイを必ず同時に行う。**
-スキーマだけデプロイし忘れると、利用者のエディタで `$schema` が 404 になり
-補完が黙って効かなくなる。CI で同一ジョブにまとめ、片方だけ成功する状態を作らない。
+**スキーマを CLI と同じ tarball に入れる。** 版ごとに別の配布先へ置くと、CLI だけが公開されて
+スキーマが無い版ができ、利用者のエディタで `$schema` が 404 になって補完が黙って効かなくなる。
+同じ tarball なら、片方だけ公開された状態も、版が食い違う状態も作れない。
+npm は公開済みの版の中身を差し替えられないので、過去バージョンの URL（D-3）は
+版を取り下げない限り同じ中身を返し続ける。
+
+**GitHub Pages には置かない。** Pages のデプロイはサイトを丸ごと置き換えるので、
+過去の版を残すにはデプロイのたびに公開済みのスキーマを取り戻す手順が要り、
+それが失敗すると過去の URL が黙って消える。Pages は Web UI だけを配る。
 
 ## 8. 受け入れ基準
 

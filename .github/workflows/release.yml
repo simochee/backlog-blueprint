@@ -7,7 +7,7 @@ on:
 
 permissions: {}
 
-# 並行させない。重なった実行が同じ Pages のデプロイを取り合い、後の側が古いスキーマ版の一覧で
+# 並行させない。重なった実行が同じ Pages のデプロイを取り合い、後の側が古いコミットから
 # 組んだサイトを公開しうる。
 concurrency:
   group: release
@@ -15,7 +15,6 @@ concurrency:
 
 env:
   PACKAGE_NAME: "@simochee/backlog-blueprint"
-  PAGES_URL: "https://simochee.github.io/backlog-blueprint"
 
 jobs:
   release-please:
@@ -47,7 +46,7 @@ jobs:
 
   # リリースのときだけに絞らない。Web UI の修正が、CLI を公開する理由ができるまで届かなくなる。
   pages:
-    name: Deploy the Web UI and the JSON Schema
+    name: Deploy the Web UI
     needs: release-please
     runs-on: ubuntu-latest
     permissions:
@@ -79,34 +78,6 @@ jobs:
       - name: Build
         run: pnpm run build
 
-      # 省かない。actions/deploy-pages はサイトを丸ごと置き換え、公開済みの $schema の URL が
-      # 解決できなくなる（D-3）。新しいビルドを優先させもしない。理由は DEVELOPMENT.md の
-      # "What the workflow has to guarantee"。
-      - name: Restore the schema of every published version
-        run: |
-          set -euo pipefail
-
-          error_log="$(mktemp)"
-          if ! published="$(npm view "${PACKAGE_NAME}" versions --json 2>"${error_log}")"; then
-            # 初回リリース（パッケージが未公開）以外の失敗を許さない。空の一覧で続けると、
-            # Pages にある公開済みのスキーマが黙って全部消える。
-            if grep -q "E404" "${error_log}"; then
-              echo "${PACKAGE_NAME} has no published version yet; nothing to restore"
-              exit 0
-            fi
-            cat "${error_log}" >&2
-            exit 1
-          fi
-
-          # 0.0.0 を取りに行かない。trusted publisher の設定画面を作るためだけに手で公開した版で、
-          # Pages にスキーマが無く、取得の 404 でデプロイが毎回落ちる。
-          echo "${published}" | jq -r '(if type == "array" then .[] else . end) | select(. != "0.0.0")' | while read -r version; do
-            curl --fail --silent --show-error --retry 3 --retry-delay 5 --create-dirs \
-              --output "apps/web/dist/schema/${version}/project.json" \
-              "${PAGES_URL}/schema/${version}/project.json"
-            echo "restored schema ${version}"
-          done
-
       - uses: actions/configure-pages@v6
 
       - uses: actions/upload-pages-artifact@v5
@@ -117,12 +88,9 @@ jobs:
         id: deploy
         uses: actions/deploy-pages@v5
 
-  # `needs: pages` を外さない。スキーマの URL が未デプロイの CLI を公開すると、エディタの補完が
-  # 黙って効かなくなる（要件定義 §7.1）。`push: tags` の別ワークフローにもしない。ワークフローを
-  # またぐと、`needs` で Pages のデプロイを待てない。
   publish:
     name: Stage the CLI on npm
-    needs: [release-please, pages]
+    needs: release-please
     if: needs.release-please.outputs.released == 'true'
     runs-on: ubuntu-latest
     permissions:

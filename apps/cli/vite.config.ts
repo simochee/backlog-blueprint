@@ -1,4 +1,32 @@
-import { defineConfig } from "vite";
+import { writeFile } from "node:fs/promises";
+import { resolve } from "node:path";
+
+import { projectSchemaArtifact } from "@backlog-blueprint/schema";
+import { type Plugin, defineConfig } from "vite";
+
+import cliPackage from "./package.json";
+
+/**
+ * スキーマの書き出しを `packages/schema` に置かない。ファイルを書くには Node が要り、
+ * プラットフォーム依存が入る（NFR-5）。
+ *
+ * `emitFile` で出さない。置き場所はパッケージの直下で、Rollup は出力先の外に書かせない。
+ */
+const schemaArtifact = (): Plugin => {
+  let root = "";
+
+  return {
+    name: "backlog-blueprint:schema",
+    configResolved(config) {
+      ({ root } = config);
+    },
+    async writeBundle() {
+      const { path, contents } = projectSchemaArtifact(cliPackage.version);
+
+      await writeFile(resolve(root, path), contents);
+    },
+  };
+};
 
 /**
  * 依存を external にしない。ワークスペースのパッケージは `.ts` のソースを `exports` にしており
@@ -16,5 +44,6 @@ export default defineConfig({
       output: { entryFileNames: "main.js" },
     },
   },
+  plugins: [schemaArtifact()],
   ssr: { noExternal: true },
 });

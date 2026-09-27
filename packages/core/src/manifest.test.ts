@@ -45,7 +45,7 @@ describe("トップレベル", () => {
 
   it("$schema を書いても受理され、他のキーの解釈は変わらない", () => {
     const manifest = {
-      $schema: "https://simochee.github.io/backlog-blueprint/schema/0.1.0/project.json",
+      $schema: "https://cdn.jsdelivr.net/npm/@simochee/backlog-blueprint@0.1.0/schema.json",
       ...minimal,
     };
 

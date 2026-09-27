@@ -39,7 +39,7 @@ npx @simochee/backlog-blueprint --help
 を参照）。
 
 ```yaml
-# yaml-language-server: $schema=https://simochee.github.io/backlog-blueprint/schema/0.1.0/project.json
+# yaml-language-server: $schema=https://cdn.jsdelivr.net/npm/@simochee/backlog-blueprint@0.2.0/schema.json
 key: PROJ_A
 name: プロジェクトA
 
@@ -233,13 +233,13 @@ Backlog API を直接呼び出します。スペースと API キーはタブの
 
 ## JSON Schema
 
-リリースごとに JSON Schema を公開しています。
+リリースごとに npm パッケージに JSON Schema を同梱しており、jsDelivr から配信されます。
 
 ```
-https://simochee.github.io/backlog-blueprint/schema/<version>/project.json
+https://cdn.jsdelivr.net/npm/@simochee/backlog-blueprint@<version>/schema.json
 ```
 
-URL のバージョンは CLI のバージョンで、古い URL は削除しません。CLI はスキーマでは表せない検証を数多く行うため、
+URL のバージョンは CLI のバージョンで、公開済みのバージョンのスキーマは変わりません。CLI はスキーマでは表せない検証を数多く行うため、
 エディタが受け入れたマニフェストでも `validate` で失敗することがあります。
 
 ## ドキュメント

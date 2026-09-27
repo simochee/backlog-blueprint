@@ -47,7 +47,7 @@ Docker Compose の例が示唆的で、**バージョンフィールドは付け
 ### 採用: `$schema` にバージョン入りの URL を書く（Biome 方式）
 
 ```yaml
-# yaml-language-server: $schema=https://<host>/schema/0.1.0/project.json
+# yaml-language-server: $schema=https://cdn.jsdelivr.net/npm/@simochee/backlog-blueprint@0.2.0/schema.json
 key: PROJ_A
 name: プロジェクトA
 ```
