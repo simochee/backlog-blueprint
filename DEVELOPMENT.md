@@ -147,8 +147,8 @@ not change is not rebuilt.
 
 ## Releasing
 
-The first release is `0.1.0`. `.release-please-manifest.json` starts at `0.0.0`, because nothing has
-been published yet, and `initial-version` in `release-please-config.json` names the version that a
+The first release is `0.1.0`. `.release-please-manifest.json` starts at `0.0.0`, because nothing had
+been released yet, and `initial-version` in `release-please-config.json` names the version that a
 repository in that state is released at — without it the first release would be `1.0.0`, which is
 release-please's default. The schema URL carries the same version as the npm package (D-2), and the
 documentation already points at `schema/0.1.0/project.json`, so the first published version has to
@@ -212,9 +212,10 @@ and `.release-please-manifest.json` records the last version that was released �
    Add prose above it only when a version asks something of its users — a manifest that has to be
    rewritten, an option that no longer exists.
 
-The release pull request carries no CI run, because a pull request opened with `GITHUB_TOKEN` does
-not start workflows. Everything in it has already been checked on `main`; the only thing CI would
-see for the first time is the version bump and the CHANGELOG.
+CI runs on the release pull request like on any other, because release-please opens it as the
+organization's release bot, a GitHub App, rather than with `GITHUB_TOKEN`. A pull request opened by
+`github-actions[bot]` holds its workflows until someone with write access approves them, which
+would leave the one pull request that decides a release as the only one merged without CI.
 
 If the publish job fails once the tag exists, use **Re-run failed jobs** on that workflow run: the
 tag comes from the first job's outputs, which a re-run keeps, so the same commit is built and
@@ -238,12 +239,11 @@ one of those says nothing about what a version does differently from the one bef
 
 ### What the workflow has to guarantee
 
-- **Tagging and publishing stay inside one workflow run.** A tag or a Release created with
-  `GITHUB_TOKEN` starts no further workflow, so a separate workflow listening for `v*` tags would
-  wait forever. Publishing is therefore another job of the release workflow, gated on
-  release-please's `releases_created` output. The other way out — a personal access token, whose
-  tags do trigger workflows — was rejected: a long-lived secret to store and rotate, for nothing
-  that two jobs do not already give.
+- **Tagging and publishing stay inside one workflow run.** Publishing is another job of the
+  release workflow, gated on release-please's `releases_created` output, because it has to `needs`
+  the Pages job (next item), and a job cannot wait on a job in another workflow. A separate workflow
+  listening for `v*` tags would start as soon as the tag exists, whether or not the site is deployed
+  yet.
 - **A release's schema is on Pages before its CLI is on npm.** Publish a CLI whose schema URL is not
   deployed yet, and every editor pointed at that version silently stops offering completion. The
   publish job therefore `needs` the Pages job and is skipped with it when the deployment fails
@@ -259,9 +259,11 @@ one of those says nothing about what a version does differently from the one bef
   deployment. A site built from `main` carries a schema for the version that is already on npm,
   built from source that has moved on since it was published; the published one has to win. During
   a release the version being released is not on the registry yet, because Pages is deployed first,
-  so nothing overwrites it. A package npm does not know at all is the first release and has nothing
-  to restore; any other failure to reach npm or Pages aborts the deployment rather than quietly
-  dropping a version.
+  so nothing overwrites it. `0.0.0` is skipped: it is the placeholder described in
+  [What the repository has to provide](#what-the-repository-has-to-provide), was never released,
+  and has no schema to restore. A package npm does not know at all has nothing to restore either;
+  any other failure to reach npm or Pages aborts the deployment rather than quietly dropping a
+  version.
 - **A breaking change to the manifest format bumps the major version** and ships as a new schema
   URL, leaving the old one in place. The CLI is then expected to recognize the superseded syntax and
   say how to rewrite it, rather than interpreting it in a way the author did not intend. The
@@ -276,17 +278,22 @@ The workflow cannot create any of these itself.
 | -------------------------- | --------------------------------------------------------------------------- |
 | Pages source               | Settings, Pages, Build and deployment, Source: **GitHub Actions**           |
 | npm trusted publisher      | On the package's npm settings: this repository, workflow `release.yml`, **no environment** |
+| npm publishing access      | On the package's npm settings: **Require two-factor authentication and disallow tokens** |
 | `github-pages` environment | Created by GitHub with the Pages source; must allow `main`                  |
-| Pull requests from Actions | Settings, Actions, General: **Allow GitHub Actions to create and approve pull requests** |
+| Release bot                | The organization's GitHub App, installed on this repository with Contents, Issues and Pull requests: **Read and write** |
+| Release bot credentials    | Organization secrets `RELEASE_BOT_APP_ID` and `RELEASE_BOT_PRIVATE_KEY`, available to this repository |
 
 The repository holds no npm token. npm accepts the publish job's OIDC token instead, which is why
 `id-token: write` appears in its permissions and why `actions/setup-node` is not given
 `registry-url`. The environment field of the trusted publisher is left empty because that job runs
 in no environment; `github-pages` belongs to the Pages job, which does not talk to npm.
 
-Trusted publishing cannot cover a package's first release, though. A trusted publisher is
-configured on a package's settings page, and a package nobody has published yet has no settings
-page ([npm/cli#8544](https://github.com/npm/cli/issues/8544)). `0.1.0` therefore has to be
-published by hand — `npm login`, then `pnpm --filter @simochee/backlog-blueprint publish` from a
-local checkout of the `v0.1.0` tag — and the trusted publisher configured once it exists. Every
-release after it is the workflow's.
+Trusted publishing cannot create a package, though. A trusted publisher is configured on a
+package's settings page, and a package nobody has published yet has no settings page
+([npm/cli#8544](https://github.com/npm/cli/issues/8544)). So `0.0.0` was published by hand, only to
+bring that page into existence, and is deprecated; it contains nothing that was ever released, and
+the release workflow skips it when it restores schemas. Every real release, `0.1.0` included, is
+the workflow's.
+
+With the trusted publisher working, publishing access disallows tokens, so a leaked or forgotten
+token cannot publish either.
