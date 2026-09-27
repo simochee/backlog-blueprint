@@ -79,8 +79,8 @@ depends on core — and turbo then refuses to build any task at all.
 
 - **How — the code.** Only the code says how something is done. If a comment is needed to explain
   it, rename something or extract a function instead.
-- **What — the tests.** A test name states behavior: "a date custom field's range is written as a
-  date string", not "validate returns false".
+- **What — the tests.** A test name states behavior: 「日付型の範囲は日付の文字列で書かれる」, not
+  「validate が false を返す」.
 - **Why — the commit message.** The body explains why the change was needed and cites the decision
   ID. The diff already shows what changed. The subject line is published as it stands:
   release-please copies the subjects of `feat`, `fix`, `perf`, `revert`, `refactor` and `build`
@@ -89,6 +89,43 @@ depends on core — and turbo then refuses to build any task at all.
   others, with no context around it.
 - **Why not — code comments.** Only where the code departs from the obvious implementation, to stop
   a later reader from "simplifying" it back into a bug. Never a description of what the code does.
+
+### What a comment may say
+
+A comment names the implementation a reader would reach for, and what breaks if they do. Anything
+else is deleted rather than kept for the sake of care.
+
+- **Cite, do not restate.** "`toSorted` would fail the type check: lib is ES2022 (NFR-5)" is a
+  comment. Two sentences retelling what §1.3 decides are a second copy of §1.3. A bare ID with no
+  rejected alternative (`// WU-15`) is traceability, and the commit that introduced the code already
+  carries it.
+- **No doc comments that describe.** A `/** ... */` saying what a function returns or what a type
+  holds is a What; the name, the type and the tests say it. When the name cannot, rename.
+- **Say each reason once.** When the same Why-not applies in two places, the code is shared so that
+  the comment lives in one.
+- **`/** ... */` sits directly above a declaration; `//` is for a line inside a body or an
+  expression.**
+
+## Module boundaries
+
+A file is a unit with a reason to change of its own, not a home for one function. Keep a part in
+its own file when one of these holds, and otherwise put it in the file that uses it:
+
+- a runtime or package boundary requires it (NFR-5; Node-only code in the CLI),
+- a decision fixes the layout (one file per resource kind under `core/src/resources/`,
+  requirements-definition §7),
+- a tool needs it (a function pulled out of a component so that React Compiler can compile the
+  component),
+- it has more than one importer, or behavior worth a test file of its own.
+
+Beyond that:
+
+- **The only re-export file in a package is its entry point**, `src/index.ts`. No barrels inside a
+  package.
+- **The entry point exports what another workspace package imports, and nothing more.** Tests
+  inside a package reach its internals by relative path, so they are no reason to export.
+- **No alias that only renames a type** (`type ResultingOrder = ResourceOrder`). Two names for one
+  thing make the reader check whether they differ.
 
 ## Language
 
@@ -103,6 +140,8 @@ depends on core — and turbo then refuses to build any task at all.
   `v0.1.0` tag is Japanese and stays that way: those bodies are this project's record of why each
   decision was taken, and translating them afterwards would replace the author's reasoning with
   someone else's paraphrase.
+- **Code comments and test names are Japanese**, like the documents they cite, because they are
+  written for the same readers: whoever works on this repository.
 - **`.claude/docs/` stays Japanese.** It is written for whoever works on this repository, and the
   decision identifiers a commit body cites — `V-A19`, `D-2`, `K-1` — read the same in either
   language, so they are what joins an English commit to a Japanese document.
@@ -140,8 +179,8 @@ Each override in `.oxlintrc.json` is there for a specific problem. Check before 
 - `import/no-default-export` and `import/no-anonymous-default-export` (`vite.config.*` and
   `vitest.config.*` only) — Vite reads a configuration file's default export, and there is no other
   way to hand it one.
-- `import/no-unassigned-import` (`apps/web/src/test-setup.ts` only) — jest-dom matchers can only be
-  registered by a side-effecting import.
+- `import/no-unassigned-import` (`apps/web/src/test-setup.ts` and `apps/web/src/main.tsx` only) —
+  jest-dom matchers and stylesheets can only be loaded by a side-effecting import.
 - `import/no-nodejs-modules` (`apps/cli/src/` and `packages/brand/src/render.tsx` only) — the CLI
   is a Node application and needs `node:*` for file and stdin access, and the brand renderer reads
   fonts and writes images. It stays enabled everywhere else under `packages/` (NFR-5).
