@@ -163,11 +163,6 @@ export const OutputPanel = ({
                 </Button>
               </DropdownMenu.Trigger>
               <DropdownMenu.Content align="start" size="1">
-                {/**
-                 * `toReversed` に置き換えない。基底の tsconfig が `lib: ES2022` を置いているため、
-                 * ES2023 のメソッドは型検査で落ちる。複製済みの配列を裏返すので破壊的でもない。
-                 */}
-                {/* oxlint-disable-next-line unicorn/no-array-reverse */}
                 {[...entries].reverse().map((entry) => (
                   <DropdownMenu.Item key={entry.id} onSelect={() => onSelect(entry.id)}>
                     {entryLabel(entry, runs[entry.id])}

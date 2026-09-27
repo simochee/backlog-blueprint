@@ -168,6 +168,9 @@ Each override in `.oxlintrc.json` is there for a specific problem. Check before 
 
 - `unicorn/no-thenable` (`packages/core/src/manifest.ts` only) — the JSON Schema `then` keyword
   reads as a `Promise` to the rule.
+- `unicorn/no-array-sort` and `unicorn/no-array-reverse` — they ask for `toSorted` and
+  `toReversed`, which are ES2023, and `lib` is `ES2022` in every package. Copy the array first
+  (`[...items].sort()`); the rules exist to stop sorting in place, and a copy already does.
 - `no-template-curly-in-string` — `${ENV}` appears in string literals all over the specification
   (E-1).
 - `typescript/consistent-type-definitions` (`**/*.d.ts` only) — `packages/core/src/fetch.d.ts`

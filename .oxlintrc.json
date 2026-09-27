@@ -34,6 +34,8 @@
     "no-underscore-dangle": "off",
     "prefer-arrow-callback": "off",
     "unicorn/max-nested-calls": "off",
+    "unicorn/no-array-sort": "off",
+    "unicorn/no-array-reverse": "off",
     "eqeqeq": ["warn", "always"],
     "no-else-return": "warn",
     "no-lonely-if": "warn",
