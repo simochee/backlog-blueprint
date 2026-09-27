@@ -20,6 +20,8 @@ export const DiagnosticList = ({ diagnostics, nothingWritten = false }: Diagnost
     return null;
   }
 
+  const hasPositions = blocks.some(({ diagnostic }) => diagnostic.line !== undefined);
+
   return (
     <Flex direction="column" gap="2">
       {summary === undefined ? null : (
@@ -43,7 +45,9 @@ export const DiagnosticList = ({ diagnostics, nothingWritten = false }: Diagnost
            * 中は `span` で済ませる。字下げは `.mono` の `white-space` が残す。
            */}
           <Callout.Text className="diagnostic-line">
-            <span className="diagnostic-position">{position(diagnostic)}</span>
+            {hasPositions ? (
+              <span className="diagnostic-position">{position(diagnostic)}</span>
+            ) : null}
             <span className="mono">{text}</span>
           </Callout.Text>
         </Callout.Root>
