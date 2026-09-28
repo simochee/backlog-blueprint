@@ -15,6 +15,10 @@ describe("アバターに描く頭文字", () => {
     expect(initialOf("𠮷野家")).toBe("𠮷");
   });
 
+  it("ZWJ でつないだ絵文字は1文字として切り出す", () => {
+    expect(initialOf("👨‍👩‍👧 家族")).toBe("👨‍👩‍👧");
+  });
+
   it("前後の空白は数えない", () => {
     expect(initialOf("  suzuki")).toBe("S");
   });
