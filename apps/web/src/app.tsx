@@ -270,7 +270,7 @@ export const App = () => {
 
   // 未入力の環境変数を先に見る。未入力も Problems にエラーとして並ぶが、直す場所は ENV の欄である（WU-52）。
   const guideToBlocker = (): void => {
-    if (validation !== undefined && validation.variables.some(({ missing }) => missing)) {
+    if (validation?.variables.some(({ missing }) => missing)) {
       openSidebar("env");
       setEnvironmentFocus((previous) => previous + 1);
 

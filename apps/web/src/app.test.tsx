@@ -888,7 +888,7 @@ describe("離脱の警告", () => {
     });
 
     const [, warn] = added.mock.calls.find(([type]) => type === "beforeunload") ?? [];
-    const event = new Event("beforeunload", { cancelable: true }) as BeforeUnloadEvent;
+    const event = new Event("beforeunload", { cancelable: true });
 
     (warn as EventListener)(event);
 

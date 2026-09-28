@@ -26,16 +26,17 @@ when `devEngines.packageManager` changes without the lockfile.
 Everything is run from the repository root.
 
 ```sh
-vp check             # format check, lint (oxfmt, oxlint)
-vp check --fix       # format and apply lint fixes
-vp run -r typecheck  # tsc --noEmit in each package
-vp run -r build      # build every package that has a build script, in dependency order
-vp test              # every package's tests in one Vitest run
-vp dev               # Vite dev server for the Web UI
+vp check          # format check, lint and type check (oxfmt, oxlint, tsgolint)
+vp check --fix    # format and apply lint fixes
+vp run -r build   # build every package that has a build script, in dependency order
+vp test           # every package's tests in one Vitest run
+vp dev            # Vite dev server for the Web UI
 ```
 
-`vp check` and `typecheck` are separate checks and both have to pass: one is fast static analysis,
-the other is the type checker.
+`vp check` is the only static check: `lint.options.typeCheck` makes it run the TypeScript 7 type
+checker over every package, so there is no separate `tsc` step. It finds the tsconfig for each file
+through the `references` of the nearest `tsconfig.json`, which is why the packages that split source
+and tests keep a `tsconfig.json` holding nothing but references.
 
 Lint and format settings live in the root `vite.config.ts`, and per-package differences are
 `overrides` there; a `lint` or `fmt` block in a package's own config is not applied by `vp check`.
@@ -150,8 +151,8 @@ observable behavior should show up there.
 
 ## Continuous integration
 
-`.github/workflows/ci.yml` runs on every pull request and on every push to `main`. It is the four
-commands listed above — `vp check`, `typecheck`, `build`, `test` — in a single job.
+`.github/workflows/ci.yml` runs on every pull request and on every push to `main`. It is the three
+commands listed above — `vp check`, `build`, `test` — in a single job.
 `voidzero-dev/setup-vp` installs `vp`, which then takes Node.js and pnpm from the root
 `package.json` exactly as it does locally. The pnpm store and the Vite Task cache
 (`node_modules/.vite/task-cache`) are both carried between runs, so a package that did not change

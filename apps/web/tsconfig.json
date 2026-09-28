@@ -1,8 +1,8 @@
 {
-  "extends": "@backlog-blueprint/tsconfigs/browser.json",
-  "compilerOptions": {
-    "jsx": "react-jsx"
-  },
-  "include": ["src"],
-  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx", "src/test-setup.ts"]
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.src.json" },
+    { "path": "./tsconfig.test.json" },
+    { "path": "./tsconfig.node.json" }
+  ]
 }

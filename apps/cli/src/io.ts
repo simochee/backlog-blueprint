@@ -27,6 +27,12 @@ const readAll = async (stream: NodeJS.ReadableStream): Promise<string> => {
   return chunks.join("");
 };
 
+/**
+ * 引数を Node の型のまま受けない。パイプやファイルにつながると `isTTY` は `undefined` で、
+ * 型の `boolean` と合わない。
+ */
+const isTty = (stream: { isTTY?: boolean }): boolean => stream.isTTY === true;
+
 export const processIo = (): Io => ({
   out: (text) => {
     process.stdout.write(text);
@@ -48,8 +54,8 @@ export const processIo = (): Io => ({
       reader.close();
     }
   },
-  isStdinTty: process.stdin.isTTY === true,
-  isStdoutTty: process.stdout.isTTY === true,
-  isStderrTty: process.stderr.isTTY === true,
+  isStdinTty: isTty(process.stdin),
+  isStdoutTty: isTty(process.stdout),
+  isStderrTty: isTty(process.stderr),
   env: process.env,
 });

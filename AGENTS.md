@@ -53,9 +53,9 @@ a word.** `types: []` only stops automatic loading; it cannot stop a reference d
 adding any dependency to `packages/core`, confirm the guard still bites:
 
 ```sh
-# typecheck must FAIL with this file present
+# the type check must FAIL with this file present
 printf "import { readFileSync } from 'node:fs'\nexport const probe = () => [readFileSync, process.env.HOME, Buffer.from('x')]\n" > packages/core/src/nfr5-probe.ts
-vp run @backlog-blueprint/core#typecheck
+vp check --no-fmt --no-lint packages/core/src/nfr5-probe.ts
 rm packages/core/src/nfr5-probe.ts
 ```
 
@@ -67,6 +67,11 @@ The same hazard applies to every package that has to run in a browser (today `co
 in one config pulls `@types/node` in through `vite-plus`, and the guard dies quietly. For the same
 reason `vite.config.ts` is type-checked by a Node tsconfig of its own (`apps/web/tsconfig.node.json`),
 never by the browser ones.
+
+Every such tsconfig must be listed in the `references` of the package's `tsconfig.json`, which holds
+nothing else. `vp check` finds a file's tsconfig through those references; a tsconfig nobody
+references is ignored, and its files are checked under other options without a word — the tests
+lost `noUncheckedIndexedAccess` that way.
 
 ## Tests never reach the network
 
@@ -181,6 +186,13 @@ Each entry in `lint.overrides` in the root `vite.config.ts` is there for a speci
   (`[...items].sort()`); the rules exist to stop sorting in place, and a copy already does.
 - `no-template-curly-in-string` — `${ENV}` appears in string literals all over the specification
   (E-1).
+- `typescript/no-unsafe-type-assertion` — values are narrowed with `as` once they have been checked
+  some other way: a manifest validated against its TypeBox schema, a Backlog response read through
+  `api-response.ts`. `consistent-type-assertions` already fixes `as` as the form to use; replacing
+  each one with a type guard would restate those checks.
+- `typescript/dot-notation` keeps `allowIndexSignaturePropertyAccess` — a key read through an index
+  signature (`record["errors"]`, `process.env["NO_COLOR"]`) is written with brackets on purpose, to
+  show that it may be absent. Dot notation is for properties the type declares.
 - `typescript/consistent-type-definitions` (`**/*.d.ts` only) — `packages/core/src/fetch.d.ts`
   declares the runtime surface core may use as ambient `interface`s, which merge with a platform
   declaration of the same name. The `type` form the rest of the code uses does not merge.

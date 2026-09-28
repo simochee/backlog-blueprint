@@ -39,7 +39,7 @@ catalog:
   react-dom: ^19.3.0
   satori: ^0.33.5
   tsx: ^4.23.15
-  typescript: ^5.9.3
+  typescript: ^7.0.2
   vite: npm:@voidzero-dev/vite-plus-core@1.0.0
   vite-plus: 1.0.0
   yaml: ^2.9.1

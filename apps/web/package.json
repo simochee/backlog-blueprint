@@ -5,8 +5,7 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "build": "vp build",
-    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json && tsc --noEmit -p tsconfig.node.json"
+    "build": "vp build"
   },
   "dependencies": {
     "@backlog-blueprint/backlog-client": "workspace:*",

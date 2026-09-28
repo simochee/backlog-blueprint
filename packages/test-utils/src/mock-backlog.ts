@@ -152,7 +152,7 @@ const BAD_REQUEST = 400;
 type Failure = { status: number; message: string };
 
 const failWith = (status: number, message: string): never => {
-  throw { status, message } as Failure;
+  throw { status, message };
 };
 
 const isFailure = (value: unknown): value is Failure =>
@@ -917,8 +917,7 @@ export const mockBacklog = (options: MockBacklogOptions = {}): MockBacklog => {
 export const withoutWritePacing = async <T>(run: () => Promise<T>): Promise<T> => {
   const original = globalThis.setTimeout;
 
-  globalThis.setTimeout = ((callback: () => void) =>
-    original(callback, 0)) as typeof globalThis.setTimeout;
+  globalThis.setTimeout = (callback: () => void) => original(callback, 0);
 
   try {
     return await run();

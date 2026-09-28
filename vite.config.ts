@@ -80,7 +80,8 @@ export default defineConfig({
       "typescript/prefer-includes": "warn",
       "typescript/prefer-optional-chain": "warn",
       "typescript/consistent-type-exports": "warn",
-      "typescript/dot-notation": "warn",
+      "typescript/dot-notation": ["warn", { allowIndexSignaturePropertyAccess: true }],
+      "typescript/no-unsafe-type-assertion": "off",
       "typescript/no-require-imports": "warn",
       "unicorn/no-null": "off",
       "unicorn/catch-error-name": [
@@ -158,6 +159,8 @@ export default defineConfig({
     ignorePatterns: [],
     options: {
       denyWarnings: true,
+      typeAware: true,
+      typeCheck: true,
     },
     jsPlugins: [
       {

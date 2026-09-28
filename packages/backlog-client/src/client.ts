@@ -187,7 +187,7 @@ export const createBacklogClient = ({
     run: (backlog: Backlog) => Promise<T>,
   ): Promise<T> => {
     const controller = new AbortController();
-    let timer: ReturnType<typeof setTimeout> | undefined;
+    let timer: unknown;
 
     const timedOut = new Promise<never>((_resolve, reject) => {
       timer = setTimeout(() => {

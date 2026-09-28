@@ -16,7 +16,7 @@ const titleWidth = 720;
 
 const SpreadWord = ({ word, width, style }: { word: string; width: number; style: object }) => (
   <div style={{ display: "flex", justifyContent: "space-between", width, ...style }}>
-    {[...word].map((letter, i) => (
+    {Array.from(new Intl.Segmenter().segment(word), ({ segment }) => segment).map((letter, i) => (
       <span key={`${letter}${i}`}>{letter}</span>
     ))}
   </div>

@@ -8,7 +8,6 @@
     "build": "vp run -r build",
     "dev": "vp dev",
     "check": "vp check",
-    "typecheck": "vp run -r typecheck",
     "test": "vp test"
   },
   "devDependencies": {

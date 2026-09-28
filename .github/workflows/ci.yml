@@ -39,11 +39,8 @@ jobs:
           restore-keys: |
             vite-task-${{ runner.os }}-${{ runner.arch }}-
 
-      - name: Check formatting and lint
+      - name: Check formatting, lint and types
         run: vp check
-
-      - name: Typecheck
-        run: vp run -r typecheck
 
       - name: Build
         run: vp run -r build
