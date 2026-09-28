@@ -1,5 +1,4 @@
-import babel from "@rolldown/plugin-babel";
-import react, { reactCompilerPreset } from "@vitejs/plugin-react";
+import react from "@vitejs/plugin-react";
 import { defineConfig, lazyPlugins } from "vite-plus";
 
 import cliPackage from "../cli/package.json";
@@ -8,14 +7,14 @@ import cliPackage from "../cli/package.json";
  * 既定の閾値に戻さない（WU-19）。既定では畳めない部品を素通しにするので、`for await` を
  * 1つ書き足しただけで部品ごと最適化から外れ、遅くなるだけで壊れないので誰も気付かない。
  */
-const reactCompiler = reactCompilerPreset({ panicThreshold: "all_errors" });
+const reactCompiler = { panicThreshold: "all_errors" } as const;
 
 const BASE = "/";
 
 export default defineConfig({
   base: BASE,
   define: { __SCHEMA_VERSION__: JSON.stringify(cliPackage.version) },
-  plugins: lazyPlugins(() => [react(), babel({ presets: [reactCompiler] })]),
+  plugins: lazyPlugins(() => [react({ compiler: reactCompiler })]),
   test: {
     environment: "happy-dom",
     setupFiles: ["./src/test-setup.ts"],
