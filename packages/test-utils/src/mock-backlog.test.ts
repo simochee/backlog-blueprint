@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import { mockBacklog, type MockBacklog } from "./mock-backlog";
 
@@ -128,14 +128,14 @@ describe("プロジェクトの参加者", () => {
 const loginIdsOf = ({ body }: Reply): unknown[] =>
   (body as { userId: unknown }[]).map(({ userId }) => userId);
 
-describe("スペースのユーザー一覧に載るログイン ID", () => {
-  const asMember = (): MockBacklog =>
-    mockBacklog({
-      executor: TANAKA,
-      spaceUsers: [YAMADA, TANAKA],
-      spaceTeams: [{ name: "開発チーム", members: ["yamada", "tanaka"] }],
-    });
+const asMember = (): MockBacklog =>
+  mockBacklog({
+    executor: TANAKA,
+    spaceUsers: [YAMADA, TANAKA],
+    spaceTeams: [{ name: "開発チーム", members: ["yamada", "tanaka"] }],
+  });
 
+describe("スペースのユーザー一覧に載るログイン ID", () => {
   it("スペース管理者のキーには全員のログイン ID が返る", async () => {
     const reply = await call(space(), "GET", "/api/v2/users");
 

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import { fixedPlanContext, fixedReadContext, fixedSnapshot } from "../../../test-utils/src/index";
 import { type Status } from "../manifest";

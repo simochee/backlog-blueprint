@@ -20,38 +20,40 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # setup-node より後に回さない。`cache: pnpm` がルートの package.json の `packageManager` で
-      # 固定した pnpm を見つけられなくなる。
-      - name: Enable Corepack
-        run: corepack enable
-
-      - uses: actions/setup-node@v7
+      - uses: voidzero-dev/setup-vp@v1.21.1
         with:
-          node-version-file: .tool-versions
-          cache: pnpm
-
-      - name: Restore the turbo cache
-        uses: actions/cache@v6
-        with:
-          path: .turbo/cache
-          key: turbo-${{ runner.os }}-${{ github.sha }}
-          restore-keys: |
-            turbo-${{ runner.os }}-
+          cache: true
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: vp install --frozen-lockfile
 
-      - name: Lint
-        run: pnpm run lint
+      # install より前に戻さない。キャッシュは node_modules の下にあり、install が作り直す。
+      # キーに lockfile やソースを混ぜない。何が変わったかは Vite Task が自分で見ており、
+      # キーが変わると使えたはずのキャッシュまで戻らなくなる。
+      - name: Restore the Vite Task cache
+        id: vite-task-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: node_modules/.vite/task-cache
+          key: vite-task-${{ runner.os }}-${{ runner.arch }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            vite-task-${{ runner.os }}-${{ runner.arch }}-
 
-      - name: Check formatting
-        run: pnpm run format:check
+      - name: Check formatting and lint
+        run: vp check
 
       - name: Typecheck
-        run: pnpm run typecheck
+        run: vp run -r typecheck
 
       - name: Build
-        run: pnpm run build
+        run: vp run -r build
 
       - name: Test
-        run: pnpm run test
+        run: vp test
+
+      - name: Save the Vite Task cache
+        if: success()
+        uses: actions/cache/save@v6
+        with:
+          path: node_modules/.vite/task-cache
+          key: ${{ steps.vite-task-cache.outputs.cache-primary-key }}

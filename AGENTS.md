@@ -55,7 +55,7 @@ adding any dependency to `packages/core`, confirm the guard still bites:
 ```sh
 # typecheck must FAIL with this file present
 printf "import { readFileSync } from 'node:fs'\nexport const probe = () => [readFileSync, process.env.HOME, Buffer.from('x')]\n" > packages/core/src/nfr5-probe.ts
-pnpm --filter @backlog-blueprint/core run typecheck
+vp run @backlog-blueprint/core#typecheck
 rm packages/core/src/nfr5-probe.ts
 ```
 
@@ -64,7 +64,7 @@ live in `packages/backlog-client` and not in core (B-2).
 
 The same hazard applies to every package that has to run in a browser (today `core`, `schema`,
 `backlog-client` and `web`). Keep their tests in a separate tsconfig from the source: putting both
-in one config pulls `@types/node` in through vitest and vite, and the guard dies quietly.
+in one config pulls `@types/node` in through `vite-plus`, and the guard dies quietly.
 
 ## Tests never reach the network
 
@@ -73,7 +73,7 @@ shared helpers in `@backlog-blueprint/test-utils` rather than reinventing them p
 
 **`packages/core` imports those helpers by relative path.** Adding
 `@backlog-blueprint/test-utils` to core's `devDependencies` creates a workspace cycle — test-utils
-depends on core — and turbo then refuses to build any task at all.
+depends on core — and `vp run -r` can then no longer order the two by their dependencies.
 
 ## Where each kind of information goes
 
@@ -170,7 +170,7 @@ Japanese.
 
 ## Disabled lint rules have reasons
 
-Each override in `.oxlintrc.json` is there for a specific problem. Check before removing one.
+Each entry in `lint.overrides` in the root `vite.config.ts` is there for a specific problem. Check before removing one.
 
 - `unicorn/no-thenable` (`packages/core/src/manifest.ts` only) — the JSON Schema `then` keyword
   reads as a `Promise` to the rule.
@@ -192,5 +192,5 @@ Each override in `.oxlintrc.json` is there for a specific problem. Check before 
   jest-dom matchers and stylesheets can only be loaded by a side-effecting import.
 - `import/no-nodejs-modules` (`apps/cli/src/`, `apps/cli/vite.config.ts` and
   `packages/brand/src/render.tsx` only) — the CLI is a Node application and needs `node:*` for file
-  and stdin access, its build writes `schema.json` next to `package.json`, where Rollup cannot emit
-  a file, and the brand renderer reads fonts and writes images. It stays enabled everywhere else under `packages/` (NFR-5).
+  and stdin access, its build writes `schema.json` next to `package.json`, where the bundler cannot
+  emit a file, and the brand renderer reads fonts and writes images. It stays enabled everywhere else under `packages/` (NFR-5).

@@ -1,5 +1,5 @@
 import { type Action } from "@backlog-blueprint/core";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import {
   appendEntry,

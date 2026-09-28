@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import { embedRef, resolutionKey, resolvePath, resolveRequest } from "./ref";
 import { type ResolutionTable } from "./resolution";

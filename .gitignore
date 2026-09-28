@@ -1,6 +1,6 @@
 node_modules/
 dist/
-.turbo/
+.vitest/
 *.tsbuildinfo
 .orca/
 apps/cli/README.md

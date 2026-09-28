@@ -1,5 +1,5 @@
 import { actionLine, type Action, type Diagnostic } from "@backlog-blueprint/core";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import { badgedAction, diagnosticView, PLAIN } from "./view";
 

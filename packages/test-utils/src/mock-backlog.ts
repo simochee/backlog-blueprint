@@ -297,6 +297,53 @@ const respond = (url: string, status: number, body: unknown): MockResponse => ({
   json: () => Promise.resolve(body),
 });
 
+const memberOf = <Item extends { id: number }>(items: Item[], id: number): Item =>
+  items.find((item) => item.id === id) ?? failWith(NOT_FOUND, `No such resource: ${id}`);
+
+const updateIssueType = (
+  issueType: MockIssueType,
+  params: Record<string, unknown>,
+): MockIssueType => {
+  issueType.name = text(params, "name") ?? issueType.name;
+  issueType.color = text(params, "color") ?? issueType.color;
+  issueType.templateSummary = text(params, "templateSummary") ?? issueType.templateSummary;
+  issueType.templateDescription =
+    text(params, "templateDescription") ?? issueType.templateDescription;
+
+  return issueType;
+};
+
+const webhookBody = (
+  params: Record<string, unknown>,
+  id: number,
+  current: MockWebhook | undefined,
+): MockWebhook => {
+  const allEvent = flag(params, "allEvent") ?? current?.allEvent ?? false;
+
+  return {
+    id,
+    name: text(params, "name") ?? current?.name ?? "",
+    description: text(params, "description") ?? current?.description ?? null,
+    hookUrl: text(params, "hookUrl") ?? current?.hookUrl ?? "",
+    allEvent,
+    activityTypeIds: allEvent
+      ? []
+      : (list(params, "activityTypeIds") ?? []).map((id_) => Number(id_)),
+  };
+};
+
+const milestoneBody = (
+  params: Record<string, unknown>,
+  id: number,
+  current: MockMilestone | undefined,
+): MockMilestone => ({
+  id,
+  name: text(params, "name") ?? current?.name ?? "",
+  description: text(params, "description") ?? current?.description ?? null,
+  startDate: asStoredDate(text(params, "startDate")) ?? current?.startDate ?? null,
+  releaseDueDate: asStoredDate(text(params, "releaseDueDate")) ?? current?.releaseDueDate ?? null,
+});
+
 export const mockBacklog = (options: MockBacklogOptions = {}): MockBacklog => {
   const requests: MockRequest[] = [];
   const reads: MockRequest[] = [];
@@ -381,9 +428,6 @@ export const mockBacklog = (options: MockBacklogOptions = {}): MockBacklog => {
     projects.find((project) => project.projectKey === key) ??
     failWith(NOT_FOUND, `No project named ${key}.`);
 
-  const memberOf = <Item extends { id: number }>(items: Item[], id: number): Item =>
-    items.find((item) => item.id === id) ?? failWith(NOT_FOUND, `No such resource: ${id}`);
-
   const createProject = (params: Record<string, unknown>): MockProject => {
     const key = text(params, "key") ?? failWith(BAD_REQUEST, "key is required.");
     const name = text(params, "name") ?? failWith(BAD_REQUEST, "name is required.");
@@ -412,19 +456,6 @@ export const mockBacklog = (options: MockBacklogOptions = {}): MockBacklog => {
     projects.push(project);
 
     return project;
-  };
-
-  const updateIssueType = (
-    issueType: MockIssueType,
-    params: Record<string, unknown>,
-  ): MockIssueType => {
-    issueType.name = text(params, "name") ?? issueType.name;
-    issueType.color = text(params, "color") ?? issueType.color;
-    issueType.templateSummary = text(params, "templateSummary") ?? issueType.templateSummary;
-    issueType.templateDescription =
-      text(params, "templateDescription") ?? issueType.templateDescription;
-
-    return issueType;
   };
 
   /**
@@ -486,37 +517,6 @@ export const mockBacklog = (options: MockBacklogOptions = {}): MockBacklog => {
           : applicable.map((id_) => Number(id_)),
     };
   };
-
-  const webhookBody = (
-    params: Record<string, unknown>,
-    id: number,
-    current: MockWebhook | undefined,
-  ): MockWebhook => {
-    const allEvent = flag(params, "allEvent") ?? current?.allEvent ?? false;
-
-    return {
-      id,
-      name: text(params, "name") ?? current?.name ?? "",
-      description: text(params, "description") ?? current?.description ?? null,
-      hookUrl: text(params, "hookUrl") ?? current?.hookUrl ?? "",
-      allEvent,
-      activityTypeIds: allEvent
-        ? []
-        : (list(params, "activityTypeIds") ?? []).map((id_) => Number(id_)),
-    };
-  };
-
-  const milestoneBody = (
-    params: Record<string, unknown>,
-    id: number,
-    current: MockMilestone | undefined,
-  ): MockMilestone => ({
-    id,
-    name: text(params, "name") ?? current?.name ?? "",
-    description: text(params, "description") ?? current?.description ?? null,
-    startDate: asStoredDate(text(params, "startDate")) ?? current?.startDate ?? null,
-    releaseDueDate: asStoredDate(text(params, "releaseDueDate")) ?? current?.releaseDueDate ?? null,
-  });
 
   const readSpace = (path: string): unknown => {
     if (path === "/api/v2/users/myself") {

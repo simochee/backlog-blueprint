@@ -1,6 +1,6 @@
 import { type ReadContext } from "@backlog-blueprint/core";
 import { fixedGet, fixedSpaceResponses, httpFailure } from "@backlog-blueprint/test-utils";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import { connect } from "./connection";
 

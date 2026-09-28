@@ -5,20 +5,22 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "build": "turbo run build",
-    "dev": "turbo run dev",
-    "typecheck": "turbo run typecheck",
-    "test": "turbo run test",
-    "lint": "oxlint --max-warnings 0",
-    "lint:fix": "oxlint --fix",
-    "format": "oxfmt",
-    "format:check": "oxfmt --check"
+    "build": "vp run -r build",
+    "dev": "vp dev",
+    "check": "vp check",
+    "typecheck": "vp run -r typecheck",
+    "test": "vp test"
   },
   "devDependencies": {
-    "oxfmt": "catalog:",
-    "oxlint": "catalog:",
-    "turbo": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vite-plus": "catalog:"
+  },
+  "devEngines": {
+    "runtime": {
+      "name": "node",
+      "version": "24.21.0",
+      "onFail": "error"
+    }
   },
   "packageManager": "pnpm@11.25.0"
 }
