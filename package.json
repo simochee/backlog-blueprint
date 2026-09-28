@@ -5,6 +5,7 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
+    "prepare": "vp config --no-agent",
     "build": "vp run -r build",
     "dev": "vp dev",
     "check": "vp check",

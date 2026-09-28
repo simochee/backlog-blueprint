@@ -21,6 +21,12 @@ another pnpm instead of fetching a second copy of what Vite+ already manages. pn
 its own version at the top of `pnpm-lock.yaml`, which is why `vp install --frozen-lockfile` fails
 when `devEngines.packageManager` changes without the lockfile.
 
+A pre-commit hook runs `vp check --fix` on the staged files (`staged` in the root
+`vite.config.ts`, `.vite-hooks/pre-commit`). `vp install` installs it through the `prepare` script,
+which sets `core.hooksPath` to `.vite-hooks/_`; hooks in `.git/hooks` stop running in this clone and
+in all its worktrees, which share that setting. Turn it off with `vp hooks disable`, or for one
+commit with `VP_GIT_HOOKS=0 git commit`.
+
 ## Commands
 
 Everything is run from the repository root.

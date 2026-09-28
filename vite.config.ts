@@ -5,6 +5,9 @@ export default defineConfig({
   run: {
     cache: { scripts: true },
   },
+  staged: {
+    "*": "vp check --fix",
+  },
   test: {
     projects: ["apps/*", "packages/*"],
   },
