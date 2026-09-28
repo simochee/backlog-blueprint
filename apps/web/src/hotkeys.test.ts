@@ -1,5 +1,5 @@
 import { matchesKeyboardEvent } from "@tanstack/react-hotkeys";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import { SHORTCUTS } from "./hotkeys";
 

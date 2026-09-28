@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import { fixedGet, httpFailure } from "../../../test-utils/src/index";
 import { authenticateExecutor } from "./auth-stage";

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import { fixedSpaceResponses, httpFailure, recordingGet } from "../../../test-utils/src/index";
 import { createExport } from "./create-export";

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import { pathFromInstancePath } from "./source-map";
 import { parseManifestSyntax } from "./syntax-stage";

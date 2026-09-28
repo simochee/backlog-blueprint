@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import { fixedResourceSnapshots } from "../../../test-utils/src/index";
 import { type ResourceSnapshots } from "../plan";
@@ -32,7 +32,7 @@ const idsOf = (overrides: Partial<ResourceSnapshots>) =>
   exported(overrides).diagnostics.map(({ id }) => id);
 
 const withSettings = (settings: Record<string, unknown>): Partial<ResourceSnapshots> => ({
-  project: { exists: true, id: 100, name: "プロジェクトA", settings: settings as never },
+  project: { exists: true, id: 100, name: "プロジェクトA", settings },
 });
 
 const customField = (overrides: Partial<ExistingCustomField>): ExistingCustomField => ({
@@ -493,7 +493,7 @@ describe("マニフェストとして表現できない実状", () => {
         exists: true,
         id: 100,
         name: "プロジェクトA",
-        settings: { textFormattingRule: "html" } as never,
+        settings: { textFormattingRule: "html" },
       },
       issueTypes: {
         source: "project",

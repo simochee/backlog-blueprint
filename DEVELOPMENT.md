@@ -6,49 +6,67 @@ changing the code are in [AGENTS.md](AGENTS.md).
 
 ## Setup
 
-The repository is a pnpm workspace driven by turbo. Enable Corepack if you do not already have the
-pinned pnpm version, then install:
+The repository is a pnpm workspace driven by [Vite+](https://viteplus.dev). Install the global `vp`
+CLI once, then install the dependencies:
 
 ```sh
-corepack enable
-pnpm install
+curl -fsSL https://vite.plus | bash
+vp install
 ```
+
+`vp` picks the Node.js and pnpm versions from `devEngines.runtime` and `devEngines.packageManager`
+in the root `package.json`, and downloads either if it is missing. Corepack is not needed. Both set
+`onFail` to `error` rather than `download`, so that pnpm refuses to run on another Node.js or as
+another pnpm instead of fetching a second copy of what Vite+ already manages. pnpm still records
+its own version at the top of `pnpm-lock.yaml`, which is why `vp install --frozen-lockfile` fails
+when `devEngines.packageManager` changes without the lockfile.
+
+A pre-commit hook runs `vp check --fix` on the staged files (`staged` in the root
+`vite.config.ts`, `.vite-hooks/pre-commit`). `vp install` installs it through the `prepare` script,
+which sets `core.hooksPath` to `.vite-hooks/_`; hooks in `.git/hooks` stop running in this clone and
+in all its worktrees, which share that setting. Turn it off with `vp hooks disable`, or for one
+commit with `VP_GIT_HOOKS=0 git commit`.
 
 ## Commands
 
 Everything is run from the repository root.
 
 ```sh
-pnpm run build       # build every package in dependency order
-pnpm run typecheck   # tsc --noEmit in each package
-pnpm run test        # vitest
-pnpm run lint        # oxlint
-pnpm run lint:fix
-pnpm run format      # oxfmt
-pnpm run format:check
-pnpm run dev         # Vite dev server for the Web UI
+vp check          # format check, lint and type check (oxfmt, oxlint, tsgolint)
+vp check --fix    # format and apply lint fixes
+vp run -r build   # build every package that has a build script, in dependency order
+vp test           # every package's tests in one Vitest run
+vp dev            # Vite dev server for the Web UI
 ```
 
-`lint` and `typecheck` are separate checks and both have to pass: one is fast static analysis, the
-other is the type checker.
+`vp check` is the only static check: `lint.options.typeCheck` makes it run the TypeScript 7 type
+checker over every package, so there is no separate `tsc` step. It finds the tsconfig for each file
+through the `references` of the nearest `tsconfig.json`, which is why the packages that split source
+and tests keep a `tsconfig.json` holding nothing but references.
 
-`format` does not touch Markdown — `.oxfmtrc.json` excludes `**/*.md` so that the documents under
-`.claude/docs/` are never rewritten by a tool. Keep Markdown tidy by hand.
+Lint and format settings live in the root `vite.config.ts`, and per-package differences are
+`overrides` there; a `lint` or `fmt` block in a package's own config is not applied by `vp check`.
+Formatting does not touch Markdown — `fmt.ignorePatterns` excludes `**/*.md` so that the documents
+under `.claude/docs/` are never rewritten by a tool. Keep Markdown tidy by hand.
 
-To work on a single package, use a filter:
+`vp run` caches `package.json` scripts (`run.cache.scripts`), recording the files each one reads
+and writes, so a package that did not change is not rebuilt. `vp cache clean` empties the cache.
+
+`vp test` runs the root `test.projects`, one Vitest project per package. To work on one package,
+select its project, or run a single file:
 
 ```sh
-pnpm --filter @backlog-blueprint/core run test
-pnpm --filter @backlog-blueprint/core exec vitest run src/manifest.test.ts
-pnpm --filter @backlog-blueprint/core exec vitest watch
+vp test --project @backlog-blueprint/core
+vp test packages/core/src/manifest.test.ts
+vp test --project @backlog-blueprint/core --watch
 ```
 
-After `pnpm run build`, the CLI can be run straight out of the build directory, which is the most
+After `vp run -r build`, the CLI can be run straight out of the build directory, which is the most
 direct way to check what a change does to the output:
 
 ```sh
-node apps/cli/dist/main.js --help
-node apps/cli/dist/main.js validate -f path/to/manifest.yaml
+node apps/cli/dist/main.mjs --help
+node apps/cli/dist/main.mjs validate -f path/to/manifest.yaml
 ```
 
 `validate` never opens a network connection, so it is safe to run against anything. `plan` and
@@ -61,8 +79,8 @@ package agrees on one version. Add them through the catalog rather than writing 
 `package.json`:
 
 ```sh
-pnpm --filter @backlog-blueprint/core add --save-catalog some-package
-pnpm --filter @backlog-blueprint/core add --save-catalog -D some-dev-package
+vp add --filter @backlog-blueprint/core --save-catalog some-package
+vp add --filter @backlog-blueprint/core --save-catalog -D some-dev-package
 ```
 
 Adding anything to `packages/core` has a further condition attached; see
@@ -101,8 +119,7 @@ them to `apps/cli/schema.json`. That is how the schema ends up in the npm tarbal
 package gaining a dependency on Node.
 
 **`packages/brand`** draws the eyecatch in JSX and renders it with
-[Satori](https://github.com/vercel/satori) and resvg. `pnpm --filter @backlog-blueprint/brand run
-render` writes `out/eyecatch.svg` and `out/eyecatch.png`, plus the Web UI's `favicon.svg` and
+[Satori](https://github.com/vercel/satori) and resvg. `vp run @backlog-blueprint/brand#render` writes `out/eyecatch.svg` and `out/eyecatch.png`, plus the Web UI's `favicon.svg` and
 `apple-touch-icon.png` into `apps/web/public/`; commit all of them after changing the design.
 The fonts are committed beside it with their licenses (SIL OFL and Apache 2.0), because Satori has
 no access to system fonts and cannot read WOFF2. It is not part of `build`, so nothing else depends on it.
@@ -114,7 +131,7 @@ model before changing anything there.
 
 ## Tests
 
-`pnpm run test` runs vitest across the workspace. What tests may and may not do is in
+`vp test` runs Vitest across the workspace. What tests may and may not do is in
 [AGENTS.md](AGENTS.md#tests-never-reach-the-network).
 
 `@backlog-blueprint/test-utils` currently offers:
@@ -140,11 +157,12 @@ observable behavior should show up there.
 
 ## Continuous integration
 
-`.github/workflows/ci.yml` runs on every pull request and on every push to `main`. It is the five
-commands listed above — `lint`, `format:check`, `typecheck`, `build`, `test` — in a single job, on
-the Node version pinned in `.tool-versions`, with the pnpm version from `packageManager` supplied by
-Corepack. The pnpm store and the turbo cache are both carried between runs, so a package that did
-not change is not rebuilt.
+`.github/workflows/ci.yml` runs on every pull request and on every push to `main`. It is the three
+commands listed above — `vp check`, `build`, `test` — in a single job.
+`voidzero-dev/setup-vp` installs `vp`, which then takes Node.js and pnpm from the root
+`package.json` exactly as it does locally. The pnpm store is carried between runs;
+the Vite Task cache is not. pnpm rewrites `node_modules/.modules.yaml` on every install and both
+builds read it, so a restored cache never matched, and a hit would only have saved about 1.5s.
 
 ## Releasing
 
@@ -219,7 +237,7 @@ minor version.
    and creates the GitHub Release, and the publish job — which runs only for a release — stages
    the CLI, schema included, on npm.
 4. Approve the staged version: on the package's page on npmjs.com, **Staged Packages**, or with
-   `pnpm stage approve` from a terminal. Either asks for 2FA. Until then nobody can install it,
+   `vp pm stage approve` from a terminal. Either asks for 2FA. Until then nobody can install it,
    and its schema URL does not resolve, even though the tag and the GitHub Release already exist.
 5. Read the GitHub Release that release-please created. Its body is the generated CHANGELOG entry,
    which needs no rewriting so long as the commit subjects were written for the people who read it.

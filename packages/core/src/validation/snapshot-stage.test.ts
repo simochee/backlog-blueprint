@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import {
   fixedManifest,
@@ -215,13 +215,13 @@ describe("既定ステータス（V-A6 / V-A6a）", () => {
   });
 });
 
-describe("カスタムステータスの色（V-A26）", () => {
-  const withCustom = (custom: { name: string; color?: string }) => [
-    ...defaultStatuses.slice(0, 3),
-    custom,
-    ...defaultStatuses.slice(3),
-  ];
+const withCustom = (custom: { name: string; color?: string }) => [
+  ...defaultStatuses.slice(0, 3),
+  custom,
+  ...defaultStatuses.slice(3),
+];
 
+describe("カスタムステータスの色（V-A26）", () => {
   it("カスタムステータスに色を書かないと V-A26 で中断する", () => {
     expect(idsOf({ statuses: withCustom({ name: "レビュー中" }) })).toEqual(["V-A26"]);
   });

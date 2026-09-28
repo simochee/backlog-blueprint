@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import { expandEnvironment, hasEnvSentinel, type Environment } from "./expand-stage";
 import { type ParsedDocument } from "./source-map";
@@ -111,9 +111,9 @@ describe("解決できない環境変数", () => {
   });
 });
 
-describe("真偽値・数値を受け付ける欄への展開（E-10）", () => {
-  const valueOf = (text: string, env: Environment) => expand(text, env).parsed.value;
+const valueOf = (text: string, env: Environment) => expand(text, env).parsed.value;
 
+describe("真偽値・数値を受け付ける欄への展開（E-10）", () => {
   it("値全体が1つの参照なら、真偽値の欄では真偽値になる", () => {
     expect(valueOf("settings:\n  chartEnabled: ${CHART}\n", { CHART: "true" })).toEqual({
       settings: { chartEnabled: true },

@@ -1,5 +1,5 @@
 import { parseManifestSyntax, type ParsedDocument } from "@backlog-blueprint/core";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import { environmentReferences, missingValueDiagnostics, referencedNames } from "./environment";
 

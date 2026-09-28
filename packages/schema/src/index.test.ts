@@ -1,6 +1,6 @@
 import { ManifestSchema, PROJECT_SCHEMA_PATH, projectSchemaUrl } from "@backlog-blueprint/core";
 import { Ajv2020 } from "ajv/dist/2020.js";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import { isEnvReferenceBranch, projectSchema, projectSchemaArtifact } from "./index";
 

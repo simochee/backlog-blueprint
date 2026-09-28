@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 import { type ResolvedHttpRequest } from "@backlog-blueprint/core";
 
@@ -59,7 +59,7 @@ const rejecting = (error: unknown) =>
   createBacklogClient({
     space: "example.backlog.com",
     apiKey: API_KEY,
-    fetch: (() => Promise.reject(error)) as never,
+    fetch: () => Promise.reject(error),
   });
 
 const brandChecked = function (this: unknown, url: string) {
@@ -235,9 +235,7 @@ describe("失敗", () => {
       .get("/api/v2/users/myself")
       .catch((error: unknown) => error)) as BacklogHttpFailureError;
 
-    expect(
-      JSON.stringify({ ...failure, message: failure.message, stack: failure.stack }),
-    ).not.toContain(API_KEY);
+    expect(JSON.stringify([failure, failure.message, failure.stack])).not.toContain(API_KEY);
   });
 });
 
@@ -445,8 +443,6 @@ describe("応答を待つ上限", () => {
 
     const failure = outcome.error as BacklogHttpFailureError;
 
-    expect(
-      JSON.stringify({ ...failure, message: failure.message, stack: failure.stack }),
-    ).not.toContain(API_KEY);
+    expect(JSON.stringify([failure, failure.message, failure.stack])).not.toContain(API_KEY);
   });
 });

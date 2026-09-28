@@ -7,10 +7,6 @@
   "exports": {
     ".": "./src/index.ts"
   },
-  "scripts": {
-    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json",
-    "test": "vitest run --passWithNoTests"
-  },
   "dependencies": {
     "@sinclair/typebox": "catalog:",
     "ajv": "catalog:",
@@ -19,6 +15,6 @@
   "devDependencies": {
     "@backlog-blueprint/tsconfigs": "workspace:*",
     "typescript": "catalog:",
-    "vitest": "catalog:"
+    "vite-plus": "catalog:"
   }
 }

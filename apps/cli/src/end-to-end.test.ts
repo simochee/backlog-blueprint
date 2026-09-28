@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 import { createBacklogClient } from "@backlog-blueprint/backlog-client";
 import { createExport } from "@backlog-blueprint/core";

@@ -1,3 +1,7 @@
+// `import` に置き換えない理由は core の `executor.ts` にある `fetch.d.ts` の参照と同じ。
+// oxlint-disable-next-line typescript/triple-slash-reference
+/// <reference path="./abort.d.ts" />
+
 import { Backlog } from "backlog-js";
 
 import {
@@ -183,7 +187,7 @@ export const createBacklogClient = ({
     run: (backlog: Backlog) => Promise<T>,
   ): Promise<T> => {
     const controller = new AbortController();
-    let timer: ReturnType<typeof setTimeout> | undefined;
+    let timer: unknown;
 
     const timedOut = new Promise<never>((_resolve, reject) => {
       timer = setTimeout(() => {

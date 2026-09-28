@@ -1,6 +1,6 @@
 import "@testing-library/jest-dom/vitest";
 import { cleanup } from "@testing-library/react";
-import { afterEach } from "vitest";
+import { afterEach } from "vite-plus/test";
 
 /**
  * 後片付けを testing-library の自動登録に任せない。自動登録は `afterEach` が

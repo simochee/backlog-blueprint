@@ -7,7 +7,7 @@ import {
 } from "@backlog-blueprint/test-utils";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent, { type UserEvent } from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from "vite-plus/test";
 
 /**
  * `fetch` を差し替えない（CLI の端から端までのテストの形）。backlog-js が読み込まれ、
@@ -888,7 +888,7 @@ describe("離脱の警告", () => {
     });
 
     const [, warn] = added.mock.calls.find(([type]) => type === "beforeunload") ?? [];
-    const event = new Event("beforeunload", { cancelable: true }) as BeforeUnloadEvent;
+    const event = new Event("beforeunload", { cancelable: true });
 
     (warn as EventListener)(event);
 
@@ -974,6 +974,19 @@ describe("通信しているあいだの押せなさ", () => {
   });
 });
 
+const requested = (): string[] => {
+  const paths: string[] = [];
+  const answered = respond;
+
+  respond = (path) => {
+    paths.push(path);
+
+    return answered(path);
+  };
+
+  return paths;
+};
+
 describe("スペースのユーザーとチームの一覧", () => {
   const DIRECTORY = {
     "/api/v2/users": [
@@ -991,19 +1004,6 @@ describe("スペースのユーザーとチームの一覧", () => {
       { id: 10, name: "開発チーム", members: [{ id: 2, userId: "suzuki" }] },
       { id: 11, name: "QA", members: [] },
     ],
-  };
-
-  const requested = (): string[] => {
-    const paths: string[] = [];
-    const answered = respond;
-
-    respond = (path) => {
-      paths.push(path);
-
-      return answered(path);
-    };
-
-    return paths;
   };
 
   const connected = async (): Promise<UserEvent> => {
@@ -1938,6 +1938,22 @@ describe("保存していない変更の差し替え", () => {
   });
 });
 
+const importProject = async (user: UserEvent, key: string): Promise<void> => {
+  await user.click(titleButton("Import from Backlog"));
+  await user.type(within(importDialog()).getByLabelText("Project key"), key);
+  await user.click(within(importDialog()).getByRole("button", { name: "Import" }));
+};
+
+const imported = async (): Promise<string> => {
+  const field = (await manifestField()) as HTMLTextAreaElement;
+
+  await waitFor(() => {
+    expect(field.value).toContain("key: PROJ_A\n");
+  });
+
+  return field.value;
+};
+
 describe("Backlog からの読み込み", () => {
   // 課題種別を空にしない。0件のプロジェクトはマニフェストにできない（EX-9h）。
   const EXPORTABLE = {
@@ -1945,22 +1961,6 @@ describe("Backlog からの読み込み", () => {
   };
 
   const ISSUES_COUNT = "/api/v2/issues/count?projectId[]=100";
-
-  const importProject = async (user: UserEvent, key: string): Promise<void> => {
-    await user.click(titleButton("Import from Backlog"));
-    await user.type(within(importDialog()).getByLabelText("Project key"), key);
-    await user.click(within(importDialog()).getByRole("button", { name: "Import" }));
-  };
-
-  const imported = async (): Promise<string> => {
-    const field = (await manifestField()) as HTMLTextAreaElement;
-
-    await waitFor(() => {
-      expect(field.value).toContain("key: PROJ_A\n");
-    });
-
-    return field.value;
-  };
 
   it("書き出した Yaml がエディタに入ってモーダルが閉じ、<KEY>.yaml という保存していない文書になる", async () => {
     const user = await connected(EXPORTABLE);

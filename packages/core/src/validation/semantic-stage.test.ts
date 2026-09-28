@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import { normalizeManifest, type ManifestInput } from "../manifest";
 import { expandEnvironment } from "./expand-stage";
@@ -257,10 +257,10 @@ describe("未解決の環境変数が入った値", () => {
   });
 });
 
-describe("Webhook のイベント", () => {
-  const webhook = (events: string) =>
-    `${HEAD}webhooks:\n  - name: 通知\n    hookUrl: https://example.test\n    events: ${events}\n`;
+const webhook = (events: string) =>
+  `${HEAD}webhooks:\n  - name: 通知\n    hookUrl: https://example.test\n    events: ${events}\n`;
 
+describe("Webhook のイベント", () => {
   it("CLI が知らない数値のイベントは警告にとどまる", () => {
     const [diagnostic] = validate(webhook("[9999]"));
 

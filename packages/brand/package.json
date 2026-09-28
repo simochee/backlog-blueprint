@@ -5,8 +5,7 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "render": "tsx src/render.tsx",
-    "typecheck": "tsc --noEmit"
+    "render": "tsx src/render.tsx"
   },
   "devDependencies": {
     "@backlog-blueprint/tsconfigs": "workspace:*",

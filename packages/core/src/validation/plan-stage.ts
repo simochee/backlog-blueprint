@@ -39,8 +39,8 @@ const selfExclusion = (actions: Action[], snapshot: Snapshot): Diagnostic[] => {
         error(
           "V-B6",
           "access/administrators",
-          `the plan revokes the project administrator role of "${revoked.name}" (${revoked.target}), who is running this`,
-          `add ${revoked.target} to access.administrators`,
+          `the plan revokes the project administrator role of "${revoked.name}" (${snapshot.executor.id}), who is running this`,
+          `add ${snapshot.executor.id} to access.administrators`,
         ),
       ];
 };

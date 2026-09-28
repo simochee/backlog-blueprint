@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import { createBacklogClient } from "@backlog-blueprint/backlog-client";
 import { createExport, NO_CHANGES } from "@backlog-blueprint/core";

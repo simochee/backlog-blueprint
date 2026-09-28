@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import {
   fixedManifest,
@@ -162,17 +162,17 @@ describe("スペース管理者にしかできない操作（V-B2）", () => {
   });
 });
 
-describe("削除の振替先（V-B7）", () => {
-  const deletion = (substitute: Action["request"]) =>
-    action({
-      kind: "issueType",
-      op: "delete",
-      name: "タスク",
-      target: 5,
-      request: substitute,
-      writeRequest: true,
-    });
+const deletion = (substitute: Action["request"]) =>
+  action({
+    kind: "issueType",
+    op: "delete",
+    name: "タスク",
+    target: 5,
+    request: substitute,
+    writeRequest: true,
+  });
 
+describe("削除の振替先（V-B7）", () => {
   it("振替先が削除対象自身なら中断する", () => {
     const self = deletion({
       method: "DELETE",
@@ -333,18 +333,18 @@ describe("チーム経由の重複記述（V-A16）", () => {
   });
 });
 
-describe("更新系レート制限の残量（V-B8）", () => {
-  const writes = (count: number) =>
-    Array.from({ length: count }, (_, index) =>
-      action({
-        kind: "category",
-        op: "create",
-        name: `分類${index}`,
-        phase: 4,
-        writeRequest: true,
-      }),
-    );
+const writes = (count: number) =>
+  Array.from({ length: count }, (_, index) =>
+    action({
+      kind: "category",
+      op: "create",
+      name: `分類${index}`,
+      phase: 4,
+      writeRequest: true,
+    }),
+  );
 
+describe("更新系レート制限の残量（V-B8）", () => {
   it("残量より計画の操作数が多いと警告する", () => {
     const [diagnostic] = validate(writes(3), {
       manifest: { categories: [{ name: "分類0" }, { name: "分類1" }, { name: "分類2" }] },

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import { fixedPlanContext, fixedReadContext, fixedSnapshot } from "../../../test-utils/src/index";
 import { type Status } from "../manifest";
@@ -54,7 +54,7 @@ describe("既定ステータス", () => {
   it("既定の4件には何も起きない", () => {
     const actions = plan(defaults, DEFAULT_STATUSES_JA);
 
-    expect(actions.every(({ writeRequest }) => writeRequest === false)).toBe(true);
+    expect(actions.every(({ writeRequest }) => !writeRequest)).toBe(true);
   });
 
   it("表示名が英語のスペースでも既定かどうかの判定は変わらない", () => {

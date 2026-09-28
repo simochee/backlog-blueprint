@@ -20,7 +20,7 @@
     "directory": "apps/cli"
   },
   "bin": {
-    "backlog-blueprint": "./dist/main.js"
+    "backlog-blueprint": "./dist/main.mjs"
   },
   "files": [
     "dist",
@@ -32,10 +32,8 @@
     "access": "public"
   },
   "scripts": {
-    "build": "vite build --configLoader runner",
-    "prepack": "cp ../../README.md ./README.md && pnpm run build",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run --configLoader runner --passWithNoTests",
+    "build": "vp pack",
+    "prepack": "cp ../../README.md ./README.md && vp run build",
     "postpack": "rm -f ./README.md"
   },
   "devDependencies": {
@@ -47,8 +45,7 @@
     "@types/node": "catalog:",
     "commander": "catalog:",
     "typescript": "catalog:",
-    "vite": "catalog:",
-    "vitest": "catalog:"
+    "vite-plus": "catalog:"
   },
   "engines": {
     "node": ">=22"
