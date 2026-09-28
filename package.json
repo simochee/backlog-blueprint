@@ -16,11 +16,15 @@
     "vite-plus": "catalog:"
   },
   "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "11.25.0",
+      "onFail": "error"
+    },
     "runtime": {
       "name": "node",
       "version": "24.21.0",
       "onFail": "error"
     }
-  },
-  "packageManager": "pnpm@11.25.0"
+  }
 }

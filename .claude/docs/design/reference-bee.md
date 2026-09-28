@@ -50,8 +50,8 @@ turbo と pnpm を使い続けることに強い理由は無いとされた。
   設定の置き場がルートの `vite.config.ts` の `lint` / `fmt` に移り、パッケージごとの違いは
   `overrides` で書く。
 - **pnpm と `catalog:` は残す。** Vite+ はパッケージマネージャーを持たず、`vp install` などは
-  検出したマネージャーに委ねる。コマンドは `vp` で打ち、pnpm は Vite+ が `packageManager` の版を
-  取ってくる。Node の版は `package.json` の `devEngines.runtime` に置き、Vite+ が選ぶ。
+  検出したマネージャーに委ねる。コマンドは `vp` で打ち、Node と pnpm の版は `package.json` の
+  `devEngines.runtime` / `devEngines.packageManager` に置いて、Vite+ が選んで取ってくる。
 - **テストは Vitest、ビルドは Vite と tsdown（`vp pack`）**を Vite+ 経由で使う。CLI は Node で
   動く実行ファイルなので `vp build` ではなく `vp pack` で組む。
 

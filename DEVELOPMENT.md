@@ -14,10 +14,12 @@ curl -fsSL https://vite.plus | bash
 vp install
 ```
 
-`vp` picks the Node.js version from `devEngines.runtime` and the pnpm version from
-`packageManager` in the root `package.json`, and downloads either if it is missing. Corepack is not
-needed. `devEngines.runtime` sets `onFail` to `error` rather than `download`, so that pnpm refuses
-to run on another Node.js instead of fetching a second copy of the one Vite+ already manages.
+`vp` picks the Node.js and pnpm versions from `devEngines.runtime` and `devEngines.packageManager`
+in the root `package.json`, and downloads either if it is missing. Corepack is not needed. Both set
+`onFail` to `error` rather than `download`, so that pnpm refuses to run on another Node.js or as
+another pnpm instead of fetching a second copy of what Vite+ already manages. pnpm still records
+its own version at the top of `pnpm-lock.yaml`, which is why `vp install --frozen-lockfile` fails
+when `devEngines.packageManager` changes without the lockfile.
 
 ## Commands
 
