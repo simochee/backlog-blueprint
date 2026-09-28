@@ -64,7 +64,9 @@ live in `packages/backlog-client` and not in core (B-2).
 
 The same hazard applies to every package that has to run in a browser (today `core`, `schema`,
 `backlog-client` and `web`). Keep their tests in a separate tsconfig from the source: putting both
-in one config pulls `@types/node` in through `vite-plus`, and the guard dies quietly.
+in one config pulls `@types/node` in through `vite-plus`, and the guard dies quietly. For the same
+reason `vite.config.ts` is type-checked by a Node tsconfig of its own (`apps/web/tsconfig.node.json`),
+never by the browser ones.
 
 ## Tests never reach the network
 
