@@ -28,6 +28,16 @@ const schemaArtifact = (): Plugin => ({
 });
 
 export default defineConfig({
+  run: {
+    tasks: {
+      build: {
+        command: "vp pack",
+        // 自分の出力と、それが並ぶパッケージ直下の一覧（`.`）を入力から外す。出力は gitignore して
+        // おり、checkout したての CI では常に無いので、残すと毎回キャッシュを外す。
+        cache: { input: [{ auto: true }, "!.", "!dist/**", "!schema.json"] },
+      },
+    },
+  },
   pack: {
     entry: ["src/main.ts"],
     platform: "node",
