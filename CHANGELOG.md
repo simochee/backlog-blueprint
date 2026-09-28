@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/simochee/backlog-blueprint/compare/v0.2.0...v0.2.1) (2026-09-28)
+
+
+### Build System
+
+* switch the toolchain to Vite+ ([#31](https://github.com/simochee/backlog-blueprint/issues/31)) ([6458358](https://github.com/simochee/backlog-blueprint/commit/64583580e6db7fdcdcd5fba1740c00969f95617d))
+
 ## [0.2.0](https://github.com/simochee/backlog-blueprint/compare/v0.1.0...v0.2.0) (2026-09-27)
 
 
