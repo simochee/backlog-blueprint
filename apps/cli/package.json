@@ -32,6 +32,7 @@
     "access": "public"
   },
   "scripts": {
+    "build": "vp pack",
     "prepack": "cp ../../README.md ./README.md && vp run build",
     "postpack": "rm -f ./README.md"
   },

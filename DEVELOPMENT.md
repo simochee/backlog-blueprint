@@ -44,9 +44,7 @@ Formatting does not touch Markdown — `fmt.ignorePatterns` excludes `**/*.md` s
 under `.claude/docs/` are never rewritten by a tool. Keep Markdown tidy by hand.
 
 `vp run` caches `package.json` scripts (`run.cache.scripts`), recording the files each one reads
-and writes, so a package that did not change is not rebuilt. The CLI's `build` is a task in
-`apps/cli/vite.config.ts` instead of a script, because only a task can keep its own outputs out of
-its inputs. `vp cache clean` empties the cache.
+and writes, so a package that did not change is not rebuilt. `vp cache clean` empties the cache.
 
 `vp test` runs the root `test.projects`, one Vitest project per package. To work on one package,
 select its project, or run a single file:
@@ -156,9 +154,9 @@ observable behavior should show up there.
 `.github/workflows/ci.yml` runs on every pull request and on every push to `main`. It is the three
 commands listed above — `vp check`, `build`, `test` — in a single job.
 `voidzero-dev/setup-vp` installs `vp`, which then takes Node.js and pnpm from the root
-`package.json` exactly as it does locally. The pnpm store and the Vite Task cache
-(`node_modules/.vite/task-cache`) are both carried between runs, so a package that did not change
-is not rebuilt. Carrying the task cache across runs is marked experimental by Vite+.
+`package.json` exactly as it does locally. The pnpm store is carried between runs;
+the Vite Task cache is not. pnpm rewrites `node_modules/.modules.yaml` on every install and both
+builds read it, so a restored cache never matched, and a hit would only have saved about 1.5s.
 
 ## Releasing
 
